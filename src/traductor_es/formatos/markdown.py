@@ -37,32 +37,48 @@ def _comillas(valor: str) -> tuple[str, str, str]:
     return "", valor, ""
 
 
-def segmentar(md: str) -> tuple[list[str], list[Segmento]]:
-    lineas = md.split("\n")
+def _cabecera(lineas: list[str]) -> tuple[int, list[Segmento]]:
+    """Cabecera YAML de GuideME (--- … ---) o JSON de Lavender (```json … ```): su «title» y dónde termina."""
+    n = len(lineas)
     segs: list[Segmento] = []
-    i, n = 0, len(lineas)
-
-    def limpia(k: int) -> str:
-        return lineas[k].rstrip("\r")
-
-    # Cabecera YAML de GuideME (--- … ---) o JSON de Lavender (```json … ```)
-    if n and limpia(0).strip() == "---":
+    primera = lineas[0].strip() if n else ""
+    if primera == "---":
         j = 1
-        while j < n and limpia(j).strip() != "---":
-            if m := _TITULO_YAML.match(limpia(j)):
+        while j < n and lineas[j].strip() != "---":
+            if m := _TITULO_YAML.match(lineas[j]):
                 abre, valor, cierra = _comillas(m.group(2))
                 if valor and not valor.startswith(("[", "{", "|", ">")):
                     segs.append(Segmento(j, j + 1, m.group(1) + abre, valor, cierra + m.group(3)))
             j += 1
-        i = j + 1
-    elif n and limpia(0).strip().startswith("```json"):
+        return j + 1, segs
+    if primera.startswith("```json"):
         j = 1
-        while j < n and not limpia(j).strip().startswith("```"):
-            if m := _TITULO_JSON.match(limpia(j)):
+        while j < n and not lineas[j].strip().startswith("```"):
+            if m := _TITULO_JSON.match(lineas[j]):
                 segs.append(Segmento(j, j + 1, m.group(1), json.loads(f'"{m.group(2)}"'), m.group(3), json=True))
             j += 1
-        i = j + 1
+        return j + 1, segs
+    return 0, segs
 
+
+def _separa_parrafos(linea: str) -> bool:
+    """Líneas que no son texto y cortan el párrafo: vacías, solo etiquetas, comentarios y tablas."""
+    return (
+        not linea.strip()
+        or bool(_SOLO_ETIQUETA.match(linea))
+        or bool(_COMENTARIO.match(linea))
+        or linea.lstrip().startswith("|")
+    )
+
+
+def segmentar(md: str) -> tuple[list[str], list[Segmento]]:
+    lineas = md.split("\n")
+    n = len(lineas)
+
+    def limpia(k: int) -> str:
+        return lineas[k].rstrip("\r")
+
+    i, segs = _cabecera([limpia(k) for k in range(n)])
     parrafo: list[int] = []
 
     def cerrar_parrafo() -> None:
@@ -80,12 +96,7 @@ def segmentar(md: str) -> tuple[list[str], list[Segmento]]:
             en_codigo = not en_codigo
         elif en_codigo:
             pass
-        elif (
-            not linea.strip()
-            or _SOLO_ETIQUETA.match(linea)
-            or _COMENTARIO.match(linea)
-            or linea.lstrip().startswith("|")
-        ):
+        elif _separa_parrafos(linea):
             cerrar_parrafo()
         elif m := (_ENCABEZADO.match(linea) or _LISTA.match(linea) or _CITA.match(linea)):
             cerrar_parrafo()
