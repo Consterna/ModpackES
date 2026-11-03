@@ -66,7 +66,12 @@ class Traductor:
 
     # ------------------------------------------------------------------ consulta
     def _conocida(self, nucleo: str, ambito: str) -> str | None:
-        return self.memoria.obtener(nucleo, self.dialecto, ambito) or self.glosario.exacto(nucleo)
+        """Lo que el usuario fijó manda; después, lo ya traducido; después, los nombres oficiales."""
+        return (
+            self.glosario.fijo(nucleo)
+            or self.memoria.obtener(nucleo, self.dialecto, ambito)
+            or self.glosario.exacto(nucleo)
+        )
 
     def pendientes(self, textos: Iterable[str], ambito: str) -> list[str]:
         """Núcleos únicos que habría que mandar al motor (lo demás sale de memoria o glosario)."""

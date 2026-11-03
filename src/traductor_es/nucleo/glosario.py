@@ -39,6 +39,10 @@ class Glosario:
         t = texto.strip()
         return self._fijos.get(t) or self._terminos.get(t)
 
+    def fijo(self, texto: str) -> str | None:
+        """Solo los términos del usuario: mandan incluso sobre lo que ya está en la memoria."""
+        return self._fijos.get(texto.strip())
+
     def _ordenados(self) -> list[tuple[str, str, re.Pattern[str]]]:
         orden = self._orden
         if orden is None:

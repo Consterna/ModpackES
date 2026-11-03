@@ -65,6 +65,19 @@ def test_glosario_fijo_manda_y_palabra_completa() -> None:
     assert g.relevantes(["an oak log"]) == {"Oak": "Encino"}
 
 
+def test_termino_del_usuario_gana_sobre_la_memoria() -> None:
+    """Regresión: si el texto ya estaba en la memoria, el término del usuario nunca se aplicaba."""
+    g = Glosario()
+    g.agregar_pares({"a": "Oak"}, {"a": "Roble"})  # nombre oficial: pierde contra la memoria
+    m = memoria()
+    m.guardar({"Copper Gear": "Engranaje cobrizo", "Oak": "Roble viejo"}, "es_mx", "ui", "gemini")
+    t = Traductor(Simulador(), m, g)
+    g.fijar({"Copper Gear": "Engranaje de cobre"})
+    r = t.traducir(["Copper Gear", "Oak"], "ui")
+    assert r.traducciones == {"Copper Gear": "Engranaje de cobre", "Oak": "Roble viejo"}
+    assert r.enviados == 0
+
+
 def test_danados_se_reintentan_y_si_siguen_mal_se_descartan() -> None:
     motor = Simulador(danar=1.0)
     t = nuevo(motor)

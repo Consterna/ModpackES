@@ -16,6 +16,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- Los términos del glosario del usuario (`glosario.json`) no se aplicaban a textos que ya estaban en la
+  memoria de traducciones. Ahora mandan siempre.
 - Un error no previsto durante el análisis o la traducción dejaba la ventana en «Trabajando…» con los botones
   bloqueados.
 
