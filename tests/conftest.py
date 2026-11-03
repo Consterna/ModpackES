@@ -30,6 +30,10 @@ def validador_java(tmp_path_factory: pytest.TempPathFactory) -> ValidadorJava:
 
 @pytest.fixture(scope="session")
 def cp_gson() -> list[Path]:
+    """Gson de TRADUCTOR_ES_GSON (lo usa el CI) o el más nuevo de las bibliotecas de Prism."""
+    propio = os.environ.get("TRADUCTOR_ES_GSON")
+    if propio and Path(propio).is_file():
+        return [Path(propio)]
     gson = biblioteca_mas_nueva(PRISM / "libraries", r"gson-[\d.]+\.jar")
     if gson is None:
         pytest.skip("No encuentro Gson en las bibliotecas de Prism")

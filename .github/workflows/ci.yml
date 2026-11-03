@@ -25,11 +25,26 @@ jobs:
         with:
           enable-cache: true
 
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Bajar Gson para el validador Java
+        shell: bash
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gson.jar" "https://repo1.maven.org/maven2/com/google/code/gson/gson/${GSON_VERSION}/gson-${GSON_VERSION}.jar"
+          echo "${GSON_SHA256}  $RUNNER_TEMP/gson.jar" | sha256sum -c -
+          echo "TRADUCTOR_ES_GSON=$RUNNER_TEMP/gson.jar" >> "$GITHUB_ENV"
+        env:
+          GSON_VERSION: "2.13.2"  # si se cambia, también el SHA-256 (de Maven Central)
+          GSON_SHA256: dd0ce1b55a3ed2080cb70f9c655850cda86c206862310009dcb5e5c95265a5e0
+
       - name: Instalar dependencias
         run: uv sync --locked
 
-      - name: Puerta de calidad (ruff, pyright, pytest)
-        run: uv run python scripts/verificar.py --rapido
+      - name: Puerta de calidad (ruff, pyright y pytest con el validador Java)
+        run: uv run python scripts/verificar.py
 
       - name: Construir ModpackES.exe
         run: uv run python scripts/construir_exe.py
