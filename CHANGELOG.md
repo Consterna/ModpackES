@@ -1,8 +1,8 @@
 # Cambios
 
-## 2.0.0 (en preparación)
+## 2.0.0 (2026-11-03)
 
-Versión reescrita desde cero.
+Versión reescrita desde cero. Probada de punta a punta con Farming Crossing 4 (1.20.1, Forge) en el juego.
 
 - Núcleo: protección de códigos con marcadores, memoria de traducciones en SQLite compartida entre modpacks,
   glosario con nombres oficiales, reintentos y validación de calidad.
