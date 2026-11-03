@@ -10,6 +10,39 @@ from pathlib import Path
 from typing import Any
 
 
+def _lista_de(linea: str) -> list[str] | None:
+    """La lista JSON que va después de «clave:», o None si está dañada."""
+    try:
+        valor: Any = json.loads(linea.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return None
+    return [str(x) for x in valor] if isinstance(valor, list) else None  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+
+
+def _linea_lista(clave: str, lista: list[str]) -> str:
+    return f"{clave}:" + json.dumps(lista, ensure_ascii=False, separators=(",", ":"))
+
+
+def _subir_pack(linea: str, nombre_pack: str) -> tuple[str, str | None]:
+    """resourcePacks con el pack al final (arriba del todo en el juego), respetando el prefijo «file/»."""
+    lista = _lista_de(linea)
+    if lista is None:
+        raise ValueError("No pude leer la lista de resource packs de options.txt: actívalo a mano en el juego.")
+    entrada = f"file/{nombre_pack}" if any(p.startswith("file/") for p in lista) else nombre_pack
+    nueva = [p for p in lista if p.removeprefix("file/") != nombre_pack] + [entrada]
+    if nueva == lista:
+        return linea, None
+    return _linea_lista("resourcePacks", nueva), "pack activado arriba del todo"
+
+
+def _sacar_de_incompatibles(linea: str, nombre_pack: str) -> str:
+    lista = _lista_de(linea)
+    if lista is None:
+        return linea
+    nueva = [p for p in lista if p.removeprefix("file/") != nombre_pack]
+    return linea if nueva == lista else _linea_lista("incompatibleResourcePacks", nueva)
+
+
 def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
     """Devuelve la lista de cambios hechos. Si no hay options.txt, no crea uno (el juego lo hace al abrirse).
 
@@ -22,44 +55,25 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
     salto = "\r\n" if b"\r\n" in crudo else "\n"
     lineas = crudo.decode("utf-8", errors="replace").splitlines()
     cambios: list[str] = []
-    vistos = {"packs": False, "idioma": False}
-
-    def lista_de(linea: str) -> list[str] | None:
-        try:
-            valor: Any = json.loads(linea.split(":", 1)[1])
-        except (ValueError, IndexError):
-            return None
-        return [str(x) for x in valor] if isinstance(valor, list) else None  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
-
+    vio_packs = vio_idioma = False
     for i, linea in enumerate(lineas):
         clave = linea.split(":", 1)[0]
+        cambio: str | None = None
         if clave == "resourcePacks":
-            vistos["packs"] = True
-            lista = lista_de(linea)
-            if lista is None:
-                raise ValueError("No pude leer la lista de resource packs de options.txt: actívalo a mano en el juego.")
-            entrada = f"file/{nombre_pack}" if any(p.startswith("file/") for p in lista) else nombre_pack
-            nueva = [p for p in lista if p.removeprefix("file/") != nombre_pack] + [entrada]
-            if nueva != lista:
-                lineas[i] = "resourcePacks:" + json.dumps(nueva, ensure_ascii=False, separators=(",", ":"))
-                cambios.append("pack activado arriba del todo")
+            vio_packs = True
+            lineas[i], cambio = _subir_pack(linea, nombre_pack)
         elif clave == "incompatibleResourcePacks":
-            lista = lista_de(linea)
-            if lista is not None:
-                nueva = [p for p in lista if p.removeprefix("file/") != nombre_pack]
-                if nueva != lista:
-                    lineas[i] = "incompatibleResourcePacks:" + json.dumps(
-                        nueva, ensure_ascii=False, separators=(",", ":")
-                    )
+            lineas[i] = _sacar_de_incompatibles(linea, nombre_pack)
         elif clave == "lang" and idioma:
-            vistos["idioma"] = True
+            vio_idioma = True
             if linea != f"lang:{idioma}":
-                lineas[i] = f"lang:{idioma}"
-                cambios.append(f"idioma del juego: {idioma}")
-    if not vistos["packs"]:
-        lineas.append("resourcePacks:" + json.dumps(["vanilla", f"file/{nombre_pack}"], separators=(",", ":")))
+                lineas[i], cambio = f"lang:{idioma}", f"idioma del juego: {idioma}"
+        if cambio:
+            cambios.append(cambio)
+    if not vio_packs:
+        lineas.append(_linea_lista("resourcePacks", ["vanilla", f"file/{nombre_pack}"]))
         cambios.append("pack activado")
-    if idioma and not vistos["idioma"]:
+    if idioma and not vio_idioma:
         lineas.append(f"lang:{idioma}")
         cambios.append(f"idioma del juego: {idioma}")
     if cambios:
