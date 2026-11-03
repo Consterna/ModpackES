@@ -101,6 +101,7 @@ def test_exportar_pack_y_kit(tmp_path: Path) -> None:
         exportar.exportar_pack(juego, tmp_path / "x.zip")
     assert main(["--autoprueba", str(juego), str(tmp_path / "auto.json")]) == 0
     datos = json.loads((tmp_path / "auto.json").read_text("utf-8"))
+    assert datos["icono"] is True
     assert datos["minecraft"] == "1.20.1" and {m["grupo"] for m in datos["modulos"]} == {"mods", "misiones", "scripts"}
     from traductor_es.__main__ import main as cli
 

@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import NOMBRE, __version__, configuracion
+from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, configuracion
 from ..fuentes.instancia import resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
 from ..motores.base import Cancelado, ErrorFatal, Motor
@@ -245,6 +245,12 @@ class Ventana(QMainWindow):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         capa.addWidget(self.log, 2)
+        self.creditos = QLabel(
+            f'{NOMBRE} {__version__} · © 2026 {AUTOR} · Licencia GPL-3.0 · <a href="{REPOSITORIO}">{REPOSITORIO}</a>'
+        )
+        self.creditos.setOpenExternalLinks(True)
+        self.creditos.setAlignment(Qt.AlignmentFlag.AlignRight)
+        capa.addWidget(self.creditos)
 
         divisor = QSplitter()
         divisor.addWidget(izquierda)
