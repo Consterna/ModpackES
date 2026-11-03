@@ -1,7 +1,7 @@
 # Cómo contribuir
 
 Gracias por querer mejorar ModpackES. Se aceptan reportes de errores, modpacks que no se traducen bien,
-ideas y cambios en el código.
+ideas y cambios en el código. Al participar aceptas el [código de conducta](CODE_OF_CONDUCT.md).
 
 ## Reportar un problema
 
@@ -10,10 +10,10 @@ Lo más útil es:
 
 - el nombre y la versión del modpack (y de dónde se descarga);
 - la versión de Minecraft, el loader y el lanzador;
-- lo que aparece en el registro de la ventana (el cuadro de texto de abajo);
+- el texto de «Copiar diagnóstico» (versiones y final del registro, sin tu carpeta personal ni claves);
 - si es un texto mal traducido, el texto original y dónde aparece en el juego.
 
-**Nunca pegues tu clave de Gemini** en un issue, aunque sea parcial.
+**Nunca pegues tu clave** de Gemini ni de otro motor en un issue, aunque sea parcial.
 
 ## Preparar el entorno
 
@@ -25,6 +25,7 @@ git clone https://github.com/Consterna/ModpackES.git
 cd ModpackES
 uv sync
 uv run python scripts/verificar.py --rapido
+uv run --with pre-commit pre-commit install   # ruff y comprobaciones básicas antes de cada commit
 ```
 
 ## Antes de mandar un pull request
@@ -57,6 +58,9 @@ referencia también baja el puntaje, así que revisa los ejemplos que lista el s
 
 ## Convenciones
 
+- Mensajes de commit con [Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/)
+  (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`, `ci:`, `chore:`…), un cambio lógico por commit y
+  explicando el porqué. El CI lo comprueba en cada pull request.
 - El código, los nombres, los comentarios y los mensajes de commit van **en español**, como el resto del
   proyecto.
 - Tipado completo: `pyright` en modo estricto no debe dar errores.

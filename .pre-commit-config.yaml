@@ -1,0 +1,21 @@
+# Comprobaciones antes de cada commit:  uv run --with pre-commit pre-commit install
+# Las versiones van fijadas por commit; Dependabot no las actualiza, se revisan a mano con `pre-commit autoupdate`.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c  # v0.17.3, la misma versión de ruff que uv.lock
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+        args: [--check]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
