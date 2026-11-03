@@ -25,6 +25,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Revisión automática opcional de misiones y libros (`--revisar`): el motor juzga cada traducción nueva y
   se rehacen las que tienen errores graves. Lo rehecho solo reemplaza a lo anterior si pasa las mismas
   reglas, y las correcciones del usuario no se tocan. El análisis estima el costo con la revisión.
+- Banco de referencia (148 textos propios con su traducción) y `scripts/medir_calidad.py`, que mide con
+  cualquier motor los textos aceptados, el chrF, los términos del glosario respetados y el costo.
 
 ### Corregido
 

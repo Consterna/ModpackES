@@ -39,6 +39,22 @@ uv run python scripts/verificar.py --rapido
    Incluye `ruff check`, `ruff format --check`, `pyright` en modo estricto, `compileall` y `pytest`.
 4. Si el cambio se nota para el usuario, anótalo en `CHANGELOG.md`, en la sección «Sin publicar».
 
+## Medir la calidad de la traducción
+
+Si cambias las instrucciones del motor, las reglas de calidad o agregas un motor, compara antes y después con el
+banco de referencia (`tests/datos/referencia_es.json`: 148 textos escritos para el proyecto, con su traducción
+de referencia y un glosario):
+
+```
+uv run python scripts/medir_calidad.py --simular            # sin gastar: comprueba que todo funcione
+uv run python scripts/medir_calidad.py --revisar            # con Gemini y tu clave (cuesta unos centavos)
+uv run python scripts/medir_calidad.py --motor ollama --modelo qwen3:8b
+```
+
+Muestra los textos aceptados por las reglas, el chrF contra la referencia, los términos del glosario respetados
+y el costo estimado. Un chrF más bajo no siempre es peor: una traducción correcta pero distinta de la
+referencia también baja el puntaje, así que revisa los ejemplos que lista el script.
+
 ## Convenciones
 
 - El código, los nombres, los comentarios y los mensajes de commit van **en español**, como el resto del
