@@ -82,7 +82,8 @@ falta un código del original (`%s`, `§a`, `$(l)`…), no se guarda, para que n
 > [!NOTE]
 > El ejecutable no tiene firma digital, así que la primera vez Windows SmartScreen puede avisar. Pulsa
 > «Más información» → «Ejecutar de todas formas». Puedes comprobar el archivo con el SHA-256 que viene en la
-> página de cada versión.
+> página de cada versión, o con `gh attestation verify ModpackES.exe -R Consterna/ModpackES`, que confirma que
+> lo construyó este repositorio en GitHub Actions.
 
 ## Motores
 
