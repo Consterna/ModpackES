@@ -1,0 +1,16 @@
+name: Idea o mejora
+description: Un mod, formato o función que te gustaría que ModpackES soporte.
+labels: ["mejora"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Qué te gustaría
+      description: Por ejemplo, un mod de misiones o de libros que todavía no se traduce.
+    validations:
+      required: true
+  - type: textarea
+    id: ejemplo
+    attributes:
+      label: Dónde verlo
+      description: Un modpack o mod donde aparezca, con su versión de Minecraft y loader.

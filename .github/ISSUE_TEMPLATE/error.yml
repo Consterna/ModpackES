@@ -1,0 +1,52 @@
+name: Algo no funciona
+description: Un error, un cierre inesperado o un modpack que no se traduce bien.
+labels: ["error"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por avisar. **No pegues tu clave de Gemini** en ningún campo.
+  - type: input
+    id: version_app
+    attributes:
+      label: Versión de ModpackES
+      description: Aparece abajo a la derecha de la ventana.
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: input
+    id: modpack
+    attributes:
+      label: Modpack
+      description: Nombre, versión y de dónde se descarga (CurseForge, Modrinth…).
+      placeholder: "Farming Crossing 4, versión 1.2, CurseForge"
+    validations:
+      required: true
+  - type: input
+    id: minecraft
+    attributes:
+      label: Minecraft, loader y lanzador
+      placeholder: "1.20.1, Forge, Prism Launcher"
+    validations:
+      required: true
+  - type: textarea
+    id: que_paso
+    attributes:
+      label: Qué pasó
+      description: Qué hiciste, qué esperabas y qué pasó en cambio. Si es un texto mal traducido, pon el original y dónde aparece.
+    validations:
+      required: true
+  - type: textarea
+    id: registro
+    attributes:
+      label: Registro de la ventana
+      description: Copia el texto del cuadro de abajo de la ventana.
+      render: text
+  - type: checkboxes
+    id: comprobado
+    attributes:
+      label: Comprobaciones
+      options:
+        - label: Usé la última versión de ModpackES.
+          required: true
+        - label: Minecraft estaba cerrado mientras traducía.
