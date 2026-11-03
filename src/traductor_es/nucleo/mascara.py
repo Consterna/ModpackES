@@ -15,6 +15,7 @@ ESCAPE_CRUDO: Final = chr(0xE000)
 _PATRONES: Final[tuple[str, ...]] = (
     ESCAPE_CRUDO + r"[\s\S]",  # escapes del formato de origen (\n en SNBT, etc.), incluido barra + salto real
     r"\$\([^)]*\)",  # macros de Patchouli: $(l) $(item) $(l:ruta) $()
+    r"\$\{[^{}\n]*\}",  # expresiones de plantillas de JavaScript: ${precio}
     r"\{[^{}\n]*\}",  # FTB Quests {image:..} {@pagebreak} {clave}, {0} de Java
     r"%(?:\d+\$)?[-#+0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%n]",  # printf: %s %1$s %d %.1f %%
     r"[§&][0-9a-fk-orA-FK-OR]",  # códigos de color y estilo
