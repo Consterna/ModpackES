@@ -23,7 +23,7 @@ sin modificar el mod: la app avisa cuáles son.
 ## Cómo se usa
 
 1. Cierra Minecraft.
-2. Abre `TraductorModpacks.exe`.
+2. Abre `ModpackES.exe`.
 3. Elige la instancia de la lista. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher y
    el launcher oficial; si no aparece, usa «Elegir carpeta…».
 4. Pulsa «Guardar clave…» y pega tu clave de [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
@@ -81,7 +81,7 @@ del juego, un JDK 17 o superior (sirve el de Prism Launcher).
 uv sync
 uv run python scripts/verificar.py            # ruff, pyright estricto, compileall y pytest con cobertura
 uv run python scripts/verificar.py --rapido   # sin las pruebas de Java ni el corpus real
-uv run python scripts/construir_exe.py        # dist/TraductorModpacks.exe
+uv run python scripts/construir_exe.py        # dist/ModpackES.exe
 ```
 
 Las pruebas del corpus usan las instancias del PC en solo lectura y copias en carpetas temporales. Los datos
