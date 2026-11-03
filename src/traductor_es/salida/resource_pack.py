@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from .. import __version__
 from ..formatos import lang_json, lang_legacy
@@ -14,6 +15,8 @@ from ..fuentes.version import mcmeta
 from ..nucleo.dialectos import nombre_archivo_lang
 
 NOMBRE = "Traduccion_ES"
+#: Un segmento de ruta seguro: sin barras invertidas, dos puntos ni caracteres que Windows no admite.
+_PARTE_VALIDA = re.compile(r"[^\\/:*?\"<>|\x00-\x1f]+")
 
 
 class PackSalida:
@@ -21,12 +24,17 @@ class PackSalida:
         self.instancia = instancia
         self.nombre = nombre
         self.raiz = instancia.juego / "resourcepacks" / nombre
+        self._escritos: set[Path] = set()
 
     def _ruta(self, relativa: str) -> Path:
-        partes = PurePosixPath(relativa).parts
-        if not partes or ".." in partes or PurePosixPath(relativa).is_absolute():
+        """Ruta dentro del pack. Rechaza todo lo que pueda salir de él (también trucos de Windows)."""
+        partes = relativa.split("/")
+        if not relativa or any(not _PARTE_VALIDA.fullmatch(p) or p in (".", "..") for p in partes):
             raise ValueError(f"Ruta fuera del pack: {relativa!r}")
-        return self.raiz.joinpath(*partes)
+        ruta = self.raiz.joinpath(*partes)
+        if not ruta.resolve().is_relative_to(self.raiz.resolve()):
+            raise ValueError(f"Ruta fuera del pack: {relativa!r}")
+        return ruta
 
     def preparar(self) -> None:
         self.raiz.mkdir(parents=True, exist_ok=True)
@@ -53,16 +61,26 @@ class PackSalida:
         return f"assets/{namespace}/lang/{nombre}.{extension}"
 
     def escribir_lang(self, namespace: str, idioma: str, textos: dict[str, str]) -> Path:
-        """Escribe (y combina con lo que ya hubiera de una ejecución anterior) un archivo de idioma."""
+        """Escribe un archivo de idioma completo (reemplaza el de una ejecución anterior)."""
         relativa = self.ruta_lang(namespace, idioma)
-        legacy = self.instancia.legacy
-        previo: dict[str, str] = {}
-        ruta = self._ruta(relativa)
-        if ruta.is_file():
-            try:
-                previo = lang_legacy.leer(ruta.read_bytes()) if legacy else lang_json.leer(ruta.read_bytes())
-            except ValueError:
-                previo = {}
-        combinado = dict(sorted({**previo, **textos}.items()))
-        datos = lang_legacy.escribir(combinado) if legacy else lang_json.escribir(combinado)
-        return self.escribir(relativa, datos)
+        ordenado = dict(sorted(textos.items()))
+        datos = lang_legacy.escribir(ordenado) if self.instancia.legacy else lang_json.escribir(ordenado)
+        ruta = self.escribir(relativa, datos)
+        self._escritos.add(ruta)
+        return ruta
+
+    def vaciar_idiomas_viejos(self) -> list[Path]:
+        """Deja vacíos los archivos de idioma de ejecuciones anteriores que esta no volvió a escribir.
+
+        Así, si un mod trae ahora su propia traducción, la de la app ya no la tapa. No se borra nada:
+        un archivo de idioma vacío no cambia nada en el juego.
+        """
+        vaciados: list[Path] = []
+        vacio = lang_legacy.escribir({}) if self.instancia.legacy else lang_json.escribir({})
+        assets = self.raiz / "assets"
+        anteriores: list[Path] = sorted(assets.glob("*/lang/*.*")) if assets.is_dir() else []
+        for ruta in anteriores:
+            if ruta not in self._escritos and ruta.suffix in (".json", ".lang") and ruta.read_bytes() != vacio:
+                ruta.write_bytes(vacio)
+                vaciados.append(ruta)
+        return vaciados

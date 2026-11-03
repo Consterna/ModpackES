@@ -104,6 +104,9 @@ class TablaIdiomas:
     historial_en: dict[str, dict[str, list[tuple[int, str]]]] = field(
         default_factory=dict[str, dict[str, list[tuple[int, str]]]]
     )
+    #: Si no se encontró el español oficial del juego, sus propias claves no se tocan nunca
+    #: (el juego sí lo tiene; traducirlas taparía la traducción de Mojang).
+    vanilla_sin_espanol: bool = False
 
     def agregar(self, namespace: str, idioma: str, textos: dict[str, str], prioridad: int, origen: str) -> None:
         destino = self.datos.setdefault(namespace, {}).setdefault(idioma, {})
@@ -119,6 +122,13 @@ class TablaIdiomas:
         """El inglés que regía cuando se escribió una traducción de esa prioridad."""
         previos = [(p, v) for p, v in self.historial_en.get(namespace, {}).get(clave, []) if p <= prioridad]
         return max(previos, key=lambda par: par[0])[1] if previos else None
+
+    def _es_de_vanilla(self, namespace: str, clave: str, en: Texto) -> bool:
+        """El texto inglés que ve el jugador es el del propio juego (aunque un mod lo repita igual)."""
+        return any(
+            p == PRIORIDAD_VANILLA and v.strip() == en.valor.strip()
+            for p, v in self.historial_en.get(namespace, {}).get(clave, [])
+        )
 
     def textos(self, namespace: str, idioma: str) -> dict[str, str]:
         return {k: t.valor for k, t in self.datos.get(namespace, {}).get(idioma, {}).items()}
@@ -148,7 +158,7 @@ class TablaIdiomas:
         for ns in sorted(self.datos):
             ingles = self.datos[ns].get("en_us", {})
             for clave, en in ingles.items():
-                if not es_traducible(en.valor):
+                if not es_traducible(en.valor) or (self.vanilla_sin_espanol and self._es_de_vanilla(ns, clave, en)):
                     continue
                 faltan = tuple(v for v in variantes if not self.es_valida(ns, v, clave))
                 if not faltan:

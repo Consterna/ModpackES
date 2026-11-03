@@ -179,7 +179,8 @@ def _mcmod_mc(datos: bytes) -> list[str]:
     ]
 
 
-_EN_NOMBRE = re.compile(r"(?<![\d.])(1\.(?:[7-9]|1\d|2\d)(?:\.\d{1,2})?|2\d\.\d(?:\.\d)?)(?![\d.])")
+# 1.7 a 1.21.x, o las versiones por año desde 26.x (20.x a 25.x no existen: suelen ser versiones de loaders)
+_EN_NOMBRE = re.compile(r"(?<![\d.])(1\.(?:[7-9]|1\d|2\d)(?:\.\d{1,2})?|2[6-9]\.\d{1,2}(?:\.\d{1,2})?)(?!\d|\.\d)")
 
 
 def _de_nombres(jars: Iterable[Path]) -> Deteccion | None:
@@ -189,13 +190,35 @@ def _de_nombres(jars: Iterable[Path]) -> Deteccion | None:
     return Deteccion(Version.de(votos.most_common(1)[0][0]), None, "nombres de los jars")
 
 
+def _log_viejo(juego: Path, jars: list[Path]) -> bool:
+    """El log es de antes de que cambiaran los mods (p. ej. se cambió de versión sin abrir el juego)."""
+    try:
+        fecha_log = (juego / "logs" / "latest.log").stat().st_mtime
+    except OSError:
+        return False
+    fechas = [j.stat().st_mtime for j in jars if j.exists()]
+    return bool(fechas) and max(fechas) > fecha_log
+
+
 def detectar(juego: Path, jars: list[Path]) -> Deteccion:
-    """Combina las fuentes: la primera que da versión manda; el loader se completa con la siguiente que lo sepa."""
-    encontradas = [d for d in (_prism(juego), _curseforge(juego), _log(juego)) if d]
+    """Combina las fuentes: la primera que da versión manda; el loader se completa con la siguiente que lo sepa.
+
+    Los metadatos del lanzador van primero. Luego el log, salvo que sea más viejo que los mods y no coincida
+    con ellos (se cambió la versión sin volver a abrir el juego).
+    """
+    encontradas = [d for d in (_prism(juego), _curseforge(juego)) if d]
+    log = _log(juego)
+    if log and _log_viejo(juego, jars) and not encontradas:
+        # El log es más viejo que los mods: solo vale si sigue de acuerdo con ellos en la versión mayor
+        # (el log es más preciso: los mods suelen pedir rangos como [1.20,1.21) y no dicen 1.20.1).
+        mods = _de_mods(jars)
+        if mods and mods.version and log.version and mods.version.partes[:2] != log.version.partes[:2]:
+            log = None
+            encontradas.append(mods)
+    if log:
+        encontradas.append(log)
     if not encontradas or encontradas[0].loader is None:
-        for extra in (_de_mods(jars), _de_nombres(jars)):
-            if extra:
-                encontradas.append(extra)
+        encontradas.extend(d for d in (_de_mods(jars), _de_nombres(jars)) if d)
     version = next((d for d in encontradas if d.version), None)
     loader = next((d.loader for d in encontradas if d.loader), None)
     if version is None:

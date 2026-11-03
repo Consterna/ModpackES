@@ -57,28 +57,24 @@ def _indice(raiz: Path, v: str) -> str | None:
 
 
 def _desde_assets(raiz: Path, indice: str | None, idioma: str, legacy: bool) -> dict[str, str]:
-    carpeta = raiz / "assets" / "indexes"
-    if not carpeta.is_dir():
+    """Solo el índice exacto de la versión: el de otra versión trae otras claves y engañaría a la tabla."""
+    if indice is None:
         return {}
-    candidatos = sorted(carpeta.glob("*.json"), key=lambda p: p.stem != indice)
+    idx = raiz / "assets" / "indexes" / f"{indice}.json"
+    try:
+        objetos = cast(dict[str, Any], json.loads(idx.read_text(encoding="utf-8"))["objects"])
+    except (OSError, ValueError, KeyError):
+        return {}
     nombres = [f"minecraft/lang/{idioma}.json"] if not legacy else [f"minecraft/lang/{idioma}.lang"]
     if legacy:
         nombres.append(f"minecraft/lang/{idioma[:3]}{idioma[3:].upper()}.lang")
-    # Con el índice de la versión se usa solo ese; si no se sabe cuál es, el primero que tenga el idioma.
-    for idx in candidatos:
-        try:
-            objetos = cast(dict[str, Any], json.loads(idx.read_text(encoding="utf-8"))["objects"])
-        except (OSError, ValueError, KeyError):
-            continue
-        for nombre in nombres:
-            if nombre in objetos:
-                h = str(objetos[nombre]["hash"])
-                ruta = raiz / "assets" / "objects" / h[:2] / h
-                if ruta.is_file():
-                    datos = ruta.read_bytes()
-                    return lang_legacy.leer(datos) if legacy else lang_json.leer(datos)
-        if idx.stem == indice:
-            break  # el índice correcto no lo tiene: no adivinar con otro
+    for nombre in nombres:
+        if nombre in objetos:
+            h = str(objetos[nombre]["hash"])
+            ruta = raiz / "assets" / "objects" / h[:2] / h
+            if ruta.is_file():
+                datos = ruta.read_bytes()
+                return lang_legacy.leer(datos) if legacy else lang_json.leer(datos)
     return {}
 
 

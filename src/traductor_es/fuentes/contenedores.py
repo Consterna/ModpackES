@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -63,10 +64,9 @@ class Carpeta:
 
     def nombres(self) -> list[str]:
         if self._nombres is None:
+            en_raiz = self._prefijo == "assets/"
             self._nombres = (
-                sorted(self._prefijo + p.relative_to(self.raiz).as_posix() for p in self.raiz.rglob("*") if p.is_file())
-                if self.raiz.is_dir()
-                else []
+                sorted(self._prefijo + r for r in _recorrer(self.raiz, en_raiz)) if self.raiz.is_dir() else []
             )
         return self._nombres
 
@@ -77,6 +77,25 @@ class Carpeta:
 
     def cerrar(self) -> None:
         return None
+
+
+#: Carpetas de assets que nunca tienen texto: no se recorren (en packs grandes son miles de archivos).
+_SIN_TEXTO = frozenset({"textures", "sounds", "models", "blockstates", "shaders", "particles", "font", "optifine",
+                        "atlases", "equipment", "items", "post_effect"})  # fmt: skip
+
+
+def _recorrer(raiz: Path, assets_en_raiz: bool) -> Iterator[str]:
+    """Archivos de la carpeta, sin entrar en assets/<mod>/textures y similares.
+
+    `assets_en_raiz`: la carpeta ya es «assets» (como kubejs/assets), así que <mod> está en el primer nivel.
+    """
+    for carpeta, subcarpetas, archivos in os.walk(raiz):
+        partes = Path(carpeta).relative_to(raiz).parts
+        en_mod = len(partes) == 1 if assets_en_raiz else (len(partes) == 2 and partes[0] == "assets")
+        if en_mod:
+            subcarpetas[:] = [d for d in subcarpetas if d not in _SIN_TEXTO]
+        for a in archivos:
+            yield Path(*partes, a).as_posix()
 
 
 def abrir_mod(ruta: Path) -> Iterator[Zip]:

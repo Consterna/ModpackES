@@ -23,6 +23,7 @@ PASOS: list[tuple[str, list[str]]] = [
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # pyright: ignore[reportAttributeAccessIssue]
     rapido = "--rapido" in sys.argv
     fallos: list[str] = []
     for nombre, base in PASOS:

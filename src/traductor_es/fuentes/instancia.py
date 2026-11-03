@@ -79,9 +79,11 @@ class Instancia:
     def tabla_idiomas(self, idiomas: Iterable[str] = ("en_us", *VARIANTES)) -> TablaIdiomas:
         lista = list(idiomas)
         tabla = leer_idiomas(self.fuentes(), lista, self.legacy)
-        for idioma, textos in self.vanilla().textos.items():
+        oficiales = self.vanilla().textos
+        for idioma, textos in oficiales.items():
             if idioma in lista:
                 tabla.agregar("minecraft", idioma, textos, PRIORIDAD_VANILLA, "minecraft (vanilla)")
+        tabla.vanilla_sin_espanol = not any(v in oficiales for v in VARIANTES)
         return tabla
 
     # ------------------------------------------------------------------ formatos de salida

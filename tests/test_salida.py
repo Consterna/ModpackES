@@ -20,7 +20,7 @@ def test_pack_moderno(tmp_path: Path) -> None:
         pack.escribir_lang("m", "es_mx", {"b": "Bé", "a": "A"})
         ruta = pack.escribir_lang("m", "es_mx", {"c": "Ce"})
     assert ruta == juego / "resourcepacks" / "Traduccion_ES" / "assets" / "m" / "lang" / "es_mx.json"
-    assert lang_json.leer(ruta.read_bytes()) == {"a": "A", "b": "Bé", "c": "Ce"}
+    assert lang_json.leer(ruta.read_bytes()) == {"c": "Ce"}  # cada escritura reemplaza el archivo completo
     meta = json.loads((pack.raiz / "pack.mcmeta").read_text(encoding="utf-8"))
     assert meta["pack"]["min_format"] == 75 and "pack_format" not in meta["pack"]
     assert (pack.raiz / MARCA).is_file()

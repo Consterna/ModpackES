@@ -11,7 +11,10 @@ from typing import Any
 
 
 def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
-    """Devuelve la lista de cambios hechos. Si no hay options.txt, no crea uno (el juego lo hace al abrirse)."""
+    """Devuelve la lista de cambios hechos. Si no hay options.txt, no crea uno (el juego lo hace al abrirse).
+
+    Lanza ValueError si options.txt tiene la lista de packs dañada (no se toca nada en ese caso).
+    """
     ruta = juego / "options.txt"
     if not ruta.is_file():
         return []
@@ -34,7 +37,7 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
             vistos["packs"] = True
             lista = lista_de(linea)
             if lista is None:
-                continue
+                raise ValueError("No pude leer la lista de resource packs de options.txt: actívalo a mano en el juego.")
             entrada = f"file/{nombre_pack}" if any(p.startswith("file/") for p in lista) else nombre_pack
             nueva = [p for p in lista if p.removeprefix("file/") != nombre_pack] + [entrada]
             if nueva != lista:
