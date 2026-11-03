@@ -160,3 +160,25 @@ def test_batch_reparte_en_varios_trabajos(monkeypatch: pytest.MonkeyPatch) -> No
     g = Gemini("clave", cliente=SimpleNamespace(batches=lotes, models=None), esperar=lambda _s: None)
     assert g.traducir_varios([lote("One"), lote("Two"), lote("Three")]) == [{"0": "X"}] * 3
     assert [len(c) for c in lotes.creados] == [1, 1, 1]
+
+
+def test_cancelar_durante_la_espera_del_lote() -> None:
+    import threading
+
+    from traductor_es.motores.base import Cancelado
+
+    class Cancelables(Lotes):
+        def __init__(self) -> None:
+            super().__init__(["JOB_STATE_PENDING"] * 5, [])
+            self.cancelados: list[str] = []
+
+        def cancel(self, name: str) -> None:
+            self.cancelados.append(name)
+
+    lotes = Cancelables()
+    evento = threading.Event()
+    g = Gemini("clave", cliente=SimpleNamespace(batches=lotes, models=None), esperar=lambda _s: evento.set())
+    g.cancelar = evento
+    with pytest.raises(Cancelado):
+        g.traducir_varios([lote("One")])
+    assert lotes.cancelados == ["trabajo"]

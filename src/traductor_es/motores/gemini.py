@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import threading
 import time
 from collections.abc import Callable, Sequence
 from typing import Any, cast
@@ -17,7 +19,7 @@ import httpx
 from google import genai
 from google.genai import errors, types
 
-from .base import ErrorFatal, Lote
+from .base import Cancelado, ErrorFatal, Lote
 
 MODELO_POR_DEFECTO = "gemini-3.8-flash"
 #: Precios de pago en US$ por millón de tokens (entrada, salida), según la página de precios de Google
@@ -125,6 +127,8 @@ class Gemini:
         self._con_razonamiento = True
         #: Para el modo por lotes: se llama con el estado del trabajo mientras se espera.
         self.al_esperar: Callable[[str], None] = lambda _estado: None
+        #: Si se activa mientras se espera un trabajo por lotes, se cancela en Google y se deja de esperar.
+        self.cancelar: threading.Event | None = None
 
     @property
     def nombre(self) -> str:
@@ -212,6 +216,10 @@ class Gemini:
             )
             terminados = {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"}
             while (estado := str(getattr(trabajo.state, "name", trabajo.state))) not in terminados:
+                if self.cancelar is not None and self.cancelar.is_set():
+                    with contextlib.suppress(errors.APIError):
+                        self._cliente.batches.cancel(name=trabajo.name)  # que Google no lo siga procesando
+                    raise Cancelado()
                 self.al_esperar(estado)
                 self._esperar(_SONDEO_LOTES)
                 trabajo = self._cliente.batches.get(name=trabajo.name)

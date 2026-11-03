@@ -9,10 +9,14 @@ dependencies = [
     "json5>=0.9",
     "keyring>=25.7.0",
     "platformdirs>=4.2",
+    "pyside6-essentials>=6.12.0",
 ]
 
 [project.scripts]
 traductor-es = "traductor_es.__main__:main"
+
+[project.gui-scripts]
+traductor-es-ventana = "traductor_es.ui.app:main"
 
 [dependency-groups]
 dev = [
@@ -22,6 +26,8 @@ dev = [
     "ruff>=0.6",
     "pyright>=1.1.380",
     "nbtlib>=2.0.4",
+    "pytest-qt>=4.5.0",
+    "pyinstaller>=6.22.3",
 ]
 
 [build-system]

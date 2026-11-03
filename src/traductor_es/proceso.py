@@ -15,7 +15,7 @@ from .modulos import libros, misiones, mods, scripts
 from .modulos.base import Contexto, Modulo, Resumen
 from .modulos.mods import es_nombre
 from .motores.base import Motor
-from .motores.gemini import PRECIOS
+from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES
 from .nucleo.glosario import Glosario
 from .nucleo.memoria import Memoria
@@ -26,6 +26,7 @@ from .salida.resource_pack import NOMBRE, PackSalida
 from .validacion.calidad import Revision, revisar_glosario, validar
 
 GRUPOS = ("mods", "libros", "misiones", "scripts")
+_ESTADOS = {"JOB_STATE_PENDING": "en cola", "JOB_STATE_RUNNING": "procesando"}
 #: Tokens por carácter y sobrecarga por lote, medidos a ojo con textos de mods: solo para estimar.
 _CARACTERES_POR_TOKEN, _TOKENS_POR_LOTE = 3.5, 450
 
@@ -96,6 +97,11 @@ class Proceso:
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
             usar_lotes=usar_lotes,
         )  # fmt: skip
+        if isinstance(motor, Gemini):
+            motor.cancelar = self.traductor.cancelar
+            motor.al_esperar = lambda estado: registro(
+                f"Esperando a Google (Batch API): {_ESTADOS.get(estado, estado)}"
+            )
         self._glosario_listo = False
 
     # ------------------------------------------------------------------ preparación

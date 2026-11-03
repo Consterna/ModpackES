@@ -26,3 +26,4 @@ config.local.json
 
 # Datos de la app durante pruebas locales (TRADUCTOR_ES_DATOS)
 .datos/
+build_exe.log
