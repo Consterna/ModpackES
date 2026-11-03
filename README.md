@@ -160,9 +160,10 @@ uv run python scripts/construir_exe.py        # dist/ModpackES.exe
 uv run python scripts/probar_exe.py           # arranca el .exe y analiza un modpack de prueba
 ```
 
-Los datos de la app (memoria, glosario, preferencias) van a `%LOCALAPPDATA%\traductor-es`; la variable
-`TRADUCTOR_ES_DATOS` los lleva a otra carpeta. Lee [CONTRIBUTING.md](CONTRIBUTING.md) antes de mandar
-cambios.
+Los datos de la app (memoria, glosario, preferencias y `registro.log`) van a `%LOCALAPPDATA%\traductor-es`;
+la variable `TRADUCTOR_ES_DATOS` los lleva a otra carpeta. Las pruebas con Java buscan Gson en las bibliotecas
+de Prism Launcher o usan el jar que indique `TRADUCTOR_ES_GSON` (así corren en el CI). Lee
+[CONTRIBUTING.md](CONTRIBUTING.md) antes de mandar cambios.
 
 ## Créditos
 

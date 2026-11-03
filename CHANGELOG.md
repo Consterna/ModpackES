@@ -6,6 +6,19 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Añadido
+
+- Registro en archivo (`registro.log`, en la carpeta de datos) con lo que muestra la ventana, los avisos y
+  los errores. Nunca guarda la clave.
+- Botones «Copiar diagnóstico» (versiones, sistema y final del registro, sin tu carpeta personal ni claves)
+  y «Abrir registro», para reportar problemas.
+- Los errores no previstos se avisan en una ventana en vez de cerrar la app en silencio.
+
+### Corregido
+
+- Un error no previsto durante el análisis o la traducción dejaba la ventana en «Trabajando…» con los botones
+  bloqueados.
+
 ## [2.0.0] - 2026-11-03
 
 Primera versión pública. Se reescribió desde cero y se probó de punta a punta, dentro del juego, con
