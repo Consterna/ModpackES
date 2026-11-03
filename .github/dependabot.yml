@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14  # las versiones recién salidas esperan dos semanas
+    groups:
+      dependencias:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      acciones:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+      include: scope
