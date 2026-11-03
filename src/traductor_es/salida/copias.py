@@ -46,9 +46,9 @@ class Respaldo:
         return ruta.resolve().relative_to(self.juego.resolve()).as_posix()
 
     def original(self, ruta: Path) -> bytes | None:
-        """Contenido original (en inglés) del archivo, guardando la copia la primera vez.
+        """Contenido original (en inglés) del archivo. Solo lee: la copia se guarda al escribir.
 
-        None si el archivo no existe y la app tampoco lo creó antes.
+        None si el archivo no existe o si lo creó la app.
         """
         clave = self._clave(ruta)
         entrada = self._datos.get(clave)
@@ -57,17 +57,7 @@ class Respaldo:
         if entrada is not None and actual is not None and entrada.get("escrito") == _huella(actual):
             # El archivo sigue como lo dejó la app: el original es la copia (o no existía).
             return copia.read_bytes() if entrada.get("existia") else None
-        if actual is None:
-            return None
-        # Primera vez o el archivo cambió por fuera: este contenido es el nuevo original
-        copia.parent.mkdir(parents=True, exist_ok=True)
-        copia.write_bytes(actual)
-        self._datos[clave] = {
-            "existia": True,
-            "escrito": None,
-            "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
-        }
-        self._guardar()
+        # Primera vez o el archivo cambió por fuera (p. ej. se actualizó el modpack): lo de ahora es el original
         return actual
 
     def escribir(self, ruta: Path, datos: bytes, neutro: bytes = b"") -> None:
@@ -80,11 +70,11 @@ class Respaldo:
             # El archivo no está como lo dejó la app: lo que hay ahora es el original.
             if actual is None:
                 entrada = {"existia": False}
-            elif entrada is not None and entrada.get("escrito") is None and entrada.get("existia"):
-                pass  # original() acaba de guardar la copia de este mismo contenido
             else:
-                (self.base / clave).parent.mkdir(parents=True, exist_ok=True)
-                (self.base / clave).write_bytes(actual)
+                copia = self.base / clave
+                if not (copia.is_file() and copia.read_bytes() == actual):
+                    copia.parent.mkdir(parents=True, exist_ok=True)
+                    copia.write_bytes(actual)
                 entrada = {"existia": True}
             self._datos[clave] = entrada
         assert entrada is not None

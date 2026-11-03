@@ -38,6 +38,12 @@ class _Base:
         self.ctx = ctx
         self._trabajos: list[_Trabajo] = []
 
+    def detectar(self) -> bool:
+        raise NotImplementedError
+
+    def describir(self) -> str:
+        raise NotImplementedError
+
     def _prefijos(self) -> list[str]:
         raise NotImplementedError
 
@@ -127,7 +133,10 @@ class FTBQuests(_Base):
             original = self._original(ruta)
             if original is None:
                 continue
-            yield self._trabajo_snbt(original.decode("utf-8"), [ruta], lambda c: c.campo in CAMPOS_FTBQ, {})
+            try:
+                yield self._trabajo_snbt(original.decode("utf-8"), [ruta], lambda c: c.campo in CAMPOS_FTBQ, {})
+            except (ValueError, UnicodeDecodeError):
+                self.ctx.registro(f"{ruta.name} está dañado: se deja igual")
 
     def _trabajo_snbt(
         self, src: str, destinos: list[Path], filtro: Callable[[snbt.Cadena], bool], fijos: Mapping[int, str]
@@ -157,8 +166,12 @@ class FTBQuests(_Base):
         if (lang / "en_us").is_dir():
             fuentes += sorted((lang / "en_us").rglob("*.snbt"))
         for fuente in fuentes:
-            src = fuente.read_text(encoding="utf-8")
-            cadenas = snbt.escanear(src)
+            try:
+                src = fuente.read_bytes().decode("utf-8")
+                cadenas = snbt.escanear(src)
+            except (ValueError, UnicodeDecodeError):
+                self.ctx.registro(f"{fuente.name} está dañado: se deja igual")
+                continue
             relativa = fuente.relative_to(lang).as_posix().removeprefix("en_us")
             # Cada variante de español que el modpack ya trae conserva sus textos; el resto se completa
             for variante in self.ctx.variantes:

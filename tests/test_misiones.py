@@ -222,3 +222,30 @@ def test_json_roto_se_deja_igual(tmp_path: Path, memoria: Memoria) -> None:
         ctx = Contexto(inst, Respaldo(juego), registro=avisos.append)
         resumen = ejecutar(Heracles(ctx), memoria)
     assert resumen.archivos == [] and avisos == ["roto.json no es JSON válido: se deja igual"]
+
+
+def test_analizar_no_escribe_nada_en_la_instancia(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    capitulo = juego / "config" / "ftbquests" / "quests" / "chapters" / "a.snbt"
+    capitulo.parent.mkdir(parents=True)
+    capitulo.write_text(CAPITULO, encoding="utf-8")
+    inst, ctx = contexto(juego)
+    with inst:
+        assert FTBQuests(ctx).recolectar()
+    assert not (juego / "traductor_es").exists()
+
+
+def test_capitulo_danado_no_frena_a_los_demas(tmp_path: Path, memoria: Memoria) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    capitulos = juego / "config" / "ftbquests" / "quests" / "chapters"
+    capitulos.mkdir(parents=True)
+    (capitulos / "bueno.snbt").write_text('{ title: "Good" }', encoding="utf-8")
+    (capitulos / "roto.snbt").write_text('{ title: "Broken }', encoding="utf-8")
+    avisos: list[str] = []
+    inst = Instancia(juego)
+    with inst:
+        ctx = Contexto(inst, Respaldo(juego), registro=avisos.append)
+        ejecutar(FTBQuests(ctx), memoria)
+    assert "«ES» Good" in (capitulos / "bueno.snbt").read_text(encoding="utf-8")
+    assert (capitulos / "roto.snbt").read_text(encoding="utf-8") == '{ title: "Broken }'
+    assert avisos == ["roto.snbt está dañado: se deja igual"]

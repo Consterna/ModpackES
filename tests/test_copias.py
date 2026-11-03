@@ -62,3 +62,24 @@ def test_restaurar_por_prefijo(tmp_path: Path) -> None:
     r.escribir(b, b"y")
     assert r.restaurar("config/ftbquests/") == [a]
     assert b.read_bytes() == b"y" and r.registrados() == ["kubejs/b"]
+
+
+def test_cambio_despues_de_restaurar_renueva_la_copia(tmp_path: Path) -> None:
+    archivo = tmp_path / "q.json"
+    archivo.write_bytes(b"v1")
+    r = Respaldo(tmp_path)
+    r.escribir(archivo, b"es1")
+    r.restaurar()
+    archivo.write_bytes(b"v2")  # el modpack se actualiza después de restaurar
+    r = Respaldo(tmp_path)
+    assert r.original(archivo) == b"v2"
+    r.escribir(archivo, b"es2")
+    r.restaurar()
+    assert archivo.read_bytes() == b"v2"
+
+
+def test_original_solo_lee(tmp_path: Path) -> None:
+    archivo = tmp_path / "q.json"
+    archivo.write_bytes(b"v1")
+    assert Respaldo(tmp_path).original(archivo) == b"v1"
+    assert not (tmp_path / "traductor_es").exists()

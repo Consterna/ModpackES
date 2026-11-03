@@ -63,7 +63,7 @@ def test_misiones_reales(
         # Los SNBT generados los lee el parser real de FTB Library, con la misma estructura que el original
         snbts = [p for p in escritos if p.suffix == ".snbt"]
         if snbts:
-            originales = []
+            originales: list[Path] = []
             for p in snbts:
                 copia = tmp_path / "originales" / p.relative_to(juego)
                 copia.parent.mkdir(parents=True, exist_ok=True)
