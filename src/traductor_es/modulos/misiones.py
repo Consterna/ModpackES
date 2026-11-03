@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..formatos import json_cadenas, nbt, snbt
-from .base import Contexto, Pieza, Resumen, aplicar, unidades
+from .base import Contexto, Pieza, Resumen, aplicar, contar, unidades
 
 AMBITO = "mision"
 #: Campos con texto visible en FTB Quests (1.12 usa «text» para la descripción larga).
@@ -257,7 +257,7 @@ class _MisionesJson(_Base):
         return bool(self._archivos())
 
     def describir(self) -> str:
-        return f"{len(self._archivos())} archivos"
+        return contar(len(self._archivos()), "archivo")
 
     def _prefijos(self) -> list[str]:
         return [c.rstrip("/") for c in self.carpetas]

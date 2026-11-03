@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from ..fuentes.recursos import Pendiente
-from .base import Contexto, Pieza, Resumen
+from .base import Contexto, Pieza, Resumen, contar
 
 AMBITO = "ui"
 #: Solo los nombres de cosas van al glosario. Textos de controles o menús («Right», «All») no son términos:
@@ -49,7 +49,7 @@ class Mods:
         return True
 
     def describir(self) -> str:
-        return f"{len(self.ctx.instancia.jars())} mods"
+        return contar(len(self.ctx.instancia.jars()), "mod")
 
     def recolectar(self) -> list[Pieza]:
         tabla = self.ctx.instancia.tabla_idiomas()

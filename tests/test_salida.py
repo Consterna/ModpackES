@@ -75,3 +75,11 @@ def test_activar_agrega_lineas_que_faltan_y_sin_options_no_crea(tmp_path: Path) 
     (tmp_path / "options.txt").write_text("version:1\n", encoding="utf-8")
     assert opciones.activar(tmp_path, "P", "es_es") == ["pack activado", "idioma del juego: es_es"]
     assert (tmp_path / "options.txt").read_text("utf-8").endswith('resourcePacks:["vanilla","file/P"]\nlang:es_es\n')
+
+
+def test_resumen_y_conteos_en_singular_y_plural() -> None:
+    from traductor_es.modulos.base import Resumen, contar
+
+    assert contar(1, "mod") == "1 mod" and contar(0, "script") == "0 scripts"
+    assert str(Resumen([Path("a")], 1)) == "1 archivo escrito, 1 texto traducido"
+    assert str(Resumen([Path("a"), Path("b")], 5, 1)) == "2 archivos escritos, 5 textos traducidos, 1 sigue en inglés"

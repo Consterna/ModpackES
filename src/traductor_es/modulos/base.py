@@ -20,6 +20,11 @@ from ..salida.resource_pack import PackSalida
 _CLAVE = re.compile(r"\{?[a-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)+\}?")
 
 
+def contar(n: int, singular: str, plural: str = "") -> str:
+    """«1 mod», «3 mods»."""
+    return f"{n} {singular if n == 1 else plural or singular + 's'}"
+
+
 def parece_clave(texto: str) -> bool:
     return bool(_CLAVE.fullmatch(texto.strip()))
 
@@ -70,8 +75,10 @@ class Resumen:
     pendientes: int = 0  #: textos que siguen en inglés (sin traducción disponible)
 
     def __str__(self) -> str:
-        extra = f", {self.pendientes} siguen en inglés" if self.pendientes else ""
-        return f"{len(self.archivos)} archivos escritos, {self.traducidos} textos traducidos{extra}"
+        escritos = contar(len(self.archivos), "archivo escrito", "archivos escritos")
+        traducidos = contar(self.traducidos, "texto traducido", "textos traducidos")
+        extra = ", " + contar(self.pendientes, "sigue en inglés", "siguen en inglés") if self.pendientes else ""
+        return f"{escritos}, {traducidos}{extra}"
 
 
 class Modulo(Protocol):

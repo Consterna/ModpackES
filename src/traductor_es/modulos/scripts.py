@@ -13,7 +13,7 @@ from pathlib import Path
 
 from ..formatos import javascript
 from ..nucleo.mascara import es_traducible
-from .base import Contexto, Pieza, Resumen, parece_clave
+from .base import Contexto, Pieza, Resumen, contar, parece_clave
 
 AMBITO = "script"
 CARPETAS = ("kubejs/client_scripts", "kubejs/server_scripts", "kubejs/startup_scripts")
@@ -87,7 +87,7 @@ class ScriptsKubeJS:
         return bool(self._archivos())
 
     def describir(self) -> str:
-        return f"{len(self._archivos())} scripts"
+        return contar(len(self._archivos()), "script")
 
     def recolectar(self) -> list[Pieza]:
         self._scripts = []
