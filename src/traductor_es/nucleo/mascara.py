@@ -31,6 +31,7 @@ _PATRONES: Final[tuple[str, ...]] = (
 )
 PROTEGER: Final = re.compile("|".join(f"(?:{p})" for p in _PATRONES))
 TOKEN: Final = re.compile(r"⟦(\d+)⟧")
+_MARCADOR_CON_ESPACIOS: Final = re.compile(r"⟦\s*(\d+)\s*⟧")
 _LETRAS: Final = re.compile(r"[^\W\d_]{2}")
 
 
@@ -51,7 +52,11 @@ def enmascarar(texto: str) -> Enmascarado:
 
 
 def desenmascarar(traducido: str, tokens: tuple[str, ...]) -> str | None:
-    """Restaura los códigos. Devuelve None si el traductor perdió, repitió o inventó algún marcador."""
+    """Restaura los códigos. Devuelve None si el traductor perdió, repitió o inventó algún marcador.
+
+    Antes repara un desliz frecuente de los modelos: espacios dentro del marcador («⟦ 0 ⟧»).
+    """
+    traducido = _MARCADOR_CON_ESPACIOS.sub(lambda m: f"⟦{m.group(1)}⟧", traducido)
     vistos = sorted(int(n) for n in TOKEN.findall(traducido))
     if vistos != list(range(len(tokens))):
         return None

@@ -9,6 +9,28 @@ from ..fuentes.recursos import Pendiente
 from .base import Contexto, Pieza, Resumen
 
 AMBITO = "ui"
+#: Solo los nombres de cosas van al glosario. Textos de controles o menús («Right», «All») no son términos:
+#: mandarlos como glosario confundiría al modelo en frases normales («That's right»).
+_CLAVES_DE_NOMBRES = (
+    "item.",
+    "block.",
+    "entity.",
+    "effect.",
+    "enchantment.",
+    "biome.",
+    "fluid.",
+    "fluid_type.",
+    "painting.",
+    "trim_material.",
+    "trim_pattern.",
+    "attribute.name.",
+    "jukebox_song.",
+)
+
+
+def es_nombre(clave: str) -> bool:
+    """La clave es el nombre de un objeto, bloque, criatura… (y no una descripción o un tooltip)."""
+    return clave.startswith(_CLAVES_DE_NOMBRES) and not clave.endswith((".desc", ".description", ".tooltip", ".info"))
 
 
 def _salto_nuevo(original: str, traduccion: str) -> bool:
@@ -63,6 +85,14 @@ class Mods:
             resumen.archivos.append(pack.escribir_lang(namespace, variante, textos))
         pack.vaciar_idiomas_viejos()
         return resumen
+
+    def nombres(self, traducciones: Mapping[str, str]) -> dict[str, str]:
+        """{inglés: traducción} de los nombres de objetos, bloques… recién traducidos (para el glosario)."""
+        return {
+            p.ingles: traducciones[p.ingles]
+            for p in self._pendientes
+            if p.existente is None and p.ingles in traducciones and es_nombre(p.clave)
+        }
 
     def restaurar(self) -> list[Path]:
         return []  # no toca la instancia: basta con desactivar el resource pack

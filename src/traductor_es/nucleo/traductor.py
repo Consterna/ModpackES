@@ -6,11 +6,12 @@ import threading
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from typing import cast
 
-from ..motores.base import Cancelado, Entrada, Lote, Motor
+from ..motores.base import Cancelado, Entrada, Lote, Motor, MotorPorLotes
 from .dialectos import DIALECTO_POR_DEFECTO, DIALECTOS
 from .glosario import Glosario
-from .mascara import desenmascarar, enmascarar, es_traducible, separar_bordes
+from .mascara import Enmascarado, desenmascarar, enmascarar, es_traducible, separar_bordes
 from .memoria import Memoria
 
 Progreso = Callable[[int, int], None]
@@ -44,6 +45,7 @@ class Traductor:
         validador: Validador | None = None,
         limite_caracteres: int = 5000,
         limite_entradas: int = 60,
+        usar_lotes: bool = False,
     ) -> None:
         if dialecto not in DIALECTOS:
             raise ValueError(f"Dialecto desconocido: {dialecto}")
@@ -58,6 +60,8 @@ class Traductor:
         self.validador = validador
         self.limite_caracteres = limite_caracteres
         self.limite_entradas = limite_entradas
+        #: Mandar cada ronda en un solo trabajo de la Batch API (si el motor lo admite): más barato, más lento
+        self.usar_lotes = usar_lotes and hasattr(motor, "traducir_varios")
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
@@ -88,7 +92,8 @@ class Traductor:
                 self.registro(f"Reintentando {len(nucleos)} textos que volvieron con códigos dañados…")
                 resultado.rechazados.clear()
                 # Lotes chicos y sin mover la barra de progreso, que ya llegó al total
-                self._ronda(sorted(nucleos), ambito, pistas, (1500, 5), resultado, informar=False)
+                # (en modo normal aunque se use la Batch API: son pocos y no vale la pena esperar otro trabajo)
+                self._ronda(sorted(nucleos), ambito, pistas, (1500, 5), resultado, informar=False, por_lotes=False)
             if resultado.rechazados:
                 n = len(resultado.rechazados)
                 self.registro(f"{n} textos se quedan en inglés porque no pasaron la validación.")
@@ -121,6 +126,7 @@ class Traductor:
         limites: tuple[int, int],
         resultado: Resultado,
         informar: bool = True,
+        por_lotes: bool = True,
     ) -> set[str]:
         """Traduce una ronda. Devuelve los núcleos que fallaron."""
         fallidos: set[str] = set()
@@ -128,6 +134,8 @@ class Traductor:
         total = len(nucleos)
         progreso = self.progreso if informar else _nada
         progreso(0, total)
+        if self.usar_lotes and por_lotes:
+            return self._ronda_por_lotes(self._lotes(nucleos, *limites), ambito, pistas, resultado, progreso)
         with ThreadPoolExecutor(self.hilos) as ex:
             futuros: dict[Future[dict[str, str]], list[str]] = {
                 ex.submit(self._lote, lote, ambito, pistas, resultado): lote for lote in self._lotes(nucleos, *limites)
@@ -148,15 +156,43 @@ class Traductor:
                 raise
         return fallidos
 
-    def _lote(self, lote: list[str], ambito: str, pistas: Mapping[str, str], resultado: Resultado) -> dict[str, str]:
-        if self.cancelar.is_set():
-            return {}
+    def _ronda_por_lotes(
+        self,
+        lotes: list[list[str]],
+        ambito: str,
+        pistas: Mapping[str, str],
+        resultado: Resultado,
+        progreso: Progreso,
+    ) -> set[str]:
+        pedidos = [self._pedido(lote, ambito, pistas) for lote in lotes]
+        salidas = cast(MotorPorLotes, self.motor).traducir_varios([p for p, _ in pedidos])
+        fallidos: set[str] = set()
+        hechos = 0
+        total = sum(len(lote) for lote in lotes)
+        for lote, (_, mascaras), salida in zip(lotes, pedidos, salidas, strict=True):
+            buenos = self._procesar(lote, mascaras, salida, resultado)
+            self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
+            fallidos.update(n for n in lote if n not in buenos)
+            hechos += len(lote)
+            progreso(hechos, total)
+        return fallidos
+
+    def _pedido(self, lote: list[str], ambito: str, pistas: Mapping[str, str]) -> tuple[Lote, list[Enmascarado]]:
         mascaras = [enmascarar(n) for n in lote]
         entradas = tuple(
             Entrada(str(i), m.texto, pistas.get(n, "")) for i, (n, m) in enumerate(zip(lote, mascaras, strict=True))
         )
-        pedido = Lote(entradas, ambito, DIALECTOS[self.dialecto], self.glosario.relevantes(lote))
-        salida = self.motor.traducir_lote(pedido)
+        return Lote(entradas, ambito, DIALECTOS[self.dialecto], self.glosario.relevantes(lote)), mascaras
+
+    def _lote(self, lote: list[str], ambito: str, pistas: Mapping[str, str], resultado: Resultado) -> dict[str, str]:
+        if self.cancelar.is_set():
+            return {}
+        pedido, mascaras = self._pedido(lote, ambito, pistas)
+        return self._procesar(lote, mascaras, self.motor.traducir_lote(pedido), resultado)
+
+    def _procesar(
+        self, lote: list[str], mascaras: list[Enmascarado], salida: Mapping[str, str], resultado: Resultado
+    ) -> dict[str, str]:
         buenos: dict[str, str] = {}
         rechazados: dict[str, str] = {}
         for i, (n, m) in enumerate(zip(lote, mascaras, strict=True)):

@@ -23,3 +23,6 @@ validador/clases/
 *.sqlite
 .env
 config.local.json
+
+# Datos de la app durante pruebas locales (TRADUCTOR_ES_DATOS)
+.datos/

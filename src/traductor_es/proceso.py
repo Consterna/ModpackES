@@ -1,0 +1,201 @@
+"""Orquestador: une la instancia, el glosario, la memoria, el motor y los módulos de contenido."""
+
+from __future__ import annotations
+
+import threading
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from types import TracebackType
+from typing import Self
+
+from . import configuracion
+from .fuentes.instancia import Instancia
+from .modulos import libros, misiones, mods, scripts
+from .modulos.base import Contexto, Modulo, Resumen
+from .modulos.mods import es_nombre
+from .motores.base import Motor
+from .motores.gemini import PRECIOS
+from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES
+from .nucleo.glosario import Glosario
+from .nucleo.memoria import Memoria
+from .nucleo.traductor import Traductor
+from .salida import opciones as opciones_salida
+from .salida.copias import Respaldo
+from .salida.resource_pack import NOMBRE, PackSalida
+from .validacion.calidad import Revision, revisar_glosario, validar
+
+GRUPOS = ("mods", "libros", "misiones", "scripts")
+#: Tokens por carácter y sobrecarga por lote, medidos a ojo con textos de mods: solo para estimar.
+_CARACTERES_POR_TOKEN, _TOKENS_POR_LOTE = 3.5, 450
+
+
+@dataclass(slots=True)
+class InformeModulo:
+    grupo: str
+    nombre: str
+    descripcion: str
+    textos: int  #: textos distintos encontrados
+    a_traducir: int  #: los que irían al motor (lo demás sale de memoria, glosario o de otra variante)
+    caracteres: int
+    resumen: Resumen | None = None
+
+
+@dataclass(slots=True)
+class Informe:
+    modulos: list[InformeModulo] = field(default_factory=list[InformeModulo])
+    avisos: list[str] = field(default_factory=list[str])
+    revision: Revision | None = None
+    pack_activado: list[str] = field(default_factory=list[str])
+
+    @property
+    def a_traducir(self) -> int:
+        return sum(m.a_traducir for m in self.modulos)
+
+    @property
+    def caracteres(self) -> int:
+        return sum(m.caracteres for m in self.modulos)
+
+    def costo(self, modelo: str, por_lotes: bool) -> float | None:
+        """Costo estimado en US$ (None si no se conoce el precio del modelo)."""
+        precio = PRECIOS.get(modelo)
+        if precio is None:
+            return None
+        tokens = self.caracteres / _CARACTERES_POR_TOKEN
+        lotes = max(1, self.a_traducir // 50)
+        entrada = tokens * 1.6 + lotes * _TOKENS_POR_LOTE
+        salida = tokens * 1.4  # traducción (el español es algo más largo) más algo de razonamiento
+        total = (entrada * precio[0] + salida * precio[1]) / 1e6
+        return total / 2 if por_lotes else total
+
+
+class Proceso:
+    def __init__(
+        self,
+        carpeta: Path | str,
+        motor: Motor,
+        dialecto: str = DIALECTO_POR_DEFECTO,
+        grupos: Sequence[str] = GRUPOS,
+        memoria: Memoria | None = None,
+        registro: Callable[[str], None] = lambda _m: None,
+        progreso: Callable[[int, int], None] = lambda _h, _t: None,
+        cancelar: threading.Event | None = None,
+        hilos: int = 4,
+        usar_lotes: bool = False,
+    ) -> None:
+        self.instancia = Instancia(carpeta)
+        self.registro = registro
+        self.grupos = [g for g in GRUPOS if g in grupos]
+        self._memoria_propia = memoria is None
+        self.memoria = memoria or Memoria(configuracion.ruta_memoria())
+        self.glosario = Glosario()
+        self.ctx = Contexto(
+            self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
+        )
+        self.traductor = Traductor(
+            motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
+            usar_lotes=usar_lotes,
+        )  # fmt: skip
+        self._glosario_listo = False
+
+    # ------------------------------------------------------------------ preparación
+    def _preparar_glosario(self) -> None:
+        if self._glosario_listo:
+            return
+        self.glosario.fijar(configuracion.leer_glosario_usuario())
+        tabla = self.instancia.tabla_idiomas()
+        orden = [self.ctx.dialecto, *(v for v in ("es_mx", "es_es", *VARIANTES) if v != self.ctx.dialecto)]
+        for ns in ["minecraft", *sorted(n for n in tabla.datos if n != "minecraft")]:
+            ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
+            for variante in dict.fromkeys(orden):
+                self.glosario.agregar_pares(ingles, tabla.textos(ns, variante))
+        self._glosario_listo = True
+        self.registro(f"Glosario: {len(self.glosario)} términos oficiales")
+
+    def modulos(self) -> list[tuple[str, Modulo]]:
+        """Módulos elegidos, en el orden en que se traducen (mods primero: sus nombres alimentan el glosario)."""
+        lista: list[tuple[str, Modulo]] = []
+        if "mods" in self.grupos:
+            lista.append(("mods", mods.Mods(self.ctx)))
+        if "libros" in self.grupos:
+            lista.append(("libros", libros.Libros(self.ctx)))
+        if "misiones" in self.grupos:
+            lista += [("misiones", m) for m in misiones.todos(self.ctx)]
+        if "scripts" in self.grupos:
+            lista.append(("scripts", scripts.ScriptsKubeJS(self.ctx)))
+        return [(g, m) for g, m in lista if m.detectar()]
+
+    # ------------------------------------------------------------------ acciones
+    def analizar(self) -> Informe:
+        """Cuenta lo que hay que traducir. Solo lee: no escribe nada en la instancia."""
+        self._preparar_glosario()
+        informe = Informe()
+        for grupo, modulo in self.modulos():
+            piezas = modulo.recolectar()
+            pendientes = self.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
+            informe.modulos.append(
+                InformeModulo(grupo, modulo.nombre, modulo.describir(), len({p.texto for p in piezas}),
+                              len(pendientes), sum(len(t) for t in pendientes))
+            )  # fmt: skip
+        return informe
+
+    def ejecutar(self, activar: bool = True, poner_idioma: bool = True) -> Informe:
+        self._preparar_glosario()
+        informe = Informe()
+        todas: dict[str, str] = {}
+        for grupo, modulo in self.modulos():
+            self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
+            piezas = modulo.recolectar()
+            textos = [p.texto for p in piezas]
+            pendientes = self.traductor.pendientes(textos, modulo.ambito)
+            resultado = self.traductor.traducir(textos, modulo.ambito, {p.texto: p.pista for p in piezas if p.pista})
+            resumen = modulo.escribir(resultado.traducciones)
+            self.registro(f"   {resumen}")
+            informe.modulos.append(
+                InformeModulo(grupo, modulo.nombre, modulo.describir(), len(set(textos)), len(pendientes),
+                              sum(len(t) for t in pendientes), resumen)
+            )  # fmt: skip
+            if grupo != "mods":  # la revisión del glosario mira textos largos (misiones, libros, scripts)
+                todas.update(resultado.traducciones)
+            if isinstance(modulo, mods.Mods):
+                # Los nombres recién traducidos pasan al glosario: libros, misiones y scripts los usarán igual
+                nuevos = modulo.nombres(resultado.traducciones)
+                self.glosario.agregar_pares({en: en for en in nuevos}, nuevos)
+        relevantes = self.glosario.relevantes(todas, maximo=500)
+        informe.revision = revisar_glosario(todas, relevantes, relevantes)
+        informe.avisos.extend(self._avisos())
+        if activar and (self.ctx.pack is not None and (self.ctx.pack.raiz / "pack.mcmeta").is_file()):
+            try:
+                informe.pack_activado = opciones_salida.activar(
+                    self.instancia.juego, NOMBRE, self.ctx.dialecto if poner_idioma else None
+                )
+            except ValueError as e:
+                informe.avisos.append(str(e))
+        return informe
+
+    def restaurar(self) -> list[Path]:
+        """Devuelve misiones, scripts y libros propios del modpack a su versión original."""
+        return self.ctx.respaldo.restaurar("")
+
+    def _avisos(self) -> list[str]:
+        avisos: list[str] = []
+        opciones = self.instancia.opciones
+        sospechosos = [p for p in opciones.packs if "localizer" in p.lower() or "translat" in p.lower()]
+        if sospechosos:
+            avisos.append(
+                "Hay otros packs de traducción activos que pueden tapar a este: " + ", ".join(sospechosos)
+                + ". Si alguno está roto, desactívalo en el juego."
+            )  # fmt: skip
+        return avisos
+
+    # ------------------------------------------------------------------ ciclo de vida
+    def cerrar(self) -> None:
+        self.instancia.cerrar()
+        if self._memoria_propia:
+            self.memoria.cerrar()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, tipo: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None:
+        self.cerrar()

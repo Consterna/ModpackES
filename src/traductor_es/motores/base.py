@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -35,4 +36,10 @@ class Motor(Protocol):
 
     def traducir_lote(self, lote: Lote) -> dict[str, str]:
         """Devuelve {id: traducción}. Puede omitir ids; nunca debe lanzar salvo ErrorFatal."""
+        ...
+
+
+class MotorPorLotes(Motor, Protocol):
+    def traducir_varios(self, lotes: Sequence[Lote]) -> list[dict[str, str]]:
+        """Traduce muchos lotes en un solo trabajo (p. ej. la Batch API). Devuelve una salida por lote."""
         ...

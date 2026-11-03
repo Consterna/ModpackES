@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import keyring
 import pytest
+from keyring.backends import fail
 
 from traductor_es.validacion.java import ValidadorJava, biblioteca_mas_nueva, buscar_jdk
 
@@ -57,3 +59,11 @@ def cp_ftb_1201() -> list[Path]:
     if not (srg and ftb and api and core) or any(c is None for c in comunes[:2]):
         pytest.skip("Faltan jars de FTB Library 1.20.1 o de Minecraft SRG")
     return [ftb, srg, api, core, *(c for c in comunes if c is not None)]
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _datos_de_la_app_en_temporal(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Ninguna prueba escribe la memoria, el glosario ni las preferencias reales del usuario."""
+    os.environ["TRADUCTOR_ES_DATOS"] = str(tmp_path_factory.mktemp("datos_app"))
+    os.environ.pop("GEMINI_API_KEY", None)
+    keyring.set_keyring(fail.Keyring())  # ni se lee ni se escribe el almacén de credenciales real
