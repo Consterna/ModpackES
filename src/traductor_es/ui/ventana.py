@@ -11,6 +11,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Qt, QThread, QUrl, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -250,7 +251,16 @@ class Ventana(QMainWindow):
         )
         self.creditos.setOpenExternalLinks(True)
         self.creditos.setAlignment(Qt.AlignmentFlag.AlignRight)
-        capa.addWidget(self.creditos)
+        pie = QHBoxLayout()
+        self.b_diagnostico = QPushButton("Copiar diagnóstico")
+        self.b_diagnostico.setToolTip("Copia versiones y el final del registro, para pegarlos al reportar un problema")
+        self.b_diagnostico.clicked.connect(self.copiar_diagnostico)
+        self.b_registro = QPushButton("Abrir registro")
+        self.b_registro.clicked.connect(self._abrir_registro)
+        pie.addWidget(self.b_diagnostico)
+        pie.addWidget(self.b_registro)
+        pie.addWidget(self.creditos, 1)
+        capa.addLayout(pie)
 
         divisor = QSplitter()
         divisor.addWidget(izquierda)
@@ -497,6 +507,23 @@ class Ventana(QMainWindow):
     def escribir(self, texto: str) -> None:
         self.log.appendPlainText(texto)
         registro.LOGGER.info(texto)
+
+    def copiar_diagnostico(self) -> str:
+        extra = {"Instancia": self.carpeta() or "(ninguna)", "Acción en curso": self._accion or "(ninguna)"}
+        if self.ultimo_informe is not None:
+            modulos = self.ultimo_informe.modulos
+            extra["Último análisis"] = ", ".join(f"{m.grupo} {m.textos}/{m.a_traducir}" for m in modulos)
+        texto = registro.diagnostico(extra)
+        QApplication.clipboard().setText(texto)
+        self.estado.setText("Diagnóstico copiado: pégalo en el reporte del problema.")
+        return texto
+
+    def _abrir_registro(self) -> None:
+        ruta = registro.ruta_actual()
+        if ruta is None or not ruta.is_file():
+            self.avisar("Todavía no hay nada en el registro.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(ruta)))
 
     def avisar(self, texto: str) -> None:
         if self._es_prueba():
