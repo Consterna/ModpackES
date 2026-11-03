@@ -60,6 +60,11 @@ Si se corta o lo cancelas, vuelve a pulsar «Traducir»: sigue donde quedó.
 **Restaurar original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar la
 traducción de los mods basta con desactivar el resource pack.
 
+**Correcciones…** busca cualquier texto en la memoria (en inglés o en español) y te deja corregir su
+traducción a mano. La corrección manda sobre todo lo demás, vale para todas las misiones, libros y mods
+donde aparezca ese texto y se aplica la próxima vez que pulses «Traducir», sin costo. Si a la corrección le
+falta un código del original (`%s`, `§a`, `$(l)`…), no se guarda, para que no rompa el juego.
+
 > [!NOTE]
 > El ejecutable no tiene firma digital, así que la primera vez Windows SmartScreen puede avisar. Pulsa
 > «Más información» → «Ejecutar de todas formas». Puedes comprobar el archivo con el SHA-256 que viene en la

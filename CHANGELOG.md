@@ -15,6 +15,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Los errores no previstos se avisan en una ventana en vez de cerrar la app en silencio.
 - Correcciones del usuario: una traducción corregida a mano manda sobre la memoria y el motor en todos
   los ámbitos, no se paga y se rechaza si pierde algún código del original (`%s`, `§a`, `$(l)`…).
+- Botón «Correcciones…»: busca en la memoria por el texto en inglés o en español y permite corregir,
+  guardar y quitar correcciones desde la ventana.
 
 ### Corregido
 

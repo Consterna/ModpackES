@@ -193,3 +193,46 @@ def test_error_no_previsto_libera_la_ventana_y_queda_en_el_registro(
         assert "Traceback" in ruta.read_text(encoding="utf-8")
     finally:
         registro.cerrar()
+
+
+def test_corregir_desde_la_ventana_y_volver_a_traducir_sin_pagar(qtbot: QtBot, tmp_path: Path) -> None:
+    from traductor_es import configuracion
+    from traductor_es.nucleo.memoria import Memoria
+    from traductor_es.ui.correcciones import DialogoCorrecciones
+
+    juego = _modpack(tmp_path)
+    motor = Simulador()
+    v = Ventana(
+        buscar_instancias=lambda: [InstanciaEncontrada("Prism Launcher", "P", juego)],
+        fabrica_motor=lambda _c, _m: motor,
+    )
+    qtbot.addWidget(v)
+    v.lista.setCurrentRow(0)
+    v.b_traducir.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    enviados = sum(len(lote.entradas) for lote in motor.lotes_recibidos)
+
+    with Memoria(configuracion.ruta_memoria()) as memoria:
+        d = DialogoCorrecciones("es_mx", memoria)
+        qtbot.addWidget(d)
+        d.e_buscar.setText("welcome")
+        d.buscar()
+        assert [c.origen for c in d.resultados] == ["Welcome to the pack"]
+        assert not d.b_guardar.isEnabled()  # sin fila elegida no se puede guardar
+        d.tabla.setCurrentCell(0, 0)
+        assert d.b_guardar.isEnabled() and not d.b_quitar.isEnabled()
+        d.t_correccion.setPlainText("Te damos la bienvenida %s")
+        d.guardar()
+        assert "códigos" in d.estado.text()  # inventó un código: se rechaza
+        d.t_correccion.setPlainText("Te damos la bienvenida al pack")
+        d.guardar()
+        assert d.resultados[0].corregida and d.b_quitar.isEnabled()
+        d.e_buscar.clear()
+        d.buscar()
+        assert [c.traduccion for c in d.resultados] == ["Te damos la bienvenida al pack"]
+
+    v.b_traducir.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert sum(len(lote.entradas) for lote in motor.lotes_recibidos) == enviados  # no se pidió nada nuevo
+    script = (juego / "kubejs" / "server_scripts" / "s.js").read_text("utf-8")
+    assert script == "player.tell('Te damos la bienvenida al pack')\n"

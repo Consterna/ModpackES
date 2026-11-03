@@ -45,6 +45,7 @@ from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS, Gemini
 from ..motores.simulador import Simulador
 from ..proceso import GRUPOS, Informe, Proceso
 from ..salida import exportar
+from . import correcciones
 
 FabricaMotor = Callable[[str, str], Motor]
 NOMBRES_GRUPOS = {
@@ -227,6 +228,8 @@ class Ventana(QMainWindow):
         self.b_exportar = QPushButton("Exportar pack…")
         self.b_kit = QPushButton("Kit de servidor…")
         self.b_abrir = QPushButton("Abrir carpeta")
+        self.b_correcciones = QPushButton("Correcciones…")
+        self.b_correcciones.setToolTip("Buscar y corregir a mano traducciones de la memoria")
         self.b_cancelar.setEnabled(False)
         self.b_analizar.clicked.connect(lambda: self.lanzar("analizar"))
         self.b_traducir.clicked.connect(self._confirmar_traducir)
@@ -235,10 +238,11 @@ class Ventana(QMainWindow):
         self.b_exportar.clicked.connect(lambda: self._exportar(kit=False))
         self.b_kit.clicked.connect(lambda: self._exportar(kit=True))
         self.b_abrir.clicked.connect(self._abrir_carpeta)
+        self.b_correcciones.clicked.connect(self.abrir_correcciones)
         for b in (self.b_analizar, self.b_traducir, self.b_cancelar):
             acciones.addWidget(b)
         acciones.addStretch(1)
-        for b in (self.b_restaurar, self.b_exportar, self.b_kit, self.b_abrir):
+        for b in (self.b_correcciones, self.b_restaurar, self.b_exportar, self.b_kit, self.b_abrir):
             acciones.addWidget(b)
         capa.addLayout(acciones)
 
@@ -435,7 +439,8 @@ class Ventana(QMainWindow):
         self._hilo.start()
 
     def _ocupado(self, si: bool) -> None:
-        for b in (self.b_analizar, self.b_traducir, self.b_restaurar, self.b_exportar, self.b_kit, self.lista):
+        for b in (self.b_analizar, self.b_traducir, self.b_restaurar, self.b_exportar, self.b_kit, self.lista,
+                  self.b_correcciones):  # fmt: skip
             b.setEnabled(not si)
         self.b_cancelar.setEnabled(si)
 
@@ -509,6 +514,9 @@ class Ventana(QMainWindow):
             self.avisar(str(e))
             return
         self.escribir(f"Exportado: {destino} ({n} archivos)")
+
+    def abrir_correcciones(self) -> None:
+        correcciones.mostrar(self, str(self.c_dialecto.currentData()))
 
     def _abrir_carpeta(self) -> None:
         carpeta = self.carpeta()
