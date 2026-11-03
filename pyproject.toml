@@ -63,11 +63,14 @@ target-version = "py313"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PL", "PTH"]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PL", "PTH", "C90"]
 ignore = [
     "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004",  # complejidad: se controla en revisión
     "RUF001", "RUF002", "RUF003",                              # el código usa español con tildes y ⟦⟧ a propósito
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15  # más que esto se parte en funciones con nombre
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLC0415", "S101", "E501"]  # los datos de prueba reales (JSON, SNBT) van en una línea
