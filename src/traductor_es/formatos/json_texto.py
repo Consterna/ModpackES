@@ -10,22 +10,30 @@ from collections.abc import Callable, Mapping
 from typing import Any, cast
 
 
-def _parece_componente(texto: str) -> bool:
+def _parece_componente(texto: str, literal: bool) -> bool:
     t = texto.strip()
     if t.startswith("["):
         return t.endswith("]")
+    if literal and len(t) >= 2 and t.startswith('"') and t.endswith('"'):
+        return True
     return t.startswith('{"') and t.endswith("}")
 
 
-def cargar(texto: str) -> Any | None:
-    """El componente ya decodificado, o None si el texto no es un componente JSON."""
-    if not _parece_componente(texto):
+def cargar(texto: str, literal: bool = False) -> Any | None:
+    """El componente ya decodificado, o None si el texto no es un componente JSON.
+
+    `literal`: aceptar también una cadena JSON entre comillas (`"Hola"`), como guarda Heracles sus títulos.
+    En FTB Quests no se usa: allí un texto entre comillas es una cita literal.
+    """
+    if not _parece_componente(texto, literal):
         return None
     try:
         datos: Any = json.loads(texto)
     except json.JSONDecodeError:
         return None
-    return cast("list[Any] | dict[str, Any]", datos) if isinstance(datos, (list, dict)) else None
+    if isinstance(datos, (list, dict)):
+        return cast("list[Any] | dict[str, Any]", datos)
+    return datos if literal and isinstance(datos, str) else None
 
 
 def _recorrer(nodo: Any, hacer: Callable[[str], str]) -> Any:
@@ -50,8 +58,8 @@ def _recorrer(nodo: Any, hacer: Callable[[str], str]) -> Any:
     return nodo
 
 
-def extraer(texto: str) -> list[str] | None:
-    datos = cargar(texto)
+def extraer(texto: str, literal: bool = False) -> list[str] | None:
+    datos = cargar(texto, literal)
     if datos is None:
         return None
     vistos: list[str] = []
@@ -65,8 +73,8 @@ def extraer(texto: str) -> list[str] | None:
     return vistos
 
 
-def reconstruir(texto: str, traducciones: Mapping[str, str]) -> str:
-    datos = cargar(texto)
+def reconstruir(texto: str, traducciones: Mapping[str, str], literal: bool = False) -> str:
+    datos = cargar(texto, literal)
     if datos is None:
         return traducciones.get(texto, texto)
     nuevo = _recorrer(datos, lambda s: traducciones.get(s, s))
