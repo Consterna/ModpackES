@@ -14,7 +14,9 @@ from .fuentes.instancia import Instancia
 from .modulos import libros, misiones, mods, scripts
 from .modulos.base import Contexto, Modulo, Resumen
 from .modulos.mods import es_nombre
+from .motores import fabrica
 from .motores.base import Motor
+from .motores.compatible import Compatible
 from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
 from .nucleo.glosario import Glosario
@@ -57,9 +59,11 @@ class Informe:
     def caracteres(self) -> int:
         return sum(m.caracteres for m in self.modulos)
 
-    def costo(self, modelo: str, por_lotes: bool) -> float | None:
-        """Costo estimado en US$ (None si no se conoce el precio del modelo)."""
-        precio = PRECIOS.get(modelo)
+    def costo(self, modelo: str, por_lotes: bool, motor: str = fabrica.GEMINI) -> float | None:
+        """Costo estimado en US$: 0 con un motor en el PC; None si no se conoce el precio del modelo."""
+        if fabrica.es_local(motor):
+            return 0.0
+        precio = PRECIOS.get(modelo) if motor == fabrica.GEMINI else None
         if precio is None:
             return None
         tokens = self.caracteres / _CARACTERES_POR_TOKEN
@@ -98,6 +102,9 @@ class Proceso:
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
             usar_lotes=usar_lotes, contexto=contexto,
         )  # fmt: skip
+        self.motor = motor
+        if isinstance(motor, Compatible):
+            motor.cancelar = self.traductor.cancelar
         if isinstance(motor, Gemini):
             motor.cancelar = self.traductor.cancelar
             motor.al_esperar = lambda estado: registro(
@@ -204,6 +211,8 @@ class Proceso:
 
     # ------------------------------------------------------------------ ciclo de vida
     def cerrar(self) -> None:
+        if isinstance(self.motor, Compatible):
+            self.motor.cerrar()
         self.instancia.cerrar()
         if self._memoria_propia:
             self.memoria.cerrar()

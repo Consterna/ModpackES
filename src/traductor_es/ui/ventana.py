@@ -40,15 +40,18 @@ from PySide6.QtWidgets import (
 from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, configuracion, registro
 from ..fuentes.instancia import resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
+from ..motores import fabrica
 from ..motores.base import Cancelado, ErrorFatal, Motor
-from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS, Gemini
+from ..motores.compatible import Compatible
+from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
 from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
 from ..salida import exportar
 from . import correcciones
 
-FabricaMotor = Callable[[str, str], Motor]
+#: (motor, clave, modelo, dirección) → motor listo para traducir
+FabricaMotor = Callable[[str, str | None, str, str], Motor]
 NOMBRES_GRUPOS = {
     "mods": "Mods (objetos, bloques, menús)",
     "libros": "Libros guía",
@@ -57,8 +60,11 @@ NOMBRES_GRUPOS = {
 }
 
 
-def _gemini(clave: str, modelo: str) -> Motor:
-    return Gemini(clave, modelo)
+def _diccionario(valor: object) -> dict[str, str]:
+    """Un diccionario de texto leído de las preferencias (vacío si el archivo tenía otra cosa)."""
+    if not isinstance(valor, dict):
+        return {}
+    return {str(k): str(v) for k, v in cast(dict[object, object], valor).items()}
 
 
 class Consulta(QObject):
@@ -142,7 +148,7 @@ class Ventana(QMainWindow):
         self.setWindowTitle(f"{NOMBRE} {__version__} · Traductor de modpacks al español")
         self.resize(1100, 800)
         self._buscar_instancias = buscar_instancias
-        self._fabrica_motor: FabricaMotor = fabrica_motor or _gemini
+        self._fabrica_motor: FabricaMotor = fabrica_motor or fabrica.crear
         self._hilo: QThread | None = None
         self._accion = ""
         self._sondeo: QThread | None = None
@@ -195,11 +201,17 @@ class Ventana(QMainWindow):
             self.casillas[g] = casilla
             grupos.addWidget(casilla)
         formulario.addRow("Qué traducir:", grupos)
+        self.c_motor = QComboBox()
+        for motor_id, nombre in fabrica.MOTORES.items():
+            self.c_motor.addItem(nombre, motor_id)
+        self.c_motor.setToolTip("Gemini necesita clave; LM Studio y Ollama traducen gratis con un modelo en tu PC")
+        formulario.addRow("Motor:", self.c_motor)
+        self.e_direccion = QLineEdit()
+        self.e_direccion.setPlaceholderText("http://localhost:8080/v1")
+        formulario.addRow("Dirección:", self.e_direccion)
         self.c_modelo = QComboBox()
         self.c_modelo.setEditable(True)
-        self.c_modelo.addItems(list(PRECIOS))
-        self.c_modelo.setCurrentText(self._preferencias.get("modelo", MODELO_POR_DEFECTO))
-        formulario.addRow("Modelo de Gemini:", self.c_modelo)
+        formulario.addRow("Modelo:", self.c_modelo)
         self.c_lotes = QCheckBox("Por lotes: mitad de precio, pero puede tardar desde minutos hasta horas")
         self.c_lotes.setChecked(bool(self._preferencias.get("lotes", False)))
         formulario.addRow("", self.c_lotes)
@@ -219,13 +231,18 @@ class Ventana(QMainWindow):
         self.etiqueta_clave = QLabel()
         self.b_clave = QPushButton("Guardar clave…")
         self.b_clave.clicked.connect(self._guardar_clave)
-        self.b_probar = QPushButton("Probar clave")
+        self.b_probar = QPushButton("Probar conexión")
+        self.b_probar.setToolTip("Comprueba la clave y la conexión, y carga la lista de modelos")
         self.b_probar.clicked.connect(self._probar_clave)
         clave.addWidget(self.etiqueta_clave, 1)
         clave.addWidget(self.b_clave)
         clave.addWidget(self.b_probar)
-        formulario.addRow("Clave de Gemini:", clave)
+        formulario.addRow("Clave:", clave)
         capa.addWidget(opciones)
+        self._formulario = formulario
+        self.c_motor.setCurrentIndex(max(0, self.c_motor.findData(self._preferencias.get("motor", fabrica.GEMINI))))
+        self.c_motor.currentIndexChanged.connect(self._al_cambiar_motor)
+        self._al_cambiar_motor()
 
         acciones = QHBoxLayout()
         self.b_analizar = QPushButton("1. Analizar (gratis)")
@@ -330,31 +347,73 @@ class Ventana(QMainWindow):
             self.lista.addItem(item)
             self.lista.setCurrentItem(item)
 
-    # ------------------------------------------------------------------ clave
+    # ------------------------------------------------------------------ motor y clave
+    def motor_elegido(self) -> str:
+        return str(self.c_motor.currentData())
+
+    def _al_cambiar_motor(self) -> None:
+        motor = self.motor_elegido()
+        es_gemini = motor == fabrica.GEMINI
+        guardada = _diccionario(self._preferencias.get("direcciones")).get(motor, "")
+        self.e_direccion.setText(guardada or fabrica.direccion_por_defecto(motor))
+        self.e_direccion.setReadOnly(motor != "personalizado")
+        self._formulario.setRowVisible(self.e_direccion, not es_gemini)
+        modelo = _diccionario(self._preferencias.get("modelos")).get(motor, "")
+        if es_gemini and not modelo:
+            modelo = str(self._preferencias.get("modelo", MODELO_POR_DEFECTO))  # preferencia de la v2.0
+        self.c_modelo.clear()
+        if es_gemini:
+            self.c_modelo.addItems(list(PRECIOS))
+        self.c_modelo.setCurrentText(modelo)
+        editor = self.c_modelo.lineEdit()
+        if editor is not None:
+            editor.setPlaceholderText("" if es_gemini else "Pulsa «Probar conexión» para ver la lista")
+        self.c_lotes.setEnabled(es_gemini)
+        if not es_gemini:
+            self.c_lotes.setChecked(False)
+        self.b_clave.setEnabled(not fabrica.es_local(motor))
+        self._actualizar_estado_clave()
+
     def _actualizar_estado_clave(self) -> None:
-        self.etiqueta_clave.setText("Guardada ✓" if configuracion.leer_clave() else "No guardada")
+        motor = self.motor_elegido()
+        if fabrica.es_local(motor):
+            self.etiqueta_clave.setText("No hace falta: el modelo corre en tu PC")
+        elif configuracion.leer_clave(motor):
+            self.etiqueta_clave.setText("Guardada ✓")
+        else:
+            self.etiqueta_clave.setText("No guardada" if fabrica.necesita_clave(motor) else "Opcional")
 
     def _guardar_clave(self) -> None:
+        motor = self.motor_elegido()
+        nombre = fabrica.MOTORES[motor]
+        donde = " de aistudio.google.com/apikey" if motor == fabrica.GEMINI else ""
         clave, ok = QInputDialog.getText(
-            self, "Clave de Gemini", "Pega tu clave de aistudio.google.com/apikey:", QLineEdit.EchoMode.Password
+            self, f"Clave de {nombre}", f"Pega tu clave{donde}:", QLineEdit.EchoMode.Password
         )
         if ok and clave.strip():
-            configuracion.guardar_clave(clave.strip())
+            configuracion.guardar_clave(clave.strip(), motor)
             self._actualizar_estado_clave()
-            self.escribir("Clave guardada en el almacén de credenciales del sistema.")
+            self.escribir(f"Clave de {nombre} guardada en el almacén de credenciales del sistema.")
 
     def _probar_clave(self) -> None:
-        clave = configuracion.leer_clave()
-        if not clave:
-            self.avisar("Primero guarda la clave de Gemini.")
+        if self._sondeo is not None:
             return
-        motor = self._fabrica_motor(clave, self.c_modelo.currentText())
-        if not isinstance(motor, Gemini) or self._sondeo is not None:
+        o = self.opciones()
+        clave = configuracion.leer_clave(o["motor"])
+        try:
+            motor = self._fabrica_motor(o["motor"], clave, o["modelo"] or "listar", o["direccion"])
+        except ErrorFatal as e:
+            self.avisar(str(e))
+            return
+        listar = getattr(motor, "listar_modelos", None)
+        if not callable(listar):
             return
         self.b_probar.setEnabled(False)
-        self.escribir("Comprobando la clave con Google…")
+        self.escribir(f"Comprobando la conexión con {fabrica.MOTORES[o['motor']]}…")
         self._sondeo = QThread(self)  # con padre: Qt lo libera junto con la ventana
-        self._consulta = Consulta(motor.listar_modelos)
+        self._consulta = Consulta(cast(Callable[[], list[str]], listar))
+        if isinstance(motor, Compatible):
+            self._sondeo.finished.connect(motor.cerrar)
         self._consulta.moveToThread(self._sondeo)
         self._sondeo.finished.connect(self._consulta.deleteLater)
         self._sondeo.started.connect(self._consulta.ejecutar)
@@ -381,15 +440,21 @@ class Ventana(QMainWindow):
             actual = self.c_modelo.currentText()
             self.c_modelo.clear()
             self.c_modelo.addItems([m for m in modelos if "tts" not in m and "image" not in m])
-            self.c_modelo.setCurrentText(actual if actual in modelos else MODELO_POR_DEFECTO)
-            self.escribir(f"Clave correcta. {len(modelos)} modelos disponibles.")
+            por_defecto = MODELO_POR_DEFECTO if self.motor_elegido() == fabrica.GEMINI else modelos[0]
+            self.c_modelo.setCurrentText(actual if actual in modelos else por_defecto)
+            self.escribir(f"Conexión correcta. {len(modelos)} modelos disponibles.")
+        else:
+            self.escribir("Conexión correcta, pero el servidor no informó modelos: escribe el nombre a mano.")
 
     # ------------------------------------------------------------------ acciones
     def opciones(self) -> dict[str, Any]:
         return {
             "dialecto": self.c_dialecto.currentData(),
             "grupos": [g for g, c in self.casillas.items() if c.isChecked()],
-            "modelo": self.c_modelo.currentText().strip() or MODELO_POR_DEFECTO,
+            "motor": self.motor_elegido(),
+            "direccion": self.e_direccion.text().strip(),
+            "modelo": self.c_modelo.currentText().strip()
+            or (MODELO_POR_DEFECTO if self.motor_elegido() == fabrica.GEMINI else ""),
             "lotes": self.c_lotes.isChecked(),
             "hilos": self.c_hilos.value(),
             "activar": self.c_activar.isChecked(),
@@ -398,8 +463,9 @@ class Ventana(QMainWindow):
         }
 
     def _confirmar_traducir(self) -> None:
-        if not configuracion.leer_clave() and not self._es_prueba():
-            self.avisar("Falta la clave de Gemini: pulsa «Guardar clave…».")
+        motor = self.motor_elegido()
+        if fabrica.necesita_clave(motor) and not configuracion.leer_clave(motor) and not self._es_prueba():
+            self.avisar(f"Falta la clave de {fabrica.MOTORES[motor]}: pulsa «Guardar clave…».")
             return
         texto = (
             "Cierra Minecraft antes de seguir.\n\nLas misiones y scripts se guardan en una copia y puedes "
@@ -407,7 +473,7 @@ class Ventana(QMainWindow):
         )
         if self.ultimo_informe is not None:
             o = self.opciones()
-            costo = self.ultimo_informe.costo(o["modelo"], o["lotes"])
+            costo = self.ultimo_informe.costo(o["modelo"], o["lotes"], o["motor"])
             if costo is not None:
                 texto = f"Costo estimado: US$ {costo:.2f}.\n\n" + texto
         if self._preguntar("Traducir", texto):
@@ -429,8 +495,14 @@ class Ventana(QMainWindow):
             return
         opciones = self.opciones()
         if accion == "traducir":
-            clave = configuracion.leer_clave() or ""
-            motor = self._fabrica_motor(clave, opciones["modelo"])
+            try:
+                motor = self._fabrica_motor(
+                    opciones["motor"], configuracion.leer_clave(opciones["motor"]), opciones["modelo"],
+                    opciones["direccion"],
+                )  # fmt: skip
+            except ErrorFatal as e:
+                self.avisar(str(e))
+                return
         else:
             motor = Simulador()  # analizar y restaurar no llaman al motor
         self._guardar_preferencias(carpeta)
@@ -501,10 +573,14 @@ class Ventana(QMainWindow):
             for col, v in enumerate(valores):
                 self.tabla.setItem(fila, col, QTableWidgetItem(v))
         o = self.opciones()
-        costo = informe.costo(o["modelo"], o["lotes"])
+        costo = informe.costo(o["modelo"], o["lotes"], o["motor"])
         texto = f"Para el motor: {informe.a_traducir} textos, {informe.caracteres} caracteres."
-        if costo is not None:
+        if fabrica.es_local(o["motor"]):
+            texto += " Sin costo: el modelo corre en tu PC."
+        elif costo is not None:
             texto += f" Costo estimado con {o['modelo']}{' por lotes' if o['lotes'] else ''}: US$ {costo:.2f}."
+        elif o["motor"] != fabrica.GEMINI:
+            texto += " El costo depende del proveedor y del modelo: revisa sus precios."
         self.costo.setText(texto)
         for aviso in informe.avisos:
             self.escribir(f"⚠ {aviso}")
@@ -577,9 +653,14 @@ class Ventana(QMainWindow):
             contextos[carpeta] = o["contexto"]
         else:
             contextos.pop(carpeta, None)
+        modelos = _diccionario(self._preferencias.get("modelos")) | {o["motor"]: o["modelo"]}
+        direcciones = _diccionario(self._preferencias.get("direcciones"))
+        if o["motor"] == "personalizado":
+            direcciones["personalizado"] = o["direccion"]
         self._preferencias = {
-            "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "modelo": o["modelo"],
-            "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
+            "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "motor": o["motor"],
+            "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
+            "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
         }  # fmt: skip
         configuracion.guardar_preferencias(dict(self._preferencias))
 

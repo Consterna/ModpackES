@@ -10,8 +10,9 @@ from typing import Any, cast
 
 from . import NOMBRE, __version__, configuracion
 from .fuentes.lanzadores import buscar
+from .motores import fabrica
 from .motores.base import Cancelado, ErrorFatal, Motor
-from .motores.gemini import MODELO_POR_DEFECTO, Gemini
+from .motores.gemini import MODELO_POR_DEFECTO
 from .motores.simulador import Simulador
 from .nucleo.dialectos import DIALECTOS
 from .proceso import GRUPOS, Informe, Proceso
@@ -23,20 +24,26 @@ def _escribir(texto: str) -> None:
     LOGGER.info(texto)
 
 
-def _motor(args: argparse.Namespace) -> Motor:
-    if getattr(args, "simular", False):
-        return Simulador()
-    clave = configuracion.leer_clave()
-    if not clave:
-        raise ErrorFatal("Falta la clave de Gemini. Guárdala con «modpackes clave guardar» o usa GEMINI_API_KEY.")
-    return Gemini(clave, args.modelo)
+def _modelo(args: argparse.Namespace) -> str:
+    return args.modelo or (MODELO_POR_DEFECTO if args.motor == fabrica.GEMINI else "")
 
 
-def _mostrar(informe: Informe, modelo: str, lotes: bool) -> None:
+def _crear(args: argparse.Namespace) -> Motor:
+    clave = configuracion.leer_clave(args.motor) if fabrica.necesita_clave(args.motor) else None
+    if fabrica.necesita_clave(args.motor) and not clave:
+        raise ErrorFatal(
+            f"Falta la clave de {fabrica.MOTORES[args.motor]}. Guárdala con «modpackes clave guardar --motor "
+            f"{args.motor}» o usa {configuracion.variable_de_entorno(args.motor)}."
+        )
+    return fabrica.crear(args.motor, clave, _modelo(args), args.direccion or "")
+
+
+def _mostrar(informe: Informe, args: argparse.Namespace) -> None:
     for m in informe.modulos:
         linea = f"  {m.nombre}: {m.descripcion} — {m.textos} textos, {m.a_traducir} para el motor ({m.caracteres} car.)"
         _escribir(linea + (f"\n      {m.resumen}" if m.resumen else ""))
-    costo = informe.costo(modelo, lotes)
+    modelo, lotes = _modelo(args), args.lotes
+    costo = informe.costo(modelo, lotes, args.motor)
     _escribir(f"Total para el motor: {informe.a_traducir} textos, {informe.caracteres} caracteres")
     if costo is not None:
         _escribir(f"Costo estimado con {modelo}{' (por lotes)' if lotes else ''}: US$ {costo:.2f}")
@@ -46,6 +53,11 @@ def _mostrar(informe: Informe, modelo: str, lotes: bool) -> None:
         _escribir(f"⚠ {informe.revision}")
     if informe.pack_activado:
         _escribir("Juego: " + ", ".join(informe.pack_activado))
+
+
+def _opciones_de_motor(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--motor", choices=list(fabrica.MOTORES), default=fabrica.GEMINI, help="motor de traducción")
+    p.add_argument("--direccion", default="", help="dirección del servidor (para --motor personalizado)")
 
 
 def _argumentos() -> argparse.ArgumentParser:
@@ -58,8 +70,9 @@ def _argumentos() -> argparse.ArgumentParser:
         p.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
         p.add_argument("--dialecto", choices=list(DIALECTOS), default="es_mx")
         p.add_argument("--solo", default=",".join(GRUPOS), help="grupos separados por comas: " + ",".join(GRUPOS))
-        p.add_argument("--modelo", default=MODELO_POR_DEFECTO)
-        p.add_argument("--lotes", action="store_true", help="usar la Batch API (mitad de precio, tarda más)")
+        _opciones_de_motor(p)
+        p.add_argument("--modelo", default="", help=f"modelo (con Gemini, por defecto {MODELO_POR_DEFECTO})")
+        p.add_argument("--lotes", action="store_true", help="usar la Batch API de Gemini (mitad de precio, tarda más)")
         p.add_argument("--contexto", default="", help="ambientación del modpack para el tono y los términos")
 
     comunes(sub.add_parser("analizar", help="cuenta lo que falta traducir y estima el costo (no escribe nada)"))
@@ -71,10 +84,32 @@ def _argumentos() -> argparse.ArgumentParser:
     traducir.add_argument("--no-idioma", action="store_true", help="no cambiar el idioma del juego")
     restaurar = sub.add_parser("restaurar", help="devuelve misiones, scripts y libros propios a su original")
     restaurar.add_argument("carpeta")
-    sub.add_parser("modelos", help="lista los modelos de Gemini que acepta tu clave")
-    clave = sub.add_parser("clave", help="guarda u olvida la clave de Gemini en el sistema")
+    modelos = sub.add_parser("modelos", help="lista los modelos que ofrece el motor")
+    _opciones_de_motor(modelos)
+    clave = sub.add_parser("clave", help="guarda u olvida la clave de un motor en el sistema")
     clave.add_argument("accion", choices=["guardar", "olvidar"])
+    clave.add_argument("--motor", choices=list(fabrica.MOTORES), default=fabrica.GEMINI)
     return ap
+
+
+def _traducir_o_analizar(args: argparse.Namespace) -> None:
+    if args.lotes and args.motor != fabrica.GEMINI:
+        raise ErrorFatal("--lotes solo funciona con Gemini.")
+    if args.orden == "analizar" or args.simular:
+        motor: Motor = Simulador()
+    else:
+        motor = _crear(args)
+    grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
+    with Proceso(
+        args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
+        hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto,
+    ) as p:  # fmt: skip
+        _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
+        if args.orden == "analizar":
+            informe = p.analizar()
+        else:
+            informe = p.ejecutar(activar=not args.no_activar, poner_idioma=not args.no_idioma)
+    _mostrar(informe, args)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -87,35 +122,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             for e in buscar():
                 _escribir(f"{e.lanzador}: {e.nombre}\n    {e.juego}")
         elif args.orden == "clave":
+            nombre = fabrica.MOTORES[args.motor]
             if args.accion == "guardar":
-                configuracion.guardar_clave(getpass.getpass("Clave de Gemini (no se muestra): "))
+                configuracion.guardar_clave(getpass.getpass(f"Clave de {nombre} (no se muestra): "), args.motor)
                 _escribir("Clave guardada en el almacén de credenciales del sistema.")
             else:
-                configuracion.olvidar_clave()
+                configuracion.olvidar_clave(args.motor)
                 _escribir("Clave olvidada.")
         elif args.orden == "modelos":
-            clave = configuracion.leer_clave()
-            if not clave:
-                raise ErrorFatal("Falta la clave de Gemini.")
-            for m in Gemini(clave).listar_modelos():
-                _escribir(m)
+            args.modelo = _modelo_para_listar(args)
+            motor = _crear(args)
+            try:
+                for m in cast(Any, motor).listar_modelos():
+                    _escribir(m)
+            finally:
+                if hasattr(motor, "cerrar"):
+                    cast(Any, motor).cerrar()
         elif args.orden == "restaurar":
             with Proceso(args.carpeta, Simulador(), registro=_escribir) as p:
                 restaurados = p.restaurar()
             _escribir(f"Restaurados {len(restaurados)} archivos.")
         else:
-            motor = Simulador() if args.orden == "analizar" else _motor(args)
-            grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
-            with Proceso(
-                args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
-                hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto,
-            ) as p:  # fmt: skip
-                _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
-                if args.orden == "analizar":
-                    informe = p.analizar()
-                else:
-                    informe = p.ejecutar(activar=not args.no_activar, poner_idioma=not args.no_idioma)
-            _mostrar(informe, args.modelo, args.lotes)
+            _traducir_o_analizar(args)
     except (ErrorFatal, ValueError) as e:
         _escribir(f"✖ {e}")
         return 1
@@ -126,6 +154,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         LOGGER.exception("Error no previsto en la línea de comandos")
         raise
     return 0
+
+
+def _modelo_para_listar(args: argparse.Namespace) -> str:
+    """Para listar modelos no hace falta elegir uno: se usa un nombre cualquiera que no se llega a pedir."""
+    return MODELO_POR_DEFECTO if args.motor == fabrica.GEMINI else "listar"
 
 
 if __name__ == "__main__":

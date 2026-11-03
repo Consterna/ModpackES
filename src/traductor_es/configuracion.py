@@ -37,27 +37,37 @@ def ruta_glosario_usuario() -> Path:
     return carpeta_datos() / "glosario.json"
 
 
-def leer_clave() -> str | None:
-    """La variable de entorno GEMINI_API_KEY tiene prioridad; si no, la guardada en el sistema."""
-    if os.environ.get("GEMINI_API_KEY"):
-        clave: str | None = os.environ["GEMINI_API_KEY"].strip()
+def _usuario_de(motor: str) -> str:
+    """Nombre de la clave en el almacén: la de Gemini conserva el de la v2.0 para no perderla."""
+    return USUARIO_CLAVE if motor == "gemini" else f"motor:{motor}"
+
+
+def variable_de_entorno(motor: str) -> str:
+    return "GEMINI_API_KEY" if motor == "gemini" else f"MODPACKES_CLAVE_{motor.upper()}"
+
+
+def leer_clave(motor: str = "gemini") -> str | None:
+    """La variable de entorno (GEMINI_API_KEY, MODPACKES_CLAVE_<MOTOR>) tiene prioridad; si no, la guardada."""
+    variable = variable_de_entorno(motor)
+    if os.environ.get(variable):
+        clave: str | None = os.environ[variable].strip()
     else:
         try:
-            clave = keyring.get_password(SERVICIO, USUARIO_CLAVE)
+            clave = keyring.get_password(SERVICIO, _usuario_de(motor))
         except KeyringError:
             return None
     registro.ocultar(clave)
     return clave
 
 
-def guardar_clave(clave: str) -> None:
+def guardar_clave(clave: str, motor: str = "gemini") -> None:
     registro.ocultar(clave)
-    keyring.set_password(SERVICIO, USUARIO_CLAVE, clave.strip())
+    keyring.set_password(SERVICIO, _usuario_de(motor), clave.strip())
 
 
-def olvidar_clave() -> None:
+def olvidar_clave(motor: str = "gemini") -> None:
     with contextlib.suppress(KeyringError):
-        keyring.delete_password(SERVICIO, USUARIO_CLAVE)
+        keyring.delete_password(SERVICIO, _usuario_de(motor))
 
 
 def leer_preferencias() -> dict[str, Any]:

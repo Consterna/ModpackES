@@ -22,7 +22,8 @@ todos los mods, con un par de clics.
 
 ## Qué hace
 
-ModpackES lee tu modpack, encuentra todo lo que sigue en inglés y lo traduce con la API de Gemini de Google.
+ModpackES lee tu modpack, encuentra todo lo que sigue en inglés y lo traduce con Gemini de Google o con
+cualquier motor compatible con OpenAI, incluidos modelos que corren gratis en tu PC (LM Studio, Ollama).
 Funciona con **cualquier versión** (de 1.7.10 a 26.x), **cualquier loader** (Forge, NeoForge, Fabric, Quilt)
 y **cualquier lanzador**, y escribe a la vez las siete variantes de español del juego.
 
@@ -50,8 +51,10 @@ sin modificar el mod: la app avisa cuáles son.
 2. Cierra Minecraft y abre `ModpackES.exe`.
 3. Elige la instancia de la lista. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher,
    GDLauncher y el launcher oficial; si no aparece, usa «Elegir carpeta…».
-4. Pulsa «Guardar clave…» y pega tu clave de [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
-   Se guarda en el Administrador de credenciales de Windows, nunca en un archivo.
+4. Elige el motor (ver [Motores](#motores)). Con Gemini, pulsa «Guardar clave…» y pega tu clave de
+   [aistudio.google.com/apikey](https://aistudio.google.com/apikey); se guarda en el Administrador de
+   credenciales de Windows, nunca en un archivo. Con LM Studio u Ollama no hace falta clave: enciende su
+   servidor y pulsa «Probar conexión» para elegir el modelo.
 5. Pulsa **1. Analizar (gratis)**: cuenta lo que falta y estima el costo.
 6. Pulsa **2. Traducir**. Al terminar activa el pack y pone el juego en español (se puede desmarcar).
 
@@ -73,6 +76,21 @@ falta un código del original (`%s`, `§a`, `$(l)`…), no se guarda, para que n
 > El ejecutable no tiene firma digital, así que la primera vez Windows SmartScreen puede avisar. Pulsa
 > «Más información» → «Ejecutar de todas formas». Puedes comprobar el archivo con el SHA-256 que viene en la
 > página de cada versión.
+
+## Motores
+
+| Motor | Clave | Costo | Notas |
+|---|---|---|---|
+| **Gemini** (por defecto) | Sí, de Google AI Studio | El que estima «Analizar»; la mitad con «Por lotes» | El más probado: con él se tradujo Farming Crossing 4 |
+| **OpenRouter** | Sí | Según el modelo que elijas | Da acceso a muchos modelos con una sola cuenta |
+| **DeepSeek** | Sí | Según su lista de precios | Responde en JSON simple; el validador revisa cada texto igual |
+| **LM Studio** / **Ollama** | No | Gratis | El modelo corre en tu PC, sin internet. La calidad depende del modelo y del equipo |
+| **Otro compatible con OpenAI** | Opcional | Según el servidor | Cualquier servidor con `/v1/chat/completions` |
+
+Todos los motores reciben las mismas instrucciones y pasan por las mismas reglas de calidad: lo que pierde un
+código o vuelve en inglés se descarta. Con modelos locales pequeños (menos de unos 7 000 millones de
+parámetros) es más probable que fallen el formato JSON y que queden más textos en inglés; LM Studio advierte
+lo mismo en su documentación.
 
 ## Costo
 
@@ -107,12 +125,12 @@ Vuelve a pulsar «Traducir». Lo que ya estaba traducido sale de la memoria sin 
 </details>
 
 <details>
-<summary><b>¿Qué se envía a Google?</b></summary>
+<summary><b>¿Qué se envía y a quién?</b></summary>
 
-Solo los textos que hay que traducir, con los códigos cambiados por marcadores y la clave del mod como
-contexto. No se envía
-nada más del PC. Ten en cuenta que, según las condiciones de Google, los datos de la capa gratuita pueden
-usarse para mejorar sus productos.
+Solo los textos que hay que traducir, con los códigos cambiados por marcadores, la clave del mod como
+contexto y la ambientación si la escribiste. Van únicamente al motor que elijas; con LM Studio u Ollama no
+salen de tu PC. No se envía nada más. Ten en cuenta que, según las condiciones de Google, los datos de la capa
+gratuita de Gemini pueden usarse para mejorar sus productos; revisa las condiciones del proveedor que uses.
 </details>
 
 <details>
@@ -139,9 +157,13 @@ uv run modpackes instancias
 uv run modpackes analizar "RUTA DE LA INSTANCIA"
 uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"]
 uv run modpackes restaurar "RUTA"
-uv run modpackes clave guardar
-uv run modpackes modelos
+uv run modpackes clave guardar [--motor openrouter]
+uv run modpackes modelos [--motor ollama]
 ```
+
+Con otro motor: `--motor openrouter|deepseek|lmstudio|ollama|personalizado`, `--modelo NOMBRE` y, para el
+personalizado, `--direccion http://servidor/v1`. La clave también se puede pasar por variable de entorno:
+`GEMINI_API_KEY` o `MODPACKES_CLAVE_<MOTOR>` (por ejemplo `MODPACKES_CLAVE_OPENROUTER`).
 
 `traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia.
 

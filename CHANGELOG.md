@@ -19,6 +19,9 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   guardar y quitar correcciones desde la ventana.
 - Campo «Ambientación» (y `--contexto` en la línea de comandos): una descripción corta del modpack que el
   motor usa para el tono y los términos propios. Se guarda por instancia.
+- Motores compatibles con OpenAI además de Gemini: OpenRouter, DeepSeek, LM Studio y Ollama (gratis, con un
+  modelo en tu PC) y uno personalizado. Se elige en la ventana o con `--motor`; cada uno guarda su clave y
+  su modelo. «Probar clave» pasa a ser «Probar conexión» y carga los modelos de cualquier motor.
 
 ### Corregido
 

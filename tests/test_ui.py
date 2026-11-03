@@ -18,7 +18,7 @@ from traductor_es.motores.base import Motor
 from traductor_es.motores.simulador import Simulador
 from traductor_es.salida import exportar
 from traductor_es.ui.app import main
-from traductor_es.ui.ventana import Ventana
+from traductor_es.ui.ventana import FabricaMotor, Ventana
 
 from . import fabrica
 
@@ -30,6 +30,15 @@ def _entorno(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(vanilla, "raices_de_lanzadores", ninguna)
     monkeypatch.setenv("TRADUCTOR_ES_PRUEBA_UI", "1")  # sin cuadros de diálogo
+
+
+def siempre(motor: Motor) -> FabricaMotor:
+    """Una fábrica que devuelve siempre el mismo motor, sea cual sea el elegido en la ventana."""
+
+    def crear(_motor: str, _clave: str | None, _modelo: str, _direccion: str) -> Motor:
+        return motor
+
+    return crear
 
 
 def _modpack(tmp_path: Path) -> Path:
@@ -49,7 +58,7 @@ def _ventana(qtbot: QtBot, juego: Path) -> Ventana:
     def instancias() -> list[InstanciaEncontrada]:
         return [InstanciaEncontrada("Prism Launcher", "Prueba", juego)]
 
-    def simulador(_clave: str, _modelo: str) -> Motor:
+    def simulador(_motor: str, _clave: str | None, _modelo: str, _direccion: str) -> Motor:
         return Simulador()
 
     v = Ventana(buscar_instancias=instancias, fabrica_motor=simulador)
@@ -123,13 +132,13 @@ def test_probar_clave_no_congela_y_muestra_modelos(qtbot: QtBot, monkeypatch: py
     from traductor_es import configuracion
     from traductor_es.motores.gemini import Gemini
 
-    monkeypatch.setattr(configuracion, "leer_clave", lambda: "clave")
+    monkeypatch.setattr(configuracion, "leer_clave", lambda _motor="gemini": "clave")
     modelos = SimpleNamespace(
         list=lambda: [SimpleNamespace(name="models/gemini-9-flash", supported_actions=["generateContent"])]
     )
 
-    def fabrica(clave: str, modelo: str) -> Motor:
-        return Gemini(clave, modelo, cliente=SimpleNamespace(models=modelos))
+    def fabrica(_motor: str, clave: str | None, modelo: str, _direccion: str) -> Motor:
+        return Gemini(clave or "", modelo, cliente=SimpleNamespace(models=modelos))
 
     v = Ventana(buscar_instancias=list, fabrica_motor=fabrica)
     qtbot.addWidget(v)
@@ -204,7 +213,7 @@ def test_corregir_desde_la_ventana_y_volver_a_traducir_sin_pagar(qtbot: QtBot, t
     motor = Simulador()
     v = Ventana(
         buscar_instancias=lambda: [InstanciaEncontrada("Prism Launcher", "P", juego)],
-        fabrica_motor=lambda _c, _m: motor,
+        fabrica_motor=siempre(motor),
     )
     qtbot.addWidget(v)
     v.lista.setCurrentRow(0)
@@ -249,7 +258,7 @@ def test_la_ambientacion_se_guarda_por_instancia(qtbot: QtBot, tmp_path: Path) -
     def instancias() -> list[InstanciaEncontrada]:
         return [InstanciaEncontrada("Prism Launcher", "A", a), InstanciaEncontrada("Prism Launcher", "B", b)]
 
-    v = Ventana(buscar_instancias=instancias, fabrica_motor=lambda _c, _m: motor)
+    v = Ventana(buscar_instancias=instancias, fabrica_motor=siempre(motor))
     qtbot.addWidget(v)
     v.lista.setCurrentRow(0)
     v.e_contexto.setText("Granja acogedora")
