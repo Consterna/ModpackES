@@ -43,12 +43,14 @@ def _mostrar(informe: Informe, args: argparse.Namespace) -> None:
         linea = f"  {m.nombre}: {m.descripcion} — {m.textos} textos, {m.a_traducir} para el motor ({m.caracteres} car.)"
         _escribir(linea + (f"\n      {m.resumen}" if m.resumen else ""))
     modelo, lotes = _modelo(args), args.lotes
-    costo = informe.costo(modelo, lotes, args.motor)
+    costo = informe.costo(modelo, lotes, args.motor, args.revisar)
     _escribir(f"Total para el motor: {informe.a_traducir} textos, {informe.caracteres} caracteres")
     if costo is not None:
         _escribir(f"Costo estimado con {modelo}{' (por lotes)' if lotes else ''}: US$ {costo:.2f}")
     for aviso in informe.avisos:
         _escribir(f"⚠ {aviso}")
+    if informe.revision_automatica is not None:
+        _escribir(str(informe.revision_automatica))
     if informe.revision and informe.revision.inconsistentes:
         _escribir(f"⚠ {informe.revision}")
     if informe.pack_activado:
@@ -74,6 +76,7 @@ def _argumentos() -> argparse.ArgumentParser:
         p.add_argument("--modelo", default="", help=f"modelo (con Gemini, por defecto {MODELO_POR_DEFECTO})")
         p.add_argument("--lotes", action="store_true", help="usar la Batch API de Gemini (mitad de precio, tarda más)")
         p.add_argument("--contexto", default="", help="ambientación del modpack para el tono y los términos")
+        p.add_argument("--revisar", action="store_true", help="revisión automática de misiones y libros (cuesta más)")
 
     comunes(sub.add_parser("analizar", help="cuenta lo que falta traducir y estima el costo (no escribe nada)"))
     traducir = sub.add_parser("traducir", help="traduce y escribe el resultado")
@@ -102,7 +105,7 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
     grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
     with Proceso(
         args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
-        hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto,
+        hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
     ) as p:  # fmt: skip
         _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
         if args.orden == "analizar":

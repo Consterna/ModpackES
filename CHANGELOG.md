@@ -22,6 +22,9 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Motores compatibles con OpenAI además de Gemini: OpenRouter, DeepSeek, LM Studio y Ollama (gratis, con un
   modelo en tu PC) y uno personalizado. Se elige en la ventana o con `--motor`; cada uno guarda su clave y
   su modelo. «Probar clave» pasa a ser «Probar conexión» y carga los modelos de cualquier motor.
+- Revisión automática opcional de misiones y libros (`--revisar`): el motor juzga cada traducción nueva y
+  se rehacen las que tienen errores graves. Lo rehecho solo reemplaza a lo anterior si pasa las mismas
+  reglas, y las correcciones del usuario no se tocan. El análisis estima el costo con la revisión.
 
 ### Corregido
 

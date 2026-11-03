@@ -64,6 +64,13 @@ El campo **Ambientación** (opcional) le cuenta al motor de qué va el modpack: 
 amable; “Bells” es la moneda del pueblo». Ayuda con el tono y con los términos propios del pack, y se guarda
 por instancia.
 
+**Revisión automática** (opcional, solo misiones y libros): después de traducir, otro pedido al motor juzga
+cada traducción nueva al estilo de [GEMBA-MQM](https://aclanthology.org/2023.wmt-1.64) (exactitud,
+terminología, fluidez y estilo, con gravedad leve, grave o crítica) y las graves se vuelven a traducir
+indicando el error. La nueva traducción tiene que pasar las mismas reglas; si no, queda la anterior. Tus
+correcciones nunca se revisan. Sube el costo de esos textos (el análisis lo incluye) y sus marcas no son
+infalibles: sirven para decidir qué rehacer, no como nota de calidad.
+
 **Restaurar original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar la
 traducción de los mods basta con desactivar el resource pack.
 
@@ -155,7 +162,7 @@ Desde el código fuente (ver [Desarrollo](#desarrollo)):
 ```
 uv run modpackes instancias
 uv run modpackes analizar "RUTA DE LA INSTANCIA"
-uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"]
+uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar]
 uv run modpackes restaurar "RUTA"
 uv run modpackes clave guardar [--motor openrouter]
 uv run modpackes modelos [--motor ollama]

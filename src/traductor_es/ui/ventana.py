@@ -114,6 +114,7 @@ class Trabajador(QObject):
                 hilos=self.opciones["hilos"],
                 usar_lotes=self.opciones["lotes"],
                 contexto=self.opciones["contexto"],
+                revisar=self.opciones["revisar"],
             ) as p:
                 self.registro.emit(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'}")
                 if self.accion == "analizar":
@@ -215,6 +216,13 @@ class Ventana(QMainWindow):
         self.c_lotes = QCheckBox("Por lotes: mitad de precio, pero puede tardar desde minutos hasta horas")
         self.c_lotes.setChecked(bool(self._preferencias.get("lotes", False)))
         formulario.addRow("", self.c_lotes)
+        self.c_revisar = QCheckBox("Revisión automática de misiones y libros: rehace lo que tenga errores graves")
+        self.c_revisar.setToolTip(
+            "Otro pedido al motor juzga cada traducción nueva de misiones y libros; las que tengan errores graves se "
+            "vuelven a traducir. El análisis muestra el costo con la revisión incluida."
+        )
+        self.c_revisar.setChecked(bool(self._preferencias.get("revisar", False)))
+        formulario.addRow("", self.c_revisar)
         self.c_hilos = QSpinBox()
         self.c_hilos.setRange(1, 16)
         self.c_hilos.setValue(int(self._preferencias.get("hilos", 4)))
@@ -460,6 +468,7 @@ class Ventana(QMainWindow):
             "activar": self.c_activar.isChecked(),
             "idioma": self.c_activar.isChecked(),
             "contexto": self.e_contexto.text().strip(),
+            "revisar": self.c_revisar.isChecked(),
         }
 
     def _confirmar_traducir(self) -> None:
@@ -473,7 +482,7 @@ class Ventana(QMainWindow):
         )
         if self.ultimo_informe is not None:
             o = self.opciones()
-            costo = self.ultimo_informe.costo(o["modelo"], o["lotes"], o["motor"])
+            costo = self.ultimo_informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"])
             if costo is not None:
                 texto = f"Costo estimado: US$ {costo:.2f}.\n\n" + texto
         if self._preguntar("Traducir", texto):
@@ -573,7 +582,7 @@ class Ventana(QMainWindow):
             for col, v in enumerate(valores):
                 self.tabla.setItem(fila, col, QTableWidgetItem(v))
         o = self.opciones()
-        costo = informe.costo(o["modelo"], o["lotes"], o["motor"])
+        costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"])
         texto = f"Para el motor: {informe.a_traducir} textos, {informe.caracteres} caracteres."
         if fabrica.es_local(o["motor"]):
             texto += " Sin costo: el modelo corre en tu PC."
@@ -584,6 +593,8 @@ class Ventana(QMainWindow):
         self.costo.setText(texto)
         for aviso in informe.avisos:
             self.escribir(f"⚠ {aviso}")
+        if informe.revision_automatica is not None:
+            self.escribir(str(informe.revision_automatica))
         if informe.pack_activado:
             self.escribir("Juego: " + ", ".join(informe.pack_activado))
 
@@ -661,6 +672,7 @@ class Ventana(QMainWindow):
             "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "motor": o["motor"],
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
+            "revisar": o["revisar"],
         }  # fmt: skip
         configuracion.guardar_preferencias(dict(self._preferencias))
 

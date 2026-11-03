@@ -31,6 +31,8 @@ class Resultado:
     traducciones: dict[str, str] = field(default_factory=dict[str, str])
     rechazados: dict[str, str] = field(default_factory=dict[str, str])  #: original → motivo
     enviados: int = 0
+    #: Lo que el motor tradujo en esta ejecución (núcleo → traducción), sin lo que salió de la memoria
+    nuevas: dict[str, str] = field(default_factory=dict[str, str])
 
 
 class Traductor:
@@ -223,4 +225,22 @@ class Traductor:
         with self._lock:
             resultado.enviados += len(lote)
             resultado.rechazados.update(rechazados)
+            resultado.nuevas.update(buenos)
         return buenos
+
+    # ------------------------------------------------------------------ revisión
+    def rehacer(self, motivos: Mapping[str, tuple[str, str]], ambito: str, pistas: Mapping[str, str]) -> dict[str, str]:
+        """Vuelve a traducir núcleos que una revisión marcó, aunque estén en la memoria.
+
+        `motivos` es {núcleo: (traducción anterior, motivo)}. La nueva traducción reemplaza a la anterior en la
+        memoria solo si pasa las mismas reglas; si no, queda la anterior. Devuelve las que cambiaron.
+        """
+        if not motivos:
+            return {}
+        pistas_nuevas: dict[str, str] = {}
+        for n, (anterior, motivo) in motivos.items():
+            aviso = f"Una revisión marcó la traducción anterior («{anterior}»): {motivo}. Corrígela."
+            pistas_nuevas[n] = f"{pistas[n]} · {aviso}" if pistas.get(n) else aviso
+        resultado = Resultado()
+        self._ronda(sorted(motivos), ambito, pistas_nuevas, (1500, 10), resultado, informar=False, por_lotes=False)
+        return {n: t for n, t in resultado.nuevas.items() if t != motivos[n][0]}

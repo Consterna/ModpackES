@@ -20,14 +20,18 @@ from .motores.compatible import Compatible
 from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
 from .nucleo.glosario import Glosario
+from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import Traductor
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
 from .salida.resource_pack import NOMBRE, PackSalida
+from .validacion import revision
 from .validacion.calidad import Revision, revisar_glosario, validar
 
 GRUPOS = ("mods", "libros", "misiones", "scripts")
+#: Grupos que pasan por la revisión automática: textos largos donde un error se nota y cambia el sentido.
+GRUPOS_REVISADOS = ("misiones", "libros")
 _ESTADOS = {"JOB_STATE_PENDING": "en cola", "JOB_STATE_RUNNING": "procesando"}
 #: Tokens por carácter y sobrecarga por lote, medidos a ojo con textos de mods: solo para estimar.
 _CARACTERES_POR_TOKEN, _TOKENS_POR_LOTE = 3.5, 450
@@ -49,6 +53,7 @@ class Informe:
     modulos: list[InformeModulo] = field(default_factory=list[InformeModulo])
     avisos: list[str] = field(default_factory=list[str])
     revision: Revision | None = None
+    revision_automatica: revision.ResumenRevision | None = None
     pack_activado: list[str] = field(default_factory=list[str])
 
     @property
@@ -59,19 +64,34 @@ class Informe:
     def caracteres(self) -> int:
         return sum(m.caracteres for m in self.modulos)
 
-    def costo(self, modelo: str, por_lotes: bool, motor: str = fabrica.GEMINI) -> float | None:
+    def costo(self, modelo: str, por_lotes: bool, motor: str = fabrica.GEMINI, revisar: bool = False) -> float | None:
         """Costo estimado en US$: 0 con un motor en el PC; None si no se conoce el precio del modelo."""
         if fabrica.es_local(motor):
             return 0.0
         precio = PRECIOS.get(modelo) if motor == fabrica.GEMINI else None
         if precio is None:
             return None
-        tokens = self.caracteres / _CARACTERES_POR_TOKEN
-        lotes = max(1, self.a_traducir // 50)
-        entrada = tokens * 1.6 + lotes * _TOKENS_POR_LOTE
-        salida = tokens * 1.4  # traducción (el español es algo más largo) más algo de razonamiento
-        total = (entrada * precio[0] + salida * precio[1]) / 1e6
-        return total / 2 if por_lotes else total
+        total = _costo_traduccion(self.caracteres, self.a_traducir, precio)
+        total = total / 2 if por_lotes else total
+        if revisar:  # la revisión va en modo normal aunque la traducción vaya por lotes
+            revisados = [m for m in self.modulos if m.grupo in GRUPOS_REVISADOS]
+            caracteres = sum(m.caracteres for m in revisados)
+            textos = sum(m.a_traducir for m in revisados)
+            tokens = caracteres / _CARACTERES_POR_TOKEN
+            # leer original y traducción, contestar unas palabras por texto y rehacer más o menos 1 de cada 7
+            total += (tokens * 2.4 * precio[0] + textos * 12 * precio[1]) / 1e6
+            total += 0.15 * _costo_traduccion(caracteres, textos, precio)
+        return total
+
+
+def _costo_traduccion(caracteres: int, textos: int, precio: tuple[float, float]) -> float:
+    if not caracteres:
+        return 0.0
+    tokens = caracteres / _CARACTERES_POR_TOKEN
+    lotes = max(1, textos // 50)
+    entrada = tokens * 1.6 + lotes * _TOKENS_POR_LOTE
+    salida = tokens * 1.4  # traducción (el español es algo más largo) más algo de razonamiento
+    return (entrada * precio[0] + salida * precio[1]) / 1e6
 
 
 class Proceso:
@@ -88,8 +108,10 @@ class Proceso:
         hilos: int = 4,
         usar_lotes: bool = False,
         contexto: str = "",
+        revisar: bool = False,
     ) -> None:
         self.instancia = Instancia(carpeta)
+        self.revisar = revisar
         self.registro = registro
         self.grupos = [g for g in GRUPOS if g in grupos]
         self._memoria_propia = memoria is None
@@ -162,7 +184,18 @@ class Proceso:
             piezas = modulo.recolectar()
             textos = [p.texto for p in piezas]
             pendientes = self.traductor.pendientes(textos, modulo.ambito)
-            resultado = self.traductor.traducir(textos, modulo.ambito, {p.texto: p.pista for p in piezas if p.pista})
+            pistas = {p.texto: p.pista for p in piezas if p.pista}
+            resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
+            if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
+                self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
+                por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
+                hecha = revision.revisar_y_corregir(self.traductor, resultado.nuevas, modulo.ambito, por_nucleo)
+                self.registro(f"   {hecha}")
+                if informe.revision_automatica is None:
+                    informe.revision_automatica = revision.ResumenRevision()
+                informe.revision_automatica.sumar(hecha)
+                if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
+                    resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
             resumen = modulo.escribir(resultado.traducciones)
             self.registro(f"   {resumen}")
             informe.modulos.append(
