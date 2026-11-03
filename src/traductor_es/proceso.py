@@ -16,7 +16,7 @@ from .modulos.base import Contexto, Modulo, Resumen
 from .modulos.mods import es_nombre
 from .motores.base import Motor
 from .motores.gemini import PRECIOS, Gemini
-from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES
+from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
 from .nucleo.glosario import Glosario
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import Traductor
@@ -173,11 +173,18 @@ class Proceso:
         if activar and (self.ctx.pack is not None and (self.ctx.pack.raiz / "pack.mcmeta").is_file()):
             try:
                 informe.pack_activado = opciones_salida.activar(
-                    self.instancia.juego, NOMBRE, self.ctx.dialecto if poner_idioma else None
+                    self.instancia.juego, NOMBRE, self._idioma_del_juego() if poner_idioma else None
                 )
             except ValueError as e:
                 informe.avisos.append(str(e))
         return informe
+
+    def _idioma_del_juego(self) -> str | None:
+        """Idioma a poner en options.txt: ninguno si el jugador ya usa una variante de español (se respeta),
+        y con el formato de su versión (es_MX en 1.10 y anteriores)."""
+        if (self.instancia.opciones.idioma or "") in VARIANTES:
+            return None
+        return nombre_archivo_lang(self.ctx.dialecto, self.instancia.version.partes)
 
     def restaurar(self) -> list[Path]:
         """Devuelve misiones, scripts y libros propios del modpack a su versión original."""

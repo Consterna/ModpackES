@@ -151,3 +151,19 @@ def test_proceso_conecta_cancelar_y_espera_al_motor(tmp_path: Path) -> None:
         assert motor.cancelar is p.traductor.cancelar
     motor.al_esperar("JOB_STATE_RUNNING")
     assert mensajes[-1] == "Esperando a Google (Batch API): procesando"
+
+
+def test_cambiar_de_instancia_borra_el_analisis_anterior(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = _modpack(tmp_path / "a")
+    otro = _modpack(tmp_path / "b")
+
+    def instancias() -> list[InstanciaEncontrada]:
+        return [InstanciaEncontrada("Prism Launcher", "A", juego), InstanciaEncontrada("Prism Launcher", "B", otro)]
+
+    v = Ventana(buscar_instancias=instancias)
+    qtbot.addWidget(v)
+    v.lista.setCurrentRow(0)
+    v.b_analizar.click()
+    qtbot.waitUntil(lambda: v._hilo is None and v.ultimo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    v.lista.setCurrentRow(1)
+    assert v.ultimo_informe is None and v.tabla.rowCount() == 0 and v.costo.text() == ""

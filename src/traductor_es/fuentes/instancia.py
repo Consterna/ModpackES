@@ -45,6 +45,7 @@ class Instancia:
         self._contenedores: list[Contenedor] | None = None
         self._fuentes: list[Fuente] | None = None
         self._vanilla: vanilla_mod.Vanilla | None = None
+        self._tablas: dict[tuple[str, ...], TablaIdiomas] = {}
 
     # ------------------------------------------------------------------ mods
     def _jars_sin_version(self) -> list[Path]:
@@ -77,7 +78,15 @@ class Instancia:
         return self._vanilla
 
     def tabla_idiomas(self, idiomas: Iterable[str] = ("en_us", *VARIANTES)) -> TablaIdiomas:
+        """La tabla se arma una sola vez por instancia e idiomas (leerla recorre todos los jars)."""
         lista = list(idiomas)
+        clave = tuple(lista)
+        if clave in self._tablas:
+            return self._tablas[clave]
+        self._tablas[clave] = self._armar_tabla(lista)
+        return self._tablas[clave]
+
+    def _armar_tabla(self, lista: list[str]) -> TablaIdiomas:
         tabla = leer_idiomas(self.fuentes(), lista, self.legacy)
         oficiales = self.vanilla().textos
         for idioma, textos in oficiales.items():

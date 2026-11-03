@@ -63,11 +63,17 @@ class Libros:
         self.ctx = ctx
         self._idiomas = frozenset({"en_us", *ctx.variantes})
         self._archivos: list[_Archivo] = []
+        self._grupos: dict[tuple[str, ...], dict[str, bytes]] | None = None
         self.sin_traducir_posible: list[str] = []  #: libros de Patchouli antiguos (texto en data/, dentro del jar)
 
     # ------------------------------------------------------------------ búsqueda
     def _agrupar(self) -> dict[tuple[str, ...], dict[str, bytes]]:
-        """{(sistema, ...clave del archivo): {idioma: contenido}} con la versión que ve el juego."""
+        """{(sistema, ...clave del archivo): {idioma: contenido}} con la versión que ve el juego (se lee una vez)."""
+        if self._grupos is None:
+            self._grupos = self._leer_grupos()
+        return self._grupos
+
+    def _leer_grupos(self) -> dict[tuple[str, ...], dict[str, bytes]]:
         grupos: dict[tuple[str, ...], dict[str, bytes]] = {}
         datos_viejos: set[str] = set()
         for nombre, leer in _fuentes_ordenadas(self.ctx.instancia.fuentes()):

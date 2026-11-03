@@ -271,6 +271,10 @@ class Ventana(QMainWindow):
         return str(item.data(Qt.ItemDataRole.UserRole)) if item else None
 
     def _al_elegir(self, actual: QListWidgetItem | None, _anterior: QListWidgetItem | None) -> None:
+        # Lo analizado era de otra instancia: no se muestra ni se usa para estimar el costo
+        self.ultimo_informe = None
+        self.tabla.setRowCount(0)
+        self.costo.setText("")
         if actual is not None:
             self.etiqueta_carpeta.setText(f"<b>{actual.text()}</b><br>{actual.data(Qt.ItemDataRole.UserRole)}")
 

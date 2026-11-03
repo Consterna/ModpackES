@@ -157,3 +157,32 @@ def test_solo_nombres_van_al_glosario() -> None:
 
     assert es_nombre("item.create.wrench") and es_nombre("block.minecraft.stone") and es_nombre("entity.x.osprey")
     assert not es_nombre("key.mouse.right") and not es_nombre("gui.all") and not es_nombre("item.x.wrench.tooltip")
+
+
+@pytest.mark.parametrize(("version", "antes", "despues"), [("1.20.1", "es_es", "es_es"), ("1.20.1", "en_us", "es_mx"),
+                                                          ("1.10.2", "en_US", "es_MX")])  # fmt: skip
+def test_idioma_del_juego(tmp_path: Path, memoria: Memoria, version: str, antes: str, despues: str) -> None:
+    juego = fabrica.prism(tmp_path, version)
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"a": "Wrench"}, legacy=version < "1.13"))
+    fabrica.opciones(juego, ["vanilla"], antes)
+    with Proceso(juego, Simulador(), memoria=memoria) as p:
+        p.ejecutar()
+    assert f"lang:{despues}\n" in (juego / "options.txt").read_text("utf-8")
+
+
+def test_tablas_y_libros_se_leen_una_vez(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _modpack(tmp_path)
+    with Proceso(juego, Simulador(), memoria=memoria) as p:
+        assert p.instancia.tabla_idiomas() is p.instancia.tabla_idiomas()
+        libros = next(m for g, m in p.modulos() if g == "libros")
+        lecturas: list[int] = []
+        original = libros._leer_grupos  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
+
+        def contar() -> object:
+            lecturas.append(1)
+            return original()  # pyright: ignore[reportUnknownVariableType]
+
+        libros._leer_grupos = contar  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        libros.describir()
+        libros.recolectar()
+        assert lecturas == []  # ya se había leído al detectarlo
