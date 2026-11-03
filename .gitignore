@@ -1,0 +1,25 @@
+# Entornos y cachés
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Construcción
+build/
+dist/
+*.spec.bak
+validador/clases/
+
+# Bancos de pruebas con copias de modpacks reales (pesados y de terceros)
+.corpus/
+.descargas/
+
+# Datos locales
+*.db
+*.sqlite
+.env
+config.local.json
