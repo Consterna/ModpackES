@@ -15,10 +15,12 @@ from .motores.gemini import MODELO_POR_DEFECTO, Gemini
 from .motores.simulador import Simulador
 from .nucleo.dialectos import DIALECTOS
 from .proceso import GRUPOS, Informe, Proceso
+from .registro import LOGGER, configurar
 
 
 def _escribir(texto: str) -> None:
     print(texto, flush=True)
+    LOGGER.info(texto)
 
 
 def _motor(args: argparse.Namespace) -> Motor:
@@ -77,6 +79,8 @@ def _argumentos() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     cast(Any, sys.stdout).reconfigure(encoding="utf-8", errors="replace")
     args = _argumentos().parse_args(argv)
+    configurar(configuracion.carpeta_datos())
+    LOGGER.info("Línea de comandos: %s", args.orden)
     try:
         if args.orden == "instancias":
             for e in buscar():
@@ -117,6 +121,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (Cancelado, KeyboardInterrupt):
         _escribir("Cancelado. Lo traducido hasta ahora quedó guardado en la memoria.")
         return 130
+    except Exception:
+        LOGGER.exception("Error no previsto en la línea de comandos")
+        raise
     return 0
 
 

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import keyring
 import pytest
 from keyring.backends import fail
 
+from traductor_es import registro
 from traductor_es.validacion.java import ValidadorJava, biblioteca_mas_nueva, buscar_jdk
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -62,8 +64,10 @@ def cp_ftb_1201() -> list[Path]:
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _datos_de_la_app_en_temporal(tmp_path_factory: pytest.TempPathFactory) -> None:
-    """Ninguna prueba escribe la memoria, el glosario ni las preferencias reales del usuario."""
+def _datos_de_la_app_en_temporal(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Ninguna prueba escribe la memoria, el glosario, las preferencias ni el registro reales del usuario."""
     os.environ["TRADUCTOR_ES_DATOS"] = str(tmp_path_factory.mktemp("datos_app"))
     os.environ.pop("GEMINI_API_KEY", None)
     keyring.set_keyring(fail.Keyring())  # ni se lee ni se escribe el almacén de credenciales real
+    yield
+    registro.cerrar()  # el archivo del registro no queda abierto al terminar

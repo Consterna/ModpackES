@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, configuracion
+from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, configuracion, registro
 from ..fuentes.instancia import resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
 from ..motores.base import Cancelado, ErrorFatal, Motor
@@ -448,6 +448,7 @@ class Ventana(QMainWindow):
         self.escribir(self.estado.text())
 
     def _fallar(self, mensaje: str) -> None:
+        registro.LOGGER.warning("Se detuvo: %s", mensaje)
         self._limpiar_hilo()
         self.estado.setText("Se detuvo.")
         self.escribir(f"✖ {mensaje}")
@@ -495,6 +496,7 @@ class Ventana(QMainWindow):
     # ------------------------------------------------------------------ utilidades
     def escribir(self, texto: str) -> None:
         self.log.appendPlainText(texto)
+        registro.LOGGER.info(texto)
 
     def avisar(self, texto: str) -> None:
         if self._es_prueba():

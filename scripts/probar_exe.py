@@ -39,7 +39,7 @@ def main() -> int:
             print(f"FALLA: el .exe terminó con código {proc.returncode}")
             return 1
         datos = json.loads(salida.read_text("utf-8"))
-    esperado = {"version_app": __version__, "minecraft": "1.20.1", "loader": "forge", "icono": True}
+    esperado = {"version_app": __version__, "minecraft": "1.20.1", "loader": "forge", "icono": True, "registro": True}
     distintos = {k: datos.get(k) for k, v in esperado.items() if datos.get(k) != v}
     grupos = {m["grupo"] for m in datos["modulos"]}
     if distintos or grupos != {"mods", "misiones"}:

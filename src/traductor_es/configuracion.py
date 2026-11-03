@@ -14,6 +14,8 @@ import keyring
 import platformdirs
 from keyring.errors import KeyringError
 
+from . import registro
+
 # Nombres internos de la v2.0 (antes de llamarse ModpackES): cambiarlos perdería la clave y la memoria guardadas.
 SERVICIO = "traductor-es"
 USUARIO_CLAVE = "gemini"
@@ -38,14 +40,18 @@ def ruta_glosario_usuario() -> Path:
 def leer_clave() -> str | None:
     """La variable de entorno GEMINI_API_KEY tiene prioridad; si no, la guardada en el sistema."""
     if os.environ.get("GEMINI_API_KEY"):
-        return os.environ["GEMINI_API_KEY"].strip()
-    try:
-        return keyring.get_password(SERVICIO, USUARIO_CLAVE)
-    except KeyringError:
-        return None
+        clave: str | None = os.environ["GEMINI_API_KEY"].strip()
+    else:
+        try:
+            clave = keyring.get_password(SERVICIO, USUARIO_CLAVE)
+        except KeyringError:
+            return None
+    registro.ocultar(clave)
+    return clave
 
 
 def guardar_clave(clave: str) -> None:
+    registro.ocultar(clave)
     keyring.set_password(SERVICIO, USUARIO_CLAVE, clave.strip())
 
 
