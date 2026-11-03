@@ -1,4 +1,4 @@
-"""Línea de comandos: `traductor-es instancias | analizar | traducir | restaurar | modelos | clave`."""
+"""Línea de comandos: `modpackes instancias | analizar | traducir | restaurar | modelos | clave`."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 from collections.abc import Sequence
 from typing import Any, cast
 
-from . import __version__, configuracion
+from . import NOMBRE, __version__, configuracion
 from .fuentes.lanzadores import buscar
 from .motores.base import Cancelado, ErrorFatal, Motor
 from .motores.gemini import MODELO_POR_DEFECTO, Gemini
@@ -26,7 +26,7 @@ def _motor(args: argparse.Namespace) -> Motor:
         return Simulador()
     clave = configuracion.leer_clave()
     if not clave:
-        raise ErrorFatal("Falta la clave de Gemini. Guárdala con «traductor-es clave guardar» o usa GEMINI_API_KEY.")
+        raise ErrorFatal("Falta la clave de Gemini. Guárdala con «modpackes clave guardar» o usa GEMINI_API_KEY.")
     return Gemini(clave, args.modelo)
 
 
@@ -47,8 +47,8 @@ def _mostrar(informe: Informe, modelo: str, lotes: bool) -> None:
 
 
 def _argumentos() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="traductor-es", description="Traduce modpacks de Minecraft al español.")
-    ap.add_argument("--version", action="version", version=__version__)
+    ap = argparse.ArgumentParser(prog="modpackes", description="Traduce modpacks de Minecraft al español.")
+    ap.add_argument("--version", action="version", version=f"{NOMBRE} {__version__}")
     sub = ap.add_subparsers(dest="orden", required=True)
     sub.add_parser("instancias", help="lista las instancias de los lanzadores del PC")
 

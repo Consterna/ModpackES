@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, configuracion
+from .. import NOMBRE, __version__, configuracion
 from ..fuentes.instancia import resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
 from ..motores.base import Cancelado, ErrorFatal, Motor
@@ -123,7 +123,7 @@ class Ventana(QMainWindow):
         fabrica_motor: FabricaMotor | None = None,
     ) -> None:
         super().__init__()
-        self.setWindowTitle(f"Traductor de Modpacks al Español {__version__}")
+        self.setWindowTitle(f"{NOMBRE} {__version__} · Traductor de modpacks al español")
         self.resize(1100, 720)
         self._buscar_instancias = buscar_instancias
         self._fabrica_motor: FabricaMotor = fabrica_motor or _gemini
@@ -494,7 +494,7 @@ class Ventana(QMainWindow):
         if self._es_prueba():
             self.escribir(f"[aviso] {texto}")
             return
-        QMessageBox.information(self, "Traductor de Modpacks", texto)
+        QMessageBox.information(self, NOMBRE, texto)
 
     def _preguntar(self, titulo: str, texto: str) -> bool:
         if self._es_prueba():

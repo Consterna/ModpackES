@@ -7,6 +7,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .. import NOMBRE as NOMBRE_APP
 from .. import __version__
 from ..formatos import lang_json, lang_legacy
 from ..fuentes.instancia import Instancia
@@ -41,7 +42,7 @@ class PackSalida:
         meta = mcmeta(self.instancia.formato_recursos(), "§eTraducción al español del modpack")
         self.escribir("pack.mcmeta", (json.dumps(meta, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
         marca = {
-            "app": "traductor-es",
+            "app": NOMBRE_APP,
             "version": __version__,
             "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
         }

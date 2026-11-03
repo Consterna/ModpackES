@@ -14,6 +14,7 @@ import keyring
 import platformdirs
 from keyring.errors import KeyringError
 
+# Nombres internos de la v2.0 (antes de llamarse ModpackES): cambiarlos perdería la clave y la memoria guardadas.
 SERVICIO = "traductor-es"
 USUARIO_CLAVE = "gemini"
 

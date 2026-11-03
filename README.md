@@ -1,4 +1,4 @@
-# Traductor de Modpacks al Español
+# ModpackES
 
 Traduce modpacks de Minecraft al español con la API de Gemini: **misiones, libros guía, scripts de KubeJS y
 textos de los mods**. Funciona con cualquier versión (de 1.7.10 a 26.x) y cualquier loader (Forge, NeoForge,
@@ -51,12 +51,12 @@ archivos ya traducidos, el resource pack para los jugadores y las instrucciones.
 ## Línea de comandos
 
 ```
-uv run traductor-es instancias
-uv run traductor-es analizar "RUTA DE LA INSTANCIA"
-uv run traductor-es traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite]
-uv run traductor-es restaurar "RUTA"
-uv run traductor-es clave guardar
-uv run traductor-es modelos
+uv run modpackes instancias
+uv run modpackes analizar "RUTA DE LA INSTANCIA"
+uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite]
+uv run modpackes restaurar "RUTA"
+uv run modpackes clave guardar
+uv run modpackes modelos
 ```
 
 `traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia.

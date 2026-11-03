@@ -211,9 +211,7 @@ class Gemini:
     def _un_trabajo(self, lotes: Sequence[Lote]) -> list[dict[str, str]]:
         pedidos = [{"contents": _usuario(lote), "config": self._config(lote)} for lote in lotes]
         try:
-            trabajo = self._cliente.batches.create(
-                model=self.modelo, src=pedidos, config={"display_name": "traductor-es"}
-            )
+            trabajo = self._cliente.batches.create(model=self.modelo, src=pedidos, config={"display_name": "modpackes"})
             terminados = {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"}
             while (estado := str(getattr(trabajo.state, "name", trabajo.state))) not in terminados:
                 if self.cancelar is not None and self.cancelar.is_set():

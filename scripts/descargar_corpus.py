@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 RAIZ = Path(__file__).resolve().parent.parent / ".descargas"
-AGENTE = "traductor-es/2.0 (corpus de pruebas local)"
+AGENTE = "ModpackES/2.0 (corpus de pruebas local)"
 
 PACKS = {
     "better-mc-neoforge-bmc5": "https://cdn.modrinth.com/data/B37WQ89b/versions/Mo8ro6Ra/Better%20MC%20%5BNEOFORGE%5D%20BMC5%20v31.mrpack",

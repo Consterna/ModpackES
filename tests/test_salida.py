@@ -23,7 +23,7 @@ def test_pack_moderno(tmp_path: Path) -> None:
     assert lang_json.leer(ruta.read_bytes()) == {"c": "Ce"}  # cada escritura reemplaza el archivo completo
     meta = json.loads((pack.raiz / "pack.mcmeta").read_text(encoding="utf-8"))
     assert meta["pack"]["min_format"] == 75 and "pack_format" not in meta["pack"]
-    assert (pack.raiz / MARCA).is_file()
+    assert json.loads((pack.raiz / MARCA).read_text(encoding="utf-8"))["app"] == "ModpackES"
 
 
 @pytest.mark.parametrize(("version", "archivo"), [("1.12.2", "es_es.lang"), ("1.10.2", "es_ES.lang")])
