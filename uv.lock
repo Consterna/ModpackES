@@ -660,6 +660,7 @@ version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "json5" },
     { name = "keyring" },
     { name = "platformdirs" },
@@ -681,6 +682,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "google-genai", specifier = ">=2.34.0" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "json5", specifier = ">=0.9" },
     { name = "keyring", specifier = ">=25.7.0" },
     { name = "platformdirs", specifier = ">=4.2" },

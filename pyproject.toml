@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "google-genai>=2.34.0",
+    "httpx>=0.28",
     "json5>=0.9",
     "keyring>=25.7.0",
     "platformdirs>=4.2",
