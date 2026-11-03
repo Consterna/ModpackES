@@ -66,9 +66,10 @@ class Traductor:
 
     # ------------------------------------------------------------------ consulta
     def _conocida(self, nucleo: str, ambito: str) -> str | None:
-        """Lo que el usuario fijó manda; después, lo ya traducido; después, los nombres oficiales."""
+        """Lo que el usuario corrigió o fijó manda; después, lo ya traducido; después, los nombres oficiales."""
         return (
-            self.glosario.fijo(nucleo)
+            self.memoria.correccion(nucleo, self.dialecto)
+            or self.glosario.fijo(nucleo)
             or self.memoria.obtener(nucleo, self.dialecto, ambito)
             or self.glosario.exacto(nucleo)
         )

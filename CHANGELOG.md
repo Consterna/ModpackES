@@ -13,6 +13,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Botones «Copiar diagnóstico» (versiones, sistema y final del registro, sin tu carpeta personal ni claves)
   y «Abrir registro», para reportar problemas.
 - Los errores no previstos se avisan en una ventana en vez de cerrar la app en silencio.
+- Correcciones del usuario: una traducción corregida a mano manda sobre la memoria y el motor en todos
+  los ámbitos, no se paga y se rechaza si pierde algún código del original (`%s`, `§a`, `$(l)`…).
 
 ### Corregido
 
