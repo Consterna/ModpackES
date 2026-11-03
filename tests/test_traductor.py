@@ -153,3 +153,16 @@ def test_memoria_persistente(tmp_path: object) -> None:
         assert m.obtener("Hello", "es_es", "ui") is None
         m.olvidar("Hello", "es_mx", "ui")
         assert m.cantidad() == 0
+
+
+def test_el_contexto_llega_al_motor_recortado_y_en_una_linea() -> None:
+    from traductor_es.nucleo.traductor import LARGO_CONTEXTO
+
+    motor = Simulador()
+    t = nuevo(motor, contexto="Granja   acogedora\n\ntono amable " + "x" * 1000)
+    t.traducir(["Hello"], "mision")
+    contexto = motor.lotes_recibidos[0].contexto
+    assert contexto.startswith("Granja acogedora tono amable x") and len(contexto) == LARGO_CONTEXTO
+    sin = Simulador()
+    nuevo(sin).traducir(["Hello"], "ui")
+    assert sin.lotes_recibidos[0].contexto == ""

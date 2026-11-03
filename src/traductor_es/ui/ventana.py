@@ -6,7 +6,7 @@ import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from PySide6.QtCore import QObject, Qt, QThread, QUrl, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QDesktopServices
@@ -43,6 +43,7 @@ from ..fuentes.lanzadores import InstanciaEncontrada, buscar
 from ..motores.base import Cancelado, ErrorFatal, Motor
 from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS, Gemini
 from ..motores.simulador import Simulador
+from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
 from ..salida import exportar
 from . import correcciones
@@ -106,6 +107,7 @@ class Trabajador(QObject):
                 cancelar=self.cancelar,
                 hilos=self.opciones["hilos"],
                 usar_lotes=self.opciones["lotes"],
+                contexto=self.opciones["contexto"],
             ) as p:
                 self.registro.emit(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'}")
                 if self.accion == "analizar":
@@ -148,7 +150,7 @@ class Ventana(QMainWindow):
         self._trabajador: Trabajador | None = None
         self._cancelar = threading.Event()
         self.ultimo_informe: Informe | None = None
-        self._preferencias = configuracion.leer_preferencias()
+        self._preferencias: dict[str, Any] = configuracion.leer_preferencias()
         self._construir()
         self.actualizar_instancias()
         self._actualizar_estado_clave()
@@ -205,6 +207,11 @@ class Ventana(QMainWindow):
         self.c_hilos.setRange(1, 16)
         self.c_hilos.setValue(int(self._preferencias.get("hilos", 4)))
         formulario.addRow("Peticiones a la vez:", self.c_hilos)
+        self.e_contexto = QLineEdit()
+        self.e_contexto.setMaxLength(LARGO_CONTEXTO)
+        self.e_contexto.setPlaceholderText("Opcional. Ej.: granja acogedora, tono amable; «Bells» es la moneda")
+        self.e_contexto.setToolTip("Se le da al motor para el tono y los términos propios. Se guarda por instancia.")
+        formulario.addRow("Ambientación:", self.e_contexto)
         self.c_activar = QCheckBox("Activar el pack y poner el juego en español (con Minecraft cerrado)")
         self.c_activar.setChecked(True)
         formulario.addRow("", self.c_activar)
@@ -309,6 +316,11 @@ class Ventana(QMainWindow):
         self.costo.setText("")
         if actual is not None:
             self.etiqueta_carpeta.setText(f"<b>{actual.text()}</b><br>{actual.data(Qt.ItemDataRole.UserRole)}")
+            self.e_contexto.setText(self._contexto_de(str(actual.data(Qt.ItemDataRole.UserRole))))
+
+    def _contexto_de(self, carpeta: str) -> str:
+        contextos: Any = self._preferencias.get("contextos", {})
+        return str(cast(dict[str, Any], contextos).get(carpeta, "")) if isinstance(contextos, dict) else ""
 
     def _elegir_carpeta(self) -> None:
         carpeta = QFileDialog.getExistingDirectory(self, "Carpeta de la instancia")
@@ -382,6 +394,7 @@ class Ventana(QMainWindow):
             "hilos": self.c_hilos.value(),
             "activar": self.c_activar.isChecked(),
             "idioma": self.c_activar.isChecked(),
+            "contexto": self.e_contexto.text().strip(),
         }
 
     def _confirmar_traducir(self) -> None:
@@ -558,10 +571,17 @@ class Ventana(QMainWindow):
 
     def _guardar_preferencias(self, carpeta: str) -> None:
         o = self.opciones()
-        configuracion.guardar_preferencias(
-            {"carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "modelo": o["modelo"],
-             "lotes": o["lotes"], "hilos": o["hilos"]}
-        )  # fmt: skip
+        anteriores = self._preferencias.get("contextos", {})
+        contextos: dict[str, str] = dict(anteriores) if isinstance(anteriores, dict) else {}  # pyright: ignore[reportUnknownArgumentType]
+        if o["contexto"]:
+            contextos[carpeta] = o["contexto"]
+        else:
+            contextos.pop(carpeta, None)
+        self._preferencias = {
+            "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "modelo": o["modelo"],
+            "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
+        }  # fmt: skip
+        configuracion.guardar_preferencias(dict(self._preferencias))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._cancelar.set()

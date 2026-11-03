@@ -18,6 +18,8 @@ Progreso = Callable[[int, int], None]
 Registro = Callable[[str], None]
 #: Recibe (original, traducción) y devuelve el motivo del rechazo, o None si es válida.
 Validador = Callable[[str, str], str | None]
+#: Largo máximo del contexto del modpack que va en cada pedido: más que esto encarece sin mejorar.
+LARGO_CONTEXTO = 400
 
 
 def _nada(*_: object) -> None:
@@ -46,6 +48,7 @@ class Traductor:
         limite_caracteres: int = 5000,
         limite_entradas: int = 60,
         usar_lotes: bool = False,
+        contexto: str = "",
     ) -> None:
         if dialecto not in DIALECTOS:
             raise ValueError(f"Dialecto desconocido: {dialecto}")
@@ -62,6 +65,7 @@ class Traductor:
         self.limite_entradas = limite_entradas
         #: Mandar cada ronda en un solo trabajo de la Batch API (si el motor lo admite): más barato, más lento
         self.usar_lotes = usar_lotes and hasattr(motor, "traducir_varios")
+        self.contexto = " ".join(contexto.split())[:LARGO_CONTEXTO]
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
@@ -188,7 +192,8 @@ class Traductor:
         entradas = tuple(
             Entrada(str(i), m.texto, pistas.get(n, "")) for i, (n, m) in enumerate(zip(lote, mascaras, strict=True))
         )
-        return Lote(entradas, ambito, DIALECTOS[self.dialecto], self.glosario.relevantes(lote)), mascaras
+        lote_motor = Lote(entradas, ambito, DIALECTOS[self.dialecto], self.glosario.relevantes(lote), self.contexto)
+        return lote_motor, mascaras
 
     def _lote(self, lote: list[str], ambito: str, pistas: Mapping[str, str], resultado: Resultado) -> dict[str, str]:
         if self.cancelar.is_set():

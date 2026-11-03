@@ -17,6 +17,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   los ámbitos, no se paga y se rechaza si pierde algún código del original (`%s`, `§a`, `$(l)`…).
 - Botón «Correcciones…»: busca en la memoria por el texto en inglés o en español y permite corregir,
   guardar y quitar correcciones desde la ventana.
+- Campo «Ambientación» (y `--contexto` en la línea de comandos): una descripción corta del modpack que el
+  motor usa para el tono y los términos propios. Se guarda por instancia.
 
 ### Corregido
 

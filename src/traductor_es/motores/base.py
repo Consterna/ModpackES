@@ -28,6 +28,7 @@ class Lote:
     ambito: str  #: «ui», «mision», «libro», «script»
     dialecto: str  #: descripción del dialecto destino
     glosario: dict[str, str] = field(default_factory=dict[str, str])
+    contexto: str = ""  #: ambientación del modpack que escribe el usuario (tono, términos propios)
 
 
 class Motor(Protocol):

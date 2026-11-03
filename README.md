@@ -57,6 +57,10 @@ sin modificar el mod: la app avisa cuáles son.
 
 Si se corta o lo cancelas, vuelve a pulsar «Traducir»: sigue donde quedó.
 
+El campo **Ambientación** (opcional) le cuenta al motor de qué va el modpack: «granja acogedora, tono
+amable; “Bells” es la moneda del pueblo». Ayuda con el tono y con los términos propios del pack, y se guarda
+por instancia.
+
 **Restaurar original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar la
 traducción de los mods basta con desactivar el resource pack.
 
@@ -133,7 +137,7 @@ Desde el código fuente (ver [Desarrollo](#desarrollo)):
 ```
 uv run modpackes instancias
 uv run modpackes analizar "RUTA DE LA INSTANCIA"
-uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite]
+uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"]
 uv run modpackes restaurar "RUTA"
 uv run modpackes clave guardar
 uv run modpackes modelos

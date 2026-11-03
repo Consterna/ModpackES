@@ -236,3 +236,28 @@ def test_corregir_desde_la_ventana_y_volver_a_traducir_sin_pagar(qtbot: QtBot, t
     assert sum(len(lote.entradas) for lote in motor.lotes_recibidos) == enviados  # no se pidió nada nuevo
     script = (juego / "kubejs" / "server_scripts" / "s.js").read_text("utf-8")
     assert script == "player.tell('Te damos la bienvenida al pack')\n"
+
+
+def test_la_ambientacion_se_guarda_por_instancia(qtbot: QtBot, tmp_path: Path) -> None:
+    from traductor_es import configuracion
+
+    a, b = _modpack(tmp_path / "a"), _modpack(tmp_path / "b")
+    # Un texto que ninguna otra prueba tradujo, para que vaya al motor y no salga de la memoria
+    (a / "kubejs" / "server_scripts" / "s.js").write_text("player.tell('Harvest the golden wheat')\n", "utf-8")
+    motor = Simulador()
+
+    def instancias() -> list[InstanciaEncontrada]:
+        return [InstanciaEncontrada("Prism Launcher", "A", a), InstanciaEncontrada("Prism Launcher", "B", b)]
+
+    v = Ventana(buscar_instancias=instancias, fabrica_motor=lambda _c, _m: motor)
+    qtbot.addWidget(v)
+    v.lista.setCurrentRow(0)
+    v.e_contexto.setText("Granja acogedora")
+    v.b_traducir.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert motor.lotes_recibidos and all(lote.contexto == "Granja acogedora" for lote in motor.lotes_recibidos)
+    assert configuracion.leer_preferencias()["contextos"] == {str(a): "Granja acogedora"}
+    v.lista.setCurrentRow(1)
+    assert v.e_contexto.text() == ""
+    v.lista.setCurrentRow(0)
+    assert v.e_contexto.text() == "Granja acogedora"

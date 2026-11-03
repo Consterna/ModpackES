@@ -60,6 +60,7 @@ def _argumentos() -> argparse.ArgumentParser:
         p.add_argument("--solo", default=",".join(GRUPOS), help="grupos separados por comas: " + ",".join(GRUPOS))
         p.add_argument("--modelo", default=MODELO_POR_DEFECTO)
         p.add_argument("--lotes", action="store_true", help="usar la Batch API (mitad de precio, tarda más)")
+        p.add_argument("--contexto", default="", help="ambientación del modpack para el tono y los términos")
 
     comunes(sub.add_parser("analizar", help="cuenta lo que falta traducir y estima el costo (no escribe nada)"))
     traducir = sub.add_parser("traducir", help="traduce y escribe el resultado")
@@ -107,7 +108,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
             with Proceso(
                 args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
-                hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes,
+                hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto,
             ) as p:  # fmt: skip
                 _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
                 if args.orden == "analizar":

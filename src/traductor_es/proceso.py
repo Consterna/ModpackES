@@ -83,6 +83,7 @@ class Proceso:
         cancelar: threading.Event | None = None,
         hilos: int = 4,
         usar_lotes: bool = False,
+        contexto: str = "",
     ) -> None:
         self.instancia = Instancia(carpeta)
         self.registro = registro
@@ -95,7 +96,7 @@ class Proceso:
         )
         self.traductor = Traductor(
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
-            usar_lotes=usar_lotes,
+            usar_lotes=usar_lotes, contexto=contexto,
         )  # fmt: skip
         if isinstance(motor, Gemini):
             motor.cancelar = self.traductor.cancelar
