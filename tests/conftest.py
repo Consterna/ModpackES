@@ -75,3 +75,9 @@ def _datos_de_la_app_en_temporal(tmp_path_factory: pytest.TempPathFactory) -> It
     keyring.set_keyring(fail.Keyring())  # ni se lee ni se escribe el almacén de credenciales real
     yield
     registro.cerrar()  # el archivo del registro no queda abierto al terminar
+
+
+@pytest.fixture(autouse=True)
+def _datos_propios_de_cada_prueba(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cada prueba arranca con memoria y preferencias vacías: lo que deja una no cambia el resultado de otra."""
+    monkeypatch.setenv("TRADUCTOR_ES_DATOS", str(tmp_path / "datos_app"))
