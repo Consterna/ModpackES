@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verificar:
+    name: Verificar y construir el .exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias
+        run: uv sync --locked
+
+      - name: Puerta de calidad (ruff, pyright, pytest)
+        run: uv run python scripts/verificar.py --rapido
+
+      - name: Construir ModpackES.exe
+        run: uv run python scripts/construir_exe.py
+
+      - name: Probar el .exe
+        run: uv run python scripts/probar_exe.py
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ModpackES-exe
+          path: dist/ModpackES.exe
+          if-no-files-found: error
+          retention-days: 14
