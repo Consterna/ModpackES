@@ -13,7 +13,7 @@ def leer(datos: bytes | str) -> dict[str, str]:
     texto = datos.decode("utf-8-sig", errors="replace") if isinstance(datos, bytes) else datos.lstrip(BOM)
     textos: dict[str, str] = {}
     for linea in _FIN_DE_LINEA.split(texto):
-        if not linea.strip() or linea.lstrip().startswith(("#", "//")) or "=" not in linea:
+        if not linea or linea.startswith("#") or "=" not in linea:  # igual que LanguageMap de 1.12
             continue
         clave, valor = linea.split("=", 1)
         textos[clave] = valor

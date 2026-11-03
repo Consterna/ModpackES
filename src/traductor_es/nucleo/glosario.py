@@ -14,7 +14,7 @@ class Glosario:
     def __init__(self) -> None:
         self._terminos: dict[str, str] = {}
         self._fijos: dict[str, str] = {}
-        self._orden: list[tuple[str, str]] | None = None
+        self._orden: list[tuple[str, str, re.Pattern[str]]] | None = None
 
     def __len__(self) -> int:
         return len(self._terminos) + len(self._fijos)
@@ -32,22 +32,31 @@ class Glosario:
 
     def fijar(self, terminos: Mapping[str, str]) -> None:
         """Términos del usuario: mandan sobre todo lo demás."""
-        self._fijos.update({k.strip(): v.strip() for k, v in terminos.items() if k.strip()})
+        self._fijos.update({k.strip(): v.strip() for k, v in terminos.items() if k.strip() and v.strip()})
         self._orden = None
 
     def exacto(self, texto: str) -> str | None:
         t = texto.strip()
         return self._fijos.get(t) or self._terminos.get(t)
 
+    def _ordenados(self) -> list[tuple[str, str, re.Pattern[str]]]:
+        orden = self._orden
+        if orden is None:
+            todos = {**self._terminos, **self._fijos}
+            # Cada patrón se compila una sola vez; luego se reutiliza en todos los lotes.
+            orden = [
+                (k.lower(), k, re.compile(r"(?<![^\W_])" + re.escape(k.lower()) + r"(?![^\W_])"))
+                for k in sorted(todos, key=len, reverse=True)
+            ]
+            self._orden = orden
+        return orden
+
     def relevantes(self, textos: Iterable[str], maximo: int = 60) -> dict[str, str]:
         """Términos que aparecen como palabra completa en los textos, priorizando los más largos."""
-        if self._orden is None:
-            todos = {**self._terminos, **self._fijos}
-            self._orden = sorted(((k.lower(), k) for k in todos), key=lambda par: len(par[0]), reverse=True)
         bloque = "\n".join(textos).lower()
         elegidos: dict[str, str] = {}
-        for bajo, original in self._orden:
-            if bajo in bloque and re.search(r"(?<![^\W_])" + re.escape(bajo) + r"(?![^\W_])", bloque):
+        for bajo, original, patron in self._ordenados():
+            if bajo in bloque and patron.search(bloque):
                 elegidos[original] = self._fijos.get(original) or self._terminos[original]
                 if len(elegidos) >= maximo:
                     break

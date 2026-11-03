@@ -14,7 +14,6 @@ from typing import Literal
 
 Modo = Literal["json", "snbt"]
 _FUENTE = "ValidadorTraductor.java"
-_LOTE = 150  # archivos por llamada, para no pasar el límite de la línea de comandos de Windows
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,24 +31,39 @@ def _ejecutable(carpeta: Path, nombre: str) -> Path | None:
 
 
 def carpetas_de_runtimes() -> list[Path]:
-    """Runtimes de Java que traen los lanzadores de Minecraft más comunes."""
+    """Runtimes de Java que traen los lanzadores de Minecraft más comunes (un nivel de profundidad)."""
     appdata = Path(os.environ.get("APPDATA", Path.home()))
-    local = Path(os.environ.get("LOCALAPPDATA", Path.home()))
     bases = [
         appdata / "PrismLauncher" / "java",
         appdata / "ModrinthApp" / "meta" / "java_versions",
+        appdata / ".minecraft" / "runtime",
         Path.home() / "curseforge" / "minecraft" / "Install" / "runtime",
-        local / "Packages",  # launcher oficial de la tienda (rara vez trae javac)
     ]
     carpetas: list[Path] = []
     for base in bases:
         if base.is_dir():
-            carpetas.extend(sorted((p for p in base.iterdir() if p.is_dir()), reverse=True))
+            carpetas.extend(p for p in base.iterdir() if p.is_dir())
     return carpetas
 
 
+def version_java(carpeta: Path) -> int:
+    """Versión mayor del JDK según su archivo `release` (0 si no se sabe). Java 8 se reporta como 1.8 → 8."""
+    try:
+        texto = (carpeta / "release").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0
+    m = re.search(r'JAVA_VERSION="(\d+)(?:\.(\d+))?', texto)
+    if not m:
+        return 0
+    mayor = int(m.group(1))
+    return int(m.group(2) or 0) if mayor == 1 else mayor
+
+
+VERSION_MINIMA = 17  #: el validador usa sintaxis de Java 16+, y FTB Library 1.20 necesita 17
+
+
 def buscar_jdk(extra: Iterable[Path] = ()) -> Path | None:
-    """Primera carpeta con java y javac: JAVA_HOME, lo que pase el usuario, PATH y los runtimes de los lanzadores."""
+    """El JDK más nuevo (17 o superior) entre JAVA_HOME, lo que pase el usuario, PATH y los lanzadores."""
     candidatos: list[Path] = []
     if os.environ.get("JAVA_HOME"):
         candidatos.append(Path(os.environ["JAVA_HOME"]))
@@ -58,10 +72,12 @@ def buscar_jdk(extra: Iterable[Path] = ()) -> Path | None:
     if javac:
         candidatos.append(Path(javac).resolve().parent.parent)
     candidatos.extend(carpetas_de_runtimes())
-    for c in candidatos:
-        if _ejecutable(c, "java") and _ejecutable(c, "javac"):
-            return c
-    return None
+    validos = [
+        (version_java(c), c)
+        for c in candidatos
+        if _ejecutable(c, "java") and _ejecutable(c, "javac") and version_java(c) >= VERSION_MINIMA
+    ]
+    return max(validos, key=lambda par: par[0])[1] if validos else None
 
 
 def biblioteca_mas_nueva(raiz: Path, patron: str) -> Path | None:
@@ -105,31 +121,21 @@ class ValidadorJava:
     def validar(self, modo: Modo, archivos: Sequence[Path], classpath: Sequence[Path]) -> list[ResultadoJava]:
         self.compilar()
         cp = os.pathsep.join([str(self.clases), *map(str, classpath)])
-        resultados: list[ResultadoJava] = []
-        for i in range(0, len(archivos), _LOTE):
-            grupo = archivos[i : i + _LOTE]
-            proc = subprocess.run(
-                [
-                    str(self.java),
-                    "-Dstdout.encoding=UTF-8",  # Java 18+
-                    "-Dsun.stdout.encoding=UTF-8",  # Java 17
-                    "-Dfile.encoding=UTF-8",
-                    "-Dlog4j2.level=OFF",
-                    "-cp",
-                    cp,
-                    "ValidadorTraductor",
-                    modo,
-                    *map(str, grupo),
-                ],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-            )
-            if proc.returncode != 0:
-                raise RuntimeError(f"El validador Java falló:\n{proc.stderr[-2000:]}")
-            resultados.extend(_interpretar(proc.stdout))
-        return resultados
+        if not archivos:
+            return []
+        # Las rutas van por la entrada estándar en UTF-8 (sin límite de largo ni problemas de página de códigos).
+        proc = subprocess.run(
+            [str(self.java), "-Dfile.encoding=UTF-8", "-Dlog4j2.level=OFF", "-cp", cp, "ValidadorTraductor", modo],
+            input="\n".join(map(str, archivos)) + "\n",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",  # la JVM escribe sus propios errores en la página de códigos de la consola
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"El validador Java falló:\n{proc.stderr[-2000:]}")
+        return _interpretar(proc.stdout)
 
 
 def _des_escapar(s: str) -> str:

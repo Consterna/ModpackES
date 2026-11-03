@@ -21,14 +21,26 @@ public final class ValidadorTraductor {
             System.err.println("uso: ValidadorTraductor json|snbt archivo...");
             System.exit(2);
         }
-        for (int i = 1; i < args.length; i++) {
-            Path ruta = Path.of(args[i]);
+        // Las rutas llegan por la entrada estándar en UTF-8, una por línea: así no importa su largo
+        // ni los caracteres que tengan (la línea de comandos de Windows usa la página de códigos ANSI).
+        List<String> rutas = new java.util.ArrayList<>(List.of(args).subList(1, args.length));
+        if (rutas.isEmpty()) {
+            try (var lector = new java.io.BufferedReader(new java.io.InputStreamReader(System.in, StandardCharsets.UTF_8))) {
+                lector.lines().filter(l -> !l.isBlank()).forEach(rutas::add);
+            } catch (java.io.IOException e) {
+                System.err.println("no pude leer la entrada: " + e);
+                System.exit(2);
+            }
+        }
+        var salida = new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out), true, StandardCharsets.UTF_8);
+        for (String texto : rutas) {
+            Path ruta = Path.of(texto);
             try {
                 String canonico = args[0].equals("json") ? json(ruta) : snbt(ruta);
-                System.out.println("OK\t" + ruta + "\t" + escapar(canonico));
+                salida.println("OK\t" + ruta + "\t" + escapar(canonico));
             } catch (Throwable t) {
                 Throwable causa = t instanceof InvocationTargetException ite && ite.getCause() != null ? ite.getCause() : t;
-                System.out.println("ERROR\t" + ruta + "\t" + escapar(causa.getClass().getSimpleName() + ": " + causa.getMessage()));
+                salida.println("ERROR\t" + ruta + "\t" + escapar(causa.getClass().getSimpleName() + ": " + causa.getMessage()));
             }
         }
     }

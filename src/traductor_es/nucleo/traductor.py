@@ -77,16 +77,18 @@ class Traductor:
     # ------------------------------------------------------------------ traducción
     def traducir(self, textos: Iterable[str], ambito: str, pistas: Mapping[str, str] | None = None) -> Resultado:
         """Traduce y devuelve {texto original: traducción}. Lo que no se pudo traducir con garantías no aparece."""
-        pistas = pistas or {}
+        # Las pistas se buscan por el núcleo (sin espacios de borde), igual que la memoria
+        pistas = {separar_bordes(k)[1]: v for k, v in (pistas or {}).items()}
         resultado = Resultado()
         unicos = {t for t in textos if es_traducible(t)}
         faltan = self.pendientes(unicos, ambito)
         if faltan:
-            nucleos = self._ronda(faltan, ambito, pistas, self.limite_caracteres, self.limite_entradas, resultado)
+            nucleos = self._ronda(faltan, ambito, pistas, (self.limite_caracteres, self.limite_entradas), resultado)
             if nucleos and not self.cancelar.is_set():
                 self.registro(f"Reintentando {len(nucleos)} textos que volvieron con códigos dañados…")
                 resultado.rechazados.clear()
-                self._ronda(sorted(nucleos), ambito, pistas, 1500, 5, resultado)
+                # Lotes chicos y sin mover la barra de progreso, que ya llegó al total
+                self._ronda(sorted(nucleos), ambito, pistas, (1500, 5), resultado, informar=False)
             if resultado.rechazados:
                 n = len(resultado.rechazados)
                 self.registro(f"{n} textos se quedan en inglés porque no pasaron la validación.")
@@ -116,19 +118,19 @@ class Traductor:
         nucleos: list[str],
         ambito: str,
         pistas: Mapping[str, str],
-        lim_chars: int,
-        lim_items: int,
+        limites: tuple[int, int],
         resultado: Resultado,
+        informar: bool = True,
     ) -> set[str]:
         """Traduce una ronda. Devuelve los núcleos que fallaron."""
         fallidos: set[str] = set()
         hechos = 0
         total = len(nucleos)
-        self.progreso(0, total)
+        progreso = self.progreso if informar else _nada
+        progreso(0, total)
         with ThreadPoolExecutor(self.hilos) as ex:
             futuros: dict[Future[dict[str, str]], list[str]] = {
-                ex.submit(self._lote, lote, ambito, pistas, resultado): lote
-                for lote in self._lotes(nucleos, lim_chars, lim_items)
+                ex.submit(self._lote, lote, ambito, pistas, resultado): lote for lote in self._lotes(nucleos, *limites)
             }
             try:
                 for fut in as_completed(futuros):
@@ -139,7 +141,7 @@ class Traductor:
                     self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
                     fallidos.update(n for n in lote if n not in buenos)
                     hechos += len(lote)
-                    self.progreso(hechos, total)
+                    progreso(hechos, total)
             except BaseException:
                 self.cancelar.set()
                 ex.shutdown(wait=True, cancel_futures=True)
