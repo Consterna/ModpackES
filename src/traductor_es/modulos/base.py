@@ -14,6 +14,7 @@ from ..nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES
 from ..nucleo.mascara import es_traducible
 from ..nucleo.traductor import Traductor
 from ..salida.copias import Respaldo
+from ..salida.resource_pack import PackSalida
 
 #: Clave de traducción en lugar de texto: «quest.x.title», «{ftbquests.chapter.x}». La traduce el módulo de mods.
 _CLAVE = re.compile(r"\{?[a-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)+\}?")
@@ -45,6 +46,15 @@ class Contexto:
     dialecto: str = DIALECTO_POR_DEFECTO
     variantes: tuple[str, ...] = VARIANTES
     registro: Callable[[str], None] = field(default=lambda _m: None)
+    pack: PackSalida | None = None  #: resource pack de salida (libros y mods)
+
+    def pack_listo(self) -> PackSalida:
+        """El pack de salida, preparado (pack.mcmeta y marca) la primera vez que se pide."""
+        if self.pack is None:
+            self.pack = PackSalida(self.instancia)
+        if not (self.pack.raiz / "pack.mcmeta").is_file():
+            self.pack.preparar()
+        return self.pack
 
 
 @dataclass(frozen=True, slots=True)
