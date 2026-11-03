@@ -75,6 +75,9 @@ class Consulta(QObject):
             self.listo.emit(self.funcion())
         except (ErrorFatal, OSError) as e:
             self.fallo.emit(str(e))
+        except Exception as e:  # un error no previsto no puede dejar el botón bloqueado
+            registro.LOGGER.exception("Error no previsto al consultar a Google")
+            self.fallo.emit(_no_previsto(e))
 
 
 class Trabajador(QObject):
@@ -115,6 +118,15 @@ class Trabajador(QObject):
             self.fallo.emit("Cancelado. Lo traducido hasta ahora quedó guardado en la memoria.")
         except (ErrorFatal, ValueError, OSError) as e:
             self.fallo.emit(str(e))
+        except Exception as e:  # sin esto la ventana quedaría en «Trabajando…» con los botones bloqueados
+            registro.LOGGER.exception("Error no previsto en «%s»", self.accion)
+            self.fallo.emit(_no_previsto(e))
+
+
+def _no_previsto(e: Exception) -> str:
+    donde = registro.ruta_actual()
+    nota = f"\n\nQuedó anotado en {donde}. Pulsa «Copiar diagnóstico» para reportarlo." if donde else ""
+    return f"Error no previsto: {type(e).__name__}: {e}{nota}"
 
 
 class Ventana(QMainWindow):

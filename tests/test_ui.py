@@ -168,3 +168,28 @@ def test_cambiar_de_instancia_borra_el_analisis_anterior(qtbot: QtBot, tmp_path:
     qtbot.waitUntil(lambda: v._hilo is None and v.ultimo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
     v.lista.setCurrentRow(1)
     assert v.ultimo_informe is None and v.tabla.rowCount() == 0 and v.costo.text() == ""
+
+
+def test_error_no_previsto_libera_la_ventana_y_queda_en_el_registro(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traductor_es import registro
+    from traductor_es.proceso import Proceso
+
+    def romper(_self: Proceso) -> None:
+        raise RuntimeError("fallo inventado")
+
+    monkeypatch.setattr(Proceso, "analizar", romper)
+    ruta = registro.configurar(tmp_path / "datos")
+    try:
+        v = _ventana(qtbot, _modpack(tmp_path))
+        v.b_analizar.click()
+        qtbot.waitUntil(lambda: v._hilo is None and "Se detuvo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+        assert v.b_analizar.isEnabled() and "Error no previsto: RuntimeError: fallo inventado" in v.log.toPlainText()
+        texto = v.copiar_diagnostico()
+        from PySide6.QtWidgets import QApplication
+
+        assert QApplication.clipboard().text() == texto and "fallo inventado" in texto and "Instancia:" in texto
+        assert "Traceback" in ruta.read_text(encoding="utf-8")
+    finally:
+        registro.cerrar()
