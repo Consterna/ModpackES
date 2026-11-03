@@ -124,7 +124,7 @@ class Ventana(QMainWindow):
     ) -> None:
         super().__init__()
         self.setWindowTitle(f"{NOMBRE} {__version__} · Traductor de modpacks al español")
-        self.resize(1100, 720)
+        self.resize(1100, 800)
         self._buscar_instancias = buscar_instancias
         self._fabrica_motor: FabricaMotor = fabrica_motor or _gemini
         self._hilo: QThread | None = None
@@ -239,7 +239,7 @@ class Ventana(QMainWindow):
         cabecera.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         cabecera.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        capa.addWidget(self.tabla, 2)
+        capa.addWidget(self.tabla, 3)
         self.costo = QLabel()
         capa.addWidget(self.costo)
         self.log = QPlainTextEdit()
