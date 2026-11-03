@@ -184,6 +184,8 @@ personalizado, `--direccion http://servidor/v1`. La clave también se puede pasa
   igual.
 - Un glosario con los nombres oficiales de Minecraft y de los mods mantiene los mismos términos en misiones,
   libros y scripts.
+- Con un banco de 148 textos de referencia, Gemini 3.8 Flash tradujo el 100 % con un chrF de 85 y respetó
+  todos los términos del glosario: detalle y límites de la medición en [docs/calidad.md](docs/calidad.md).
 
 ## Desarrollo
 
