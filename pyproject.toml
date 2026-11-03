@@ -4,6 +4,21 @@ version = "2.0.0"
 description = "Traduce modpacks de Minecraft al español: misiones, libros guía, scripts y mods."
 readme = "README.md"
 requires-python = ">=3.13"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "THIRD-PARTY-NOTICES.md"]
+authors = [{ name = "Cristian" }]
+keywords = ["minecraft", "modpack", "traduccion", "espanol", "ftb-quests", "patchouli", "kubejs", "gemini"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Natural Language :: Spanish",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment",
+    "Topic :: Software Development :: Localization",
+]
 dependencies = [
     "google-genai>=2.34.0",
     "json5>=0.9",
@@ -11,6 +26,11 @@ dependencies = [
     "platformdirs>=4.2",
     "pyside6-essentials>=6.12.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Consterna/ModpackES"
+Issues = "https://github.com/Consterna/ModpackES/issues"
+Changelog = "https://github.com/Consterna/ModpackES/blob/main/CHANGELOG.md"
 
 [project.scripts]
 modpackes = "traductor_es.__main__:main"
