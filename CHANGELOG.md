@@ -1,19 +1,35 @@
 # Cambios
 
-## 2.0.0 (2026-11-03)
+Todos los cambios importantes de ModpackES quedan en este archivo. El formato sigue
+[Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones siguen
+[Versionado Semántico](https://semver.org/lang/es/).
 
-Versión reescrita desde cero. Probada de punta a punta con Farming Crossing 4 (1.20.1, Forge) en el juego.
+## [Sin publicar]
 
-- Núcleo: protección de códigos con marcadores, memoria de traducciones en SQLite compartida entre modpacks,
-  glosario con nombres oficiales, reintentos y validación de calidad.
-- Fuentes universales: detección de versión y loader con cualquier lanzador, jars anidados, `.lang` antiguo,
-  prioridad real de los resource packs, idioma oficial del juego y formato de pack de cada versión hasta 26.3.
-- Misiones: FTB Quests (SNBT en línea, carpeta `lang/` y NBT de 1.12), BetterQuesting, HQM y Heracles.
-- Libros: Patchouli, Mantle, Citadel, GuideME y Lavender.
-- Scripts de KubeJS y textos de mods, KubeJS y resource packs en todas las variantes de español.
-- Motor Gemini (SDK oficial) con salida JSON estricta y Batch API; modelo por defecto `gemini-3.8-flash`.
-- Ventana (PySide6), línea de comandos, exportación del pack y kit de servidor, y ejecutable de un solo archivo.
+## [2.0.0] - 2026-11-03
 
-## 1.0 (prototipo)
+Primera versión pública. Se reescribió desde cero y se probó de punta a punta, dentro del juego, con
+Farming Crossing 4 (1.20.1, Forge).
+
+### Añadido
+
+- **Misiones:** FTB Quests (texto en los capítulos, carpeta `lang/` de 1.21+ y NBT de 1.12), BetterQuesting,
+  HQM y Heracles.
+- **Libros guía:** Patchouli, Mantle (Tinkers), Citadel, GuideME (AE2) y Lavender.
+- **Scripts de KubeJS:** los textos que ve el jugador (`tell`, `displayName`, `Text.of`, tooltips, JEI/REI/EMI).
+- **Textos de mods**, de KubeJS y de los resource packs del modpack en las siete variantes de español del juego.
+- Detección de versión y loader con cualquier lanzador (Prism, MultiMC, CurseForge, Modrinth, ATLauncher,
+  GDLauncher y el oficial), jars anidados, `.lang` antiguo y formato de pack de cada versión hasta 26.3.
+- Protección de los códigos de formato con marcadores, memoria de traducciones compartida entre modpacks,
+  glosario con los nombres oficiales y reglas de calidad con reintentos.
+- Motor Gemini (SDK oficial) con salida JSON estricta y modo por lotes (Batch API) a mitad de precio.
+- Copia de seguridad de todo lo que se cambia y botón para restaurar el original.
+- Ventana con PySide6, línea de comandos (`modpackes`), exportación del resource pack y kit para servidores.
+- Ejecutable de un solo archivo para Windows, construido y probado en GitHub Actions.
+
+## 1.0 - prototipo (sin publicar)
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
+
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/Consterna/ModpackES/releases/tag/v2.0.0
