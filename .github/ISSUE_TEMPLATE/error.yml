@@ -40,7 +40,7 @@ body:
     id: registro
     attributes:
       label: Diagnóstico
-      description: Pulsa «Copiar diagnóstico» (abajo a la izquierda de la ventana) y pégalo aquí. No incluye tu carpeta personal ni claves.
+      description: Usa «Más ▸ Copiar diagnóstico» (al lado del botón principal) y pégalo aquí. No incluye tu carpeta personal ni claves.
       render: text
   - type: checkboxes
     id: comprobado

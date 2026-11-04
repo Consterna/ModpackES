@@ -17,7 +17,10 @@ todos los mods, con un par de clics.
 · [versión portable](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe)
 · [Cómo se usa](#cómo-se-usa) · [Preguntas frecuentes](#preguntas-frecuentes) · [Cambios](CHANGELOG.md)
 
-<img src="docs/captura.png" alt="Ventana de ModpackES con un modpack analizado" width="820">
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/captura-claro.png">
+  <img src="docs/captura.png" alt="Ventana de ModpackES con un modpack analizado: tarjetas de instancias a la izquierda; a la derecha, los pasos, las cantidades de mods, libros, misiones y scripts, y el botón «Traducir 295 textos · US$ 0,01»" width="820">
+</picture>
 
 </div>
 
@@ -53,35 +56,41 @@ sin modificar el mod: la app avisa cuáles son.
    instalar nada, usa la versión portable
    [`ModpackES.exe`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe).
 2. Cierra Minecraft y abre ModpackES.
-3. Elige la instancia de la lista. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher,
-   GDLauncher y el launcher oficial; si no aparece, usa «Elegir carpeta…».
-4. Elige el motor (ver [Motores](#motores)). Con Gemini, pulsa «Guardar clave…» y pega tu clave de
-   [aistudio.google.com/apikey](https://aistudio.google.com/apikey); se guarda en el Administrador de
-   credenciales de Windows, nunca en un archivo. Con LM Studio u Ollama no hace falta clave: enciende su
-   servidor y pulsa «Probar conexión» para elegir el modelo.
-5. Pulsa **1. Analizar (gratis)**: cuenta lo que falta y estima el costo.
-6. Pulsa **2. Traducir**. Al terminar activa el pack y pone el juego en español (se puede desmarcar).
+3. Elige la instancia en la barra de la izquierda: cada tarjeta muestra la versión de Minecraft, el loader y
+   si ya está traducida. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher, GDLauncher y
+   el launcher oficial; si no aparece, arrastra su carpeta a la ventana o usa «Elegir carpeta…».
+4. Elige el motor con la ficha de arriba a la derecha (ver [Motores](#motores)). Con Gemini, pulsa «Guardar
+   clave…» y pega tu clave de [aistudio.google.com/apikey](https://aistudio.google.com/apikey); se guarda en
+   el Administrador de credenciales de Windows, nunca en un archivo. Con LM Studio u Ollama no hace falta
+   clave: enciende su servidor y pulsa «Probar conexión» para elegir el modelo.
+5. Pulsa **Analizar (gratis)**. Las tarjetas de mods, libros, misiones y scripts muestran cuántos textos
+   faltan, y el botón, cuánto costaría. Desmarca lo que no quieras traducir.
+6. Pulsa **Traducir**. Al terminar activa el pack y pone el juego en español (se puede cambiar en «Opciones
+   avanzadas»).
 
-Si se corta o lo cancelas, vuelve a pulsar «Traducir»: sigue donde quedó.
+Si se corta o lo cancelas, analiza de nuevo y vuelve a traducir: sigue donde quedó. Los pasos de arriba
+(Motor, Analizar, Traducir, Listo) dicen en cuál estás, y Ctrl+Enter pulsa el botón principal.
+
+El engranaje de arriba cambia el tema (como Windows, oscuro o claro) y el aviso de versiones nuevas.
 
 El campo **Ambientación** (opcional) le cuenta al motor de qué va el modpack: «granja acogedora, tono
 amable; “Bells” es la moneda del pueblo». Ayuda con el tono y con los términos propios del pack, y se guarda
 por instancia.
 
-**Revisión automática** (opcional, solo misiones y libros): después de traducir, otro pedido al motor juzga
-cada traducción nueva al estilo de [GEMBA-MQM](https://aclanthology.org/2023.wmt-1.64) (exactitud,
-terminología, fluidez y estilo, con gravedad leve, grave o crítica) y las graves se vuelven a traducir
-indicando el error. La nueva traducción tiene que pasar las mismas reglas; si no, queda la anterior. Tus
-correcciones nunca se revisan. Sube el costo de esos textos (el análisis lo incluye) y sus marcas no son
+**Revisión automática** (opcional, en «Opciones avanzadas», solo misiones y libros): después de traducir, otro
+pedido al motor juzga cada traducción nueva al estilo de [GEMBA-MQM](https://aclanthology.org/2023.wmt-1.64)
+(exactitud, terminología, fluidez y estilo, con gravedad leve, grave o crítica) y las graves se vuelven a
+traducir indicando el error. La nueva traducción tiene que pasar las mismas reglas; si no, queda la anterior.
+Tus correcciones nunca se revisan. Sube el costo de esos textos (el análisis lo incluye) y sus marcas no son
 infalibles: sirven para decidir qué rehacer, no como nota de calidad.
 
-**Restaurar original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar la
-traducción de los mods basta con desactivar el resource pack.
+**Más ▸ Restaurar el original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar
+la traducción de los mods basta con desactivar el resource pack.
 
-**Correcciones…** busca cualquier texto en la memoria (en inglés o en español) y te deja corregir su
-traducción a mano. La corrección manda sobre todo lo demás, vale para todas las misiones, libros y mods
-donde aparezca ese texto y se aplica la próxima vez que pulses «Traducir», sin costo. Si a la corrección le
-falta un código del original (`%s`, `§a`, `$(l)`…), no se guarda, para que no rompa el juego.
+**Más ▸ Correcciones…** busca cualquier texto en la memoria (en inglés o en español) y te deja corregir su
+traducción a mano. La corrección manda sobre todo lo demás, vale para todas las misiones, libros y mods donde
+aparezca ese texto y se aplica la próxima vez que traduzcas, sin costo. Si a la corrección le falta un código
+del original (`%s`, `§a`, `$(l)`…), no se guarda, para que no rompa el juego.
 
 > [!NOTE]
 > El ejecutable no tiene firma digital, así que la primera vez Windows SmartScreen puede avisar. Pulsa
@@ -93,7 +102,7 @@ falta un código del original (`%s`, `§a`, `$(l)`…), no se guarda, para que n
 
 | Motor | Clave | Costo | Notas |
 |---|---|---|---|
-| **Gemini** (por defecto) | Sí, de Google AI Studio | El que estima «Analizar»; la mitad con «Por lotes» | El más probado: con él se tradujo Farming Crossing 4 |
+| **Gemini** (por defecto) | Sí, de Google AI Studio | El que estima «Analizar»; la mitad con «Más barato, pero tarda más» | El más probado: con él se tradujo Farming Crossing 4 |
 | **OpenRouter** | Sí | Según el modelo que elijas | Da acceso a muchos modelos con una sola cuenta |
 | **DeepSeek** | Sí | Según su lista de precios | Responde en JSON simple; el validador revisa cada texto igual |
 | **LM Studio** / **Ollama** | No | Gratis | El modelo corre en tu PC, sin internet. La calidad depende del modelo y del equipo |
@@ -106,34 +115,35 @@ lo mismo en su documentación.
 
 ## Costo
 
-Con `gemini-3.8-flash` un modpack grande (unos 800 000 caracteres por traducir) cuesta alrededor de
-**1,5 a 2 dólares**, y la mitad con la opción «Por lotes» (Batch API), que puede tardar desde minutos hasta
-horas. Un modpack pequeño cuesta centavos. Son estimaciones con los precios de Google de noviembre de 2026;
-el botón «Analizar» calcula el de tu modpack antes de gastar nada.
+Con `gemini-3.8-flash` un modpack grande (unos 800 000 caracteres por traducir) cuesta alrededor de **1,5 a 2
+dólares**, y la mitad con la opción «Más barato, pero tarda más» (Batch API), que puede tardar desde minutos
+hasta horas. Un modpack pequeño cuesta centavos. Son estimaciones con los precios de Google de noviembre de
+2026; el botón «Analizar» calcula el de tu modpack antes de gastar nada.
 
 La capa gratuita de Gemini sirve para probar, pero tiene límites de peticiones por minuto y por día que un
 modpack grande supera enseguida. Con la facturación activada (nivel 1) se traduce de una vez.
 
 ## Multijugador
 
-Las misiones y los scripts de servidor los lee el servidor. «Kit de servidor…» arma un `.zip` con esos
-archivos ya traducidos, el resource pack para los jugadores y las instrucciones. «Exportar pack…» saca solo
-el resource pack, para compartirlo con quien juegue el mismo modpack.
+Las misiones y los scripts de servidor los lee el servidor. «Más ▸ Kit de servidor…» arma un `.zip` con esos
+archivos ya traducidos, el resource pack para los jugadores y las instrucciones. «Exportar pack…» saca solo el
+resource pack, para compartirlo con quien juegue el mismo modpack.
 
 ## Preguntas frecuentes
 
 <details>
 <summary><b>¿Puede romper mi modpack?</b></summary>
 
-Cada archivo que se cambia se guarda antes en `traductor_es/respaldo` dentro de la instancia, y «Restaurar
-original» los devuelve. Los archivos se reescriben sin pérdidas (solo cambian los textos traducidos) y las
-pruebas validan el resultado con los parsers reales del juego (Gson y el SNBT de FTB Library).
+Cada archivo que se cambia se guarda antes en `traductor_es/respaldo` dentro de la instancia, y «Más ▸
+Restaurar el original» los devuelve. Los archivos se reescriben sin pérdidas (solo cambian los textos
+traducidos) y las pruebas validan el resultado con los parsers reales del juego (Gson y el SNBT de FTB
+Library).
 </details>
 
 <details>
 <summary><b>¿Qué pasa cuando el modpack se actualiza?</b></summary>
 
-Vuelve a pulsar «Traducir». Lo que ya estaba traducido sale de la memoria sin costo y solo se paga lo nuevo.
+Analiza y traduce de nuevo. Lo que ya estaba traducido sale de la memoria sin costo y solo se paga lo nuevo.
 </details>
 
 <details>
@@ -142,7 +152,7 @@ Vuelve a pulsar «Traducir». Lo que ya estaba traducido sale de la memoria sin 
 Solo los textos que hay que traducir, con los códigos cambiados por marcadores, la clave del mod como
 contexto y la ambientación si la escribiste. Van únicamente al motor que elijas; con LM Studio u Ollama no
 salen de tu PC. No se envía nada más. Al abrirse, la app consulta en GitHub si hay una versión nueva (sin
-enviar datos tuyos); se desactiva con la casilla «Avisar al abrir si hay una versión nueva».
+enviar datos tuyos); se desactiva en el engranaje, con «Avisar al abrir si hay una versión nueva».
 
 Ten en cuenta que, según las condiciones de Google, los datos de la capa gratuita de Gemini pueden usarse para
 mejorar sus productos; revisa las condiciones del proveedor que uses.
