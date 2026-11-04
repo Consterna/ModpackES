@@ -14,8 +14,8 @@ corregido, el reporte se publica con el crédito para quien lo encontró (si as�
 
 ## Cómo maneja ModpackES tus datos
 
-- La clave de Gemini se guarda en el Administrador de credenciales de Windows; nunca en un archivo ni en el
-  registro de la ventana.
+- Las claves de los motores (Gemini u otro proveedor) se guardan en el Administrador de credenciales de
+  Windows, una por motor; nunca en un archivo ni en el registro de la ventana.
 - Los textos a traducir se envían solo al motor que elijas (Gemini, otro proveedor o un servidor en tu PC).
 - Al abrirse, la app pregunta a la API pública de GitHub cuál es la última versión, sin datos tuyos; se
   puede desactivar. No descarga ni instala nada por su cuenta.
