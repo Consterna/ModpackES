@@ -6,6 +6,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Cambiado
+
+- Aspecto nuevo: tema propio agua marina y morado, en oscuro y en claro. Sigue el modo de Windows y tiene íconos
+  en los botones. Todos los textos cumplen el contraste mínimo de WCAG (4,5:1).
+
 ## [2.1.1] - 2026-11-03
 
 Arreglos que encontró el análisis de seguridad de GitHub (CodeQL) después de publicar la 2.1.0.

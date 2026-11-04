@@ -43,6 +43,8 @@ def probar(exe: Path) -> int:
         datos = json.loads(salida.read_text("utf-8"))
     esperado = {"version_app": __version__, "minecraft": "1.20.1", "loader": "forge", "icono": True, "registro": True}
     distintos = {k: datos.get(k) for k, v in esperado.items() if datos.get(k) != v}
+    if int(datos.get("iconos", 0)) < 30:  # los SVG de la interfaz tienen que ir dentro del .exe
+        distintos["iconos"] = datos.get("iconos")
     grupos = {m["grupo"] for m in datos["modulos"]}
     if distintos or grupos != {"mods", "misiones"}:
         print(f"FALLA: {distintos or grupos}")

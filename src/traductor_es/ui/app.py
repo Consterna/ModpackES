@@ -8,6 +8,7 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 from PySide6.QtCore import QEvent, QObject, Signal
 from PySide6.QtGui import QIcon
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from .. import NOMBRE, __version__, configuracion, registro
 from ..motores.simulador import Simulador
 from ..proceso import Proceso
+from . import iconos, tema
 from .ventana import Ventana
 
 ICONO = Path(__file__).with_name("icono.png")
@@ -45,6 +47,7 @@ def _autoprueba(carpeta: str, salida: str) -> int:
         datos = {
             "version_app": __version__,
             "icono": ICONO.is_file(),
+            "iconos": len(iconos.disponibles()),
             "registro": bool(registro.ultimas_lineas(5)),
             "minecraft": str(p.instancia.version),
             "loader": p.instancia.loader,
@@ -61,6 +64,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     QApplication.setApplicationVersion(__version__)
     QApplication.setWindowIcon(QIcon(str(ICONO)))
     registro.configurar(configuracion.carpeta_datos())
+    tema.instalar(cast(QApplication, app), str(configuracion.leer_preferencias().get("tema", "sistema")))
     registro.LOGGER.info("Inicio de %s %s", NOMBRE, __version__)
     if argumentos[:1] == ["--autoprueba"] and len(argumentos) == 3:
         return _autoprueba(argumentos[1], argumentos[2])

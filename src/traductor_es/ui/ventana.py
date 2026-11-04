@@ -49,7 +49,7 @@ from ..motores.simulador import Simulador
 from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
 from ..salida import exportar
-from . import correcciones
+from . import correcciones, iconos, tema
 
 #: (motor, clave, modelo, dirección) → motor listo para traducir
 FabricaMotor = Callable[[str, str | None, str, str], Motor]
@@ -164,6 +164,10 @@ class Ventana(QMainWindow):
         self._preferencias: dict[str, Any] = configuracion.leer_preferencias()
         self._motor_anterior: str | None = None
         self._construir()
+        self._decorar()
+        instalado = tema.tema()
+        if instalado is not None:
+            instalado.cambiado.connect(self._al_cambiar_tema)
         self.actualizar_instancias()
         self._actualizar_estado_clave()
         self._hilo_novedad: QThread | None = None
@@ -701,8 +705,35 @@ class Ventana(QMainWindow):
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
             "revisar": o["revisar"], "avisar_version": self.c_avisar.isChecked(),
+            "tema": self._preferencias.get("tema", "sistema"),
         }  # fmt: skip
         configuracion.guardar_preferencias(dict(self._preferencias))
+
+    # ------------------------------------------------------------------ aspecto
+    def _al_cambiar_tema(self, _paleta: object) -> None:
+        self._decorar()
+
+    def _decorar(self) -> None:
+        """Íconos teñidos con el tema en curso y el papel de cada botón (se repite al cambiar de tema)."""
+        p = tema.actual()
+        self.b_traducir.setProperty("tipo", "primario")
+        botones = {
+            self.b_analizar: "search", self.b_traducir: "languages", self.b_cancelar: "square",
+            self.b_correcciones: "pencil", self.b_restaurar: "undo-2", self.b_exportar: "package",
+            self.b_kit: "server", self.b_abrir: "folder-open", self.b_diagnostico: "copy",
+            self.b_registro: "file-text", self.b_clave: "key-round", self.b_probar: "plug",
+            self.b_carpeta: "folder-plus", self.b_actualizar: "refresh-cw",
+        }  # fmt: skip
+        for boton, nombre in botones.items():
+            color = p.sobre_acento if boton is self.b_traducir else p.texto
+            boton.setIcon(iconos.icono(nombre, color))
+        self.etiqueta_carpeta.setProperty("tipo", "subtitulo")
+        self.costo.setProperty("tipo", "tenue")
+        self.creditos.setProperty("tipo", "tenue")
+        self.log.setProperty("tipo", "registro")
+        for w in (self.b_traducir, self.etiqueta_carpeta, self.costo, self.creditos, self.log):
+            w.style().unpolish(w)
+            w.style().polish(w)
 
     # ------------------------------------------------------------------ versión nueva
     def _guardar_aviso(self, activo: bool) -> None:
