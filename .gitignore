@@ -27,3 +27,7 @@ config.local.json
 # Datos de la app durante pruebas locales (TRADUCTOR_ES_DATOS)
 .datos/
 build_exe.log
+
+# Prototipo antiguo que quedó en la carpeta del proyecto (no forma parte de la app)
+/traducir_mods.py
+/TraductorModpacks/
