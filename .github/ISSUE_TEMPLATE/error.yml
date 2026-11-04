@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Gracias por avisar. **No pegues tu clave de Gemini** en ningún campo.
+        Gracias por avisar. **No pegues tu clave** de Gemini ni de otro motor en ningún campo.
   - type: input
     id: version_app
     attributes:
@@ -39,8 +39,8 @@ body:
   - type: textarea
     id: registro
     attributes:
-      label: Registro de la ventana
-      description: Copia el texto del cuadro de abajo de la ventana.
+      label: Diagnóstico
+      description: Pulsa «Copiar diagnóstico» (abajo a la izquierda de la ventana) y pégalo aquí. No incluye tu carpeta personal ni claves.
       render: text
   - type: checkboxes
     id: comprobado
