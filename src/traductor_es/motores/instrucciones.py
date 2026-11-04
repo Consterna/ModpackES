@@ -1,4 +1,4 @@
-"""Instrucciones y formato de los pedidos, comunes a todos los motores de IA.
+"""Instrucciones y formato de los pedidos, comunes a todos los motores de traducción.
 
 Cada lote va con las mismas reglas (marcadores intactos, terminología oficial, tono por ámbito) y la respuesta
 es un JSON con una clave por texto. Así Gemini y los motores compatibles con OpenAI traducen igual.
