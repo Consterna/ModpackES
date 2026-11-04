@@ -74,14 +74,15 @@ referencia también baja el puntaje, así que revisa los ejemplos que lista el s
 
 | Carpeta | Qué hay |
 |---|---|
-| `src/traductor_es/nucleo` | Marcadores de códigos, memoria, glosario, variantes de español y el orquestador de traducción |
+| `src/traductor_es` | `proceso.py` (une todo), `configuracion.py` (claves y preferencias), `registro.py` (registro y diagnóstico), `actualizaciones.py` (aviso de versión nueva) |
+| `src/traductor_es/nucleo` | Marcadores de códigos, memoria y correcciones, glosario, variantes de español y el orquestador de traducción |
 | `src/traductor_es/formatos` | Lectura y escritura sin pérdidas: SNBT, JSON, NBT, `.lang`, JavaScript y markdown |
 | `src/traductor_es/fuentes` | Lanzadores, versión, loader, jars y prioridad de los resource packs |
 | `src/traductor_es/modulos` | Misiones, libros, scripts y mods: qué se traduce y dónde se escribe |
-| `src/traductor_es/motores` | Gemini y el simulador para pruebas |
+| `src/traductor_es/motores` | Gemini, el motor compatible con OpenAI, las instrucciones comunes a todos, la fábrica de motores y el simulador para pruebas |
 | `src/traductor_es/salida` | Resource pack, `options.txt`, copias de seguridad y exportación |
-| `src/traductor_es/validacion` | Reglas de calidad y el validador con los parsers del juego (Java) |
-| `src/traductor_es/ui` | La ventana (PySide6) |
+| `src/traductor_es/validacion` | Reglas de calidad, revisión automática, medición con el banco de referencia y el validador con los parsers del juego (Java) |
+| `src/traductor_es/ui` | La ventana y el editor de correcciones (PySide6) |
 
 ## Licencia de las contribuciones
 

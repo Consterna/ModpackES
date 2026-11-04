@@ -86,8 +86,8 @@ falta un código del original (`%s`, `§a`, `$(l)`…), no se guarda, para que n
 > [!NOTE]
 > El ejecutable no tiene firma digital, así que la primera vez Windows SmartScreen puede avisar. Pulsa
 > «Más información» → «Ejecutar de todas formas». Puedes comprobar el archivo con el SHA-256 que viene en la
-> página de cada versión, o con `gh attestation verify ModpackES.exe -R Consterna/ModpackES`, que confirma que
-> lo construyó este repositorio en GitHub Actions.
+> página de cada versión, o con `gh attestation verify ModpackES-instalador.exe -R Consterna/ModpackES` (o
+> `ModpackES.exe`), que confirma que lo construyó este repositorio en GitHub Actions.
 
 ## Motores
 
@@ -142,8 +142,10 @@ Vuelve a pulsar «Traducir». Lo que ya estaba traducido sale de la memoria sin 
 Solo los textos que hay que traducir, con los códigos cambiados por marcadores, la clave del mod como
 contexto y la ambientación si la escribiste. Van únicamente al motor que elijas; con LM Studio u Ollama no
 salen de tu PC. No se envía nada más. Al abrirse, la app consulta en GitHub si hay una versión nueva (sin
-enviar datos tuyos); se desactiva con la casilla «Avisar al abrir si hay una versión nueva». Ten en cuenta que, según las condiciones de Google, los datos de la capa
-gratuita de Gemini pueden usarse para mejorar sus productos; revisa las condiciones del proveedor que uses.
+enviar datos tuyos); se desactiva con la casilla «Avisar al abrir si hay una versión nueva».
+
+Ten en cuenta que, según las condiciones de Google, los datos de la capa gratuita de Gemini pueden usarse para
+mejorar sus productos; revisa las condiciones del proveedor que uses.
 </details>
 
 <details>
@@ -211,15 +213,17 @@ uv run python scripts/probar_exe.py --instalador  # instala en una carpeta tempo
 Los datos de la app (memoria, glosario, preferencias y `registro.log`) van a `%LOCALAPPDATA%\traductor-es`;
 la variable `TRADUCTOR_ES_DATOS` los lleva a otra carpeta. Las pruebas con Java buscan Gson en las bibliotecas
 de Prism Launcher o usan el jar que indique `TRADUCTOR_ES_GSON` (así corren en el CI). Lee
-[CONTRIBUTING.md](CONTRIBUTING.md) antes de mandar cambios.
+[CONTRIBUTING.md](CONTRIBUTING.md) y el [código de conducta](CODE_OF_CONDUCT.md) antes de mandar cambios.
 
 ## Créditos
 
 Ideas tomadas de [MinecraftModsLocalizer](https://github.com/Y-RyuZU/MinecraftModsLocalizer) (MIT),
 [MineAI Modpack Translator](https://github.com/Thedrezik/MineAI-Modpack-Translator) (MIT),
-[mc-questing-mod-localizer](https://github.com/peunsu/mc-questing-mod-localizer) (MIT) y
-[AutoTranslation](https://github.com/yuefdev/minecraft-ai-translator) (AGPL, solo ideas). No se copió código
-de ninguno. Los formatos de cada mod se comprobaron en su código fuente (FTB Quests, BetterQuesting, HQM,
+[mc-questing-mod-localizer](https://github.com/peunsu/mc-questing-mod-localizer) (MIT),
+[mc_translator](https://github.com/chrysoljq/mc_translator) (GPL-3.0, la ambientación del modpack) y
+[AutoTranslation](https://github.com/yuefdev/minecraft-ai-translator) (AGPL, solo ideas: correcciones del
+usuario y modelos locales). La revisión automática sigue el método GEMBA-MQM (Kocmi y Federmann, WMT 2023).
+No se copió código de ninguno. Los formatos de cada mod se comprobaron en su código fuente (FTB Quests, BetterQuesting, HQM,
 Heracles, Patchouli, Mantle, GuideME, Lavender). Las bibliotecas que usa la app están en
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
