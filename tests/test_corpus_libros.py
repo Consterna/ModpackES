@@ -26,7 +26,7 @@ from . import fabrica
 
 pytestmark = pytest.mark.corpus
 AE2 = Path(__file__).resolve().parent.parent / ".descargas" / "jars" / "appliedenergistics2-26.1.13-beta.jar"
-_SOLO_ETIQUETAS = re.compile(r"^\s*(?:</?[A-Za-z][^<>]*/?>\s*)+$")
+_SOLO_ETIQUETAS = re.compile(r"^\s*(?:</?[A-Za-z][^<>]*>\s*)+$")
 
 
 class _SoloPack(Libros):

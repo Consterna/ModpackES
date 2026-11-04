@@ -13,7 +13,9 @@ from dataclasses import dataclass
 
 _TITULO_YAML = re.compile(r"^(\s*title\s*:\s*)(.*?)(\s*)$")
 _TITULO_JSON = re.compile(r'^(\s*"title"\s*:\s*")((?:[^"\\]|\\.)*)("\s*,?\s*)$')
-_SOLO_ETIQUETA = re.compile(r"^\s*(?:</?[A-Za-z][^<>]*/?>\s*)+$")
+#: El «/» de las etiquetas que se cierran solas ya entra en [^<>]*: un «/?» aparte hacía que una línea mal formada
+#: tardara un tiempo exponencial en descartarse (ReDoS).
+_SOLO_ETIQUETA = re.compile(r"^\s*(?:</?[A-Za-z][^<>]*>\s*)+$")
 _COMENTARIO = re.compile(r"^\s*<!--.*-->\s*$")
 _ENCABEZADO = re.compile(r"^(\s*#{1,6}\s+)(.+?)(\s*)$")
 _LISTA = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+)(.+?)(\s*)$")

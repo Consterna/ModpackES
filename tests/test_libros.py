@@ -182,3 +182,16 @@ def test_md_suelto_no_es_guia_y_las_urls_no_se_parten(tmp_path: Path, memoria: M
     assert not (pack / "assets/m/docs").exists()
     texto = (pack / "assets/m/book/b/es_mx/p.txt").read_text("utf-8")
     assert url in texto
+
+
+def test_linea_de_etiquetas_mal_formada_no_se_cuelga() -> None:
+    """Regresión (CodeQL py/redos): «<A/><A/>…» sin cierre tardaba un tiempo exponencial en descartarse."""
+    import time
+
+    linea = "<A" + "/><A" * 200
+    inicio = time.perf_counter()
+    _, segmentos = markdown.segmentar(f"# Título\n\n{linea}\n")
+    assert time.perf_counter() - inicio < 0.5
+    assert [s.texto for s in segmentos] == ["Título", linea]  # no son solo etiquetas: queda como texto
+    _, solo = markdown.segmentar('<GameScene zoom="2" />\n<ItemImage id="ae2:controller"/>\n')
+    assert solo == []

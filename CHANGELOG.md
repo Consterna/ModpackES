@@ -6,6 +6,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Seguridad
+
+- Una guía de GuideME o Lavender con una línea de etiquetas mal formada podía dejar la app trabada un tiempo
+  que crecía de forma exponencial con su largo (ReDoS, detectado por CodeQL). Ahora se descarta al instante.
+
 ## [2.1.0] - 2026-11-03
 
 Más control sobre la traducción (correcciones, ambientación, revisión), otros motores además de Gemini,
