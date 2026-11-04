@@ -6,6 +6,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+## [2.1.0] - 2026-11-03
+
+Más control sobre la traducción (correcciones, ambientación, revisión), otros motores además de Gemini,
+incluidos modelos gratis en el propio PC, un instalador y releases verificables.
+
 ### Añadido
 
 - Registro en archivo (`registro.log`, en la carpeta de datos) con lo que muestra la ventana, los avisos y
@@ -32,12 +37,26 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Instalador (`ModpackES-instalador.exe`, Inno Setup) que se instala para el usuario sin permisos de
   administrador. Arranca en 1,1 s frente a 2,7 s del portable, que se sigue publicando.
 
+### Cambiado
+
+- En la línea de comandos, `--modelo` solo tiene valor por defecto con Gemini: con otro motor hay que
+  indicarlo.
+- Si `options.txt` no tenía lista de resource packs, la que se crea queda en UTF-8 sin escapar, igual que
+  cuando se modifica una existente.
+
 ### Corregido
 
 - Los términos del glosario del usuario (`glosario.json`) no se aplicaban a textos que ya estaban en la
   memoria de traducciones. Ahora mandan siempre.
 - Un error no previsto durante el análisis o la traducción dejaba la ventana en «Trabajando…» con los botones
   bloqueados.
+
+### Seguridad
+
+- Cada release trae una atestación de origen firmada (se comprueba con `gh attestation verify`) y la lista
+  de componentes en formato CycloneDX.
+- Las acciones del CI van fijadas por commit, con CodeQL y Dependabot (las versiones nuevas esperan 14 días).
+- La firma del ejecutable con SignPath queda preparada para cuando se apruebe el proyecto (`docs/firma.md`).
 
 ## [2.0.0] - 2026-11-03
 
@@ -64,5 +83,6 @@ Farming Crossing 4 (1.20.1, Forge).
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
 
-[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.0.0...HEAD
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/Consterna/ModpackES/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/Consterna/ModpackES/releases/tag/v2.0.0
