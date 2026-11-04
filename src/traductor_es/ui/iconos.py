@@ -6,7 +6,7 @@ vean nítidos con la pantalla al 100 % y al 200 %.
 
 from __future__ import annotations
 
-from functools import cache
+from functools import cache, lru_cache
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
@@ -43,7 +43,12 @@ def pixmap(nombre: str, color: str, tam: int) -> QPixmap:
 
 def icono(nombre: str, color: str | None = None, tam: int = 18) -> QIcon:
     """Ícono teñido; sin color usa el del texto del tema en curso."""
-    tinta = color or tema.actual().texto
+    return _icono(nombre, color or tema.actual().texto, tam)
+
+
+@lru_cache(maxsize=512)
+def _icono(nombre: str, tinta: str, tam: int) -> QIcon:
+    """Los pasos y las tarjetas se repintan a cada cambio de opción: el mismo ícono no se vuelve a dibujar."""
     resultado = QIcon()
     for escala in (1, 2):
         resultado.addPixmap(pixmap(nombre, tinta, tam * escala))

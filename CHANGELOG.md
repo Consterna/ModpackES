@@ -32,6 +32,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Los avisos y errores salen en una franja dentro de la ventana, en lugar de cuadros que cortan el trabajo.
   Solo «Restaurar» y «Traducir» siguen pidiendo confirmación.
 - La barra de progreso dice qué parte se está traduciendo y cuánto falta.
+- Si un grupo no se puede leer al analizar (un archivo bloqueado o roto), el análisis sigue con los demás:
+  ese grupo queda desmarcado y el motivo, en Detalles.
 - El engranaje de arriba elige el tema (como Windows, oscuro o claro) y el aviso de versiones nuevas.
 
 ## [2.1.1] - 2026-11-03

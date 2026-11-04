@@ -418,3 +418,50 @@ def test_cancelar_no_se_muestra_como_error(qtbot: QtBot) -> None:
     v._cancelar.set()  # pyright: ignore[reportPrivateUsage]
     v._fallar("Cancelado. Lo traducido hasta ahora quedó guardado en la memoria.")  # pyright: ignore[reportPrivateUsage]
     assert v.aviso.tipo == "info" and not v.detalles.abierta and v.estado.text() == "Se detuvo."
+
+
+def test_f5_y_el_motor_no_se_tocan_mientras_trabaja(qtbot: QtBot, tmp_path: Path) -> None:
+    from PySide6.QtCore import QThread
+
+    v = _ventana(qtbot, _modpack(tmp_path))
+    tarjeta = v.lista.actual()
+    v._hilo = QThread(v)  # pyright: ignore[reportPrivateUsage]
+    v._estado = "trabajando"  # pyright: ignore[reportPrivateUsage]
+    v._ocupado(True)  # pyright: ignore[reportPrivateUsage]
+    try:
+        v.actualizar_instancias()
+        assert v.lista.actual() is tarjeta and not v.b_cancelar.isHidden()
+        assert not v.a_motor.isEnabled() and not v.bienvenida.b_configurar.isEnabled()
+    finally:
+        v._hilo = None  # pyright: ignore[reportPrivateUsage]
+        v._estado = "analizar"  # pyright: ignore[reportPrivateUsage]
+        v._ocupado(False)  # pyright: ignore[reportPrivateUsage]
+    assert v.a_motor.isEnabled()
+
+
+def test_soltar_la_carpeta_de_la_instancia_no_la_repite(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = _modpack(tmp_path)
+    v = _ventana(qtbot, juego)  # el lanzador la da como …/Pack/minecraft
+    assert v.agregar_carpeta(str(juego.parent))  # se suelta …/Pack
+    assert v.lista.count() == 1 and v.carpeta() == str(juego)
+
+
+def test_un_grupo_que_no_se_puede_leer_queda_fuera(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traductor_es.modulos import scripts
+    from traductor_es.proceso import Proceso
+
+    def romper(_self: object) -> list[object]:
+        raise OSError("archivo bloqueado")
+
+    monkeypatch.setattr(scripts.ScriptsKubeJS, "recolectar", romper)
+    juego = _modpack(tmp_path)
+    with Proceso(juego, Simulador()) as p:
+        informe = p.analizar()
+    assert informe.fallidos == ["scripts"] and any("archivo bloqueado" in a for a in informe.avisos)
+    assert {m.grupo for m in informe.modulos} == {"mods", "misiones"}
+    v = _ventana(qtbot, juego)
+    _analizar(qtbot, v)
+    assert not v.grupos["scripts"].incluido and "No se pudo leer" in v.grupos["scripts"].e_detalle.text()
+    assert v.b_principal.isEnabled()

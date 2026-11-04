@@ -42,7 +42,7 @@ class DialogoCorrecciones(QDialog):
         capa = QVBoxLayout(self)
         ayuda = QLabel(
             "Busca un texto en inglés o en español. Lo que corrijas manda sobre la memoria y el motor, en todas las "
-            "misiones, libros y mods, y se aplica la próxima vez que pulses «Traducir» (sin costo). Con la búsqueda "
+            "misiones, libros y mods, y se aplica la próxima vez que traduzcas (sin costo). Con la búsqueda "
             "vacía se listan tus correcciones."
         )
         ayuda.setWordWrap(True)
@@ -130,7 +130,7 @@ class DialogoCorrecciones(QDialog):
         except ValueError as e:
             self.estado.setText(f"✖ {e}")
             return
-        self._refrescar(c, "Corrección guardada. Se aplica la próxima vez que pulses «Traducir».")
+        self._refrescar(c, "Corrección guardada. Se aplica la próxima vez que traduzcas.")
 
     def quitar(self) -> None:
         c = self._actual()

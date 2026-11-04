@@ -80,8 +80,8 @@ CLARO = Paleta(
     borde_control="#8682A8",
     texto="#1B1930",
     tenue="#55516F",
-    acento="#087A63",
-    acento_activo="#06644F",
+    acento="#07735D",
+    acento_activo="#055A49",
     sobre_acento="#FFFFFF",
     morado="#6246D0",
     morado_suave="#E6E0FB",
@@ -115,7 +115,8 @@ def contraste(a: str, b: str) -> float:
 #: Pares que la app pone uno sobre otro y el mínimo que piden las WCAG: 4,5 para texto y 3 para controles.
 PARES: tuple[tuple[str, str, float], ...] = (
     ("texto", "fondo", 4.5), ("texto", "lateral", 4.5), ("texto", "tarjeta", 4.5), ("texto", "tarjeta_activa", 4.5),
-    ("tenue", "fondo", 4.5), ("tenue", "lateral", 4.5), ("tenue", "tarjeta", 4.5),
+    ("tenue", "fondo", 4.5), ("tenue", "lateral", 4.5), ("tenue", "tarjeta", 4.5), ("tenue", "tarjeta_activa", 4.5),
+    ("acento", "tarjeta_activa", 4.5), ("morado", "tarjeta_activa", 4.5), ("acento", "fondo_exito", 4.5),
     ("sobre_acento", "acento", 4.5), ("sobre_acento", "acento_activo", 4.5),
     ("acento", "fondo", 4.5), ("acento", "tarjeta", 4.5), ("morado", "fondo", 4.5), ("morado", "tarjeta", 4.5),
     ("texto", "morado_suave", 4.5), ("peligro", "fondo", 4.5), ("aviso", "fondo", 4.5),
@@ -167,15 +168,25 @@ def paleta_qt(p: Paleta) -> QPalette:
 def recursos(p: Paleta) -> dict[str, str]:
     """Íconos teñidos que usa la hoja (marca de las casillas, flechas), en una carpeta temporal.
 
-    La QSS solo admite imágenes desde archivos: se escriben una vez por paleta y solo si cambiaron.
+    La QSS solo admite imágenes desde archivos: se escriben una vez por paleta y solo si cambiaron. Si la
+    carpeta temporal no se puede escribir, se usan los SVG sin teñir del paquete: se ven peor, pero la app abre.
     """
-    carpeta = Path(tempfile.gettempdir()) / "modpackes-tema" / p.nombre
-    carpeta.mkdir(parents=True, exist_ok=True)
     origen = Path(__file__).with_name("iconos")
-    pedidos = {"marca": ("check", p.sobre_acento, "3"), "abajo": ("chevron-down", p.tenue, "2"),
-               "arriba": ("chevron-up", p.tenue, "2")}  # fmt: skip
+    try:
+        return _escribir_recursos(p, Path(tempfile.gettempdir()) / "modpackes-tema" / p.nombre, origen)
+    except OSError:
+        return {clave: (origen / f"{nombre}.svg").as_posix() for clave, (nombre, _c, _g) in _pedidos(p).items()}
+
+
+def _pedidos(p: Paleta) -> dict[str, tuple[str, str, str]]:
+    return {"marca": ("check", p.sobre_acento, "3"), "abajo": ("chevron-down", p.tenue, "2"),
+            "arriba": ("chevron-up", p.tenue, "2")}  # fmt: skip
+
+
+def _escribir_recursos(p: Paleta, carpeta: Path, origen: Path) -> dict[str, str]:
+    carpeta.mkdir(parents=True, exist_ok=True)
     salida: dict[str, str] = {}
-    for clave, (nombre, color, grosor) in pedidos.items():
+    for clave, (nombre, color, grosor) in _pedidos(p).items():
         datos = (origen / f"{nombre}.svg").read_bytes()
         datos = datos.replace(b"currentColor", color.encode()).replace(
             b'stroke-width="2"', f'stroke-width="{grosor}"'.encode()

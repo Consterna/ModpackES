@@ -55,6 +55,7 @@ class Informe:
     revision: Revision | None = None
     revision_automatica: revision.ResumenRevision | None = None
     pack_activado: list[str] = field(default_factory=list[str])
+    fallidos: list[str] = field(default_factory=list[str])  #: grupos que el análisis no pudo leer
 
     @property
     def a_traducir(self) -> int:
@@ -167,7 +168,13 @@ class Proceso:
         self._preparar_glosario()
         informe = Informe()
         for grupo, modulo in self.modulos():
-            piezas = modulo.recolectar()
+            try:
+                piezas = modulo.recolectar()
+            except (ValueError, OSError) as e:  # se deja fuera ese grupo y se avisa: el resto se puede traducir
+                informe.avisos.append(f"{modulo.nombre}: no se pudo leer ({e}). Queda fuera de la traducción.")
+                if grupo not in informe.fallidos:
+                    informe.fallidos.append(grupo)
+                continue
             pendientes = self.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre, modulo.describir(), len({p.texto for p in piezas}),

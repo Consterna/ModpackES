@@ -92,3 +92,17 @@ def test_iconos_disponibles_y_tenidos(app: QApplication) -> None:
     assert colores == {"#2EF5C9"}  # el trazo sale del color pedido
     with pytest.raises(ValueError, match="inventado"):
         iconos.icono("inventado")
+
+
+def test_sin_carpeta_temporal_la_app_abre_igual(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import tempfile
+
+    archivo = tmp_path / "no-es-carpeta"
+    archivo.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(archivo))
+    r = tema.recursos(tema.OSCURO)
+    assert set(r) == {"marca", "abajo", "arriba"} and all(Path(v).is_file() for v in r.values())
+
+
+def test_los_iconos_se_reusan() -> None:
+    assert iconos.icono("check", "#FFFFFF", 16) is iconos.icono("check", "#FFFFFF", 16)

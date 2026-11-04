@@ -424,7 +424,7 @@ class Ventana(QMainWindow):
             tarjeta = TarjetaGrupo(g, titulo, nombre_icono)
             tarjeta.fijar_cantidad(None, abarca)
             tarjeta.fijar_incluido(g in elegidos)
-            tarjeta.cambiado.connect(self._al_cambiar_grupo)
+            tarjeta.cambiado.connect(self._al_cambiar_opciones)
             self.grupos[g] = tarjeta
             rejilla.addWidget(tarjeta, 0, i)
         return rejilla
@@ -516,6 +516,8 @@ class Ventana(QMainWindow):
 
     # ------------------------------------------------------------------ instancias
     def actualizar_instancias(self) -> None:
+        if self._hilo is not None:  # el atajo F5 sigue activo mientras trabaja: la lista no se toca
+            return
         for lector in self._lectores:
             lector.parar.set()
         self._lectores = [lector for lector in self._lectores if not lector.terminado.is_set()]
@@ -568,11 +570,13 @@ class Ventana(QMainWindow):
 
     def agregar_carpeta(self, carpeta: str) -> bool:
         ruta = Path(carpeta)
-        carpeta = str(ruta)  # el diálogo y lo soltado usan «/»: igual que en la lista, para no repetirla
-        if resolver_carpeta_juego(ruta) is None:
+        juego = resolver_carpeta_juego(ruta)
+        if juego is None:
             self.avisar(f"«{ruta.name}» no parece una instancia de Minecraft: no tiene las carpetas mods ni config.")
             return False
-        nombre = ruta.parent.name if ruta.name.lower() in ("minecraft", ".minecraft") else ruta.name
+        # La del juego, con «\»: la misma ruta que da el lanzador, para no repetir la instancia ni perder lo guardado
+        carpeta = str(juego)
+        nombre = juego.parent.name if juego.name.lower() in ("minecraft", ".minecraft") else juego.name
         tarjeta = self.lista.tarjeta_de(carpeta) or self.lista.agregar(nombre or carpeta, "Carpeta", carpeta)
         self._leer_datos([carpeta])
         self.lista.elegir(tarjeta)
@@ -740,9 +744,6 @@ class Ventana(QMainWindow):
         elegidos = set(self._grupos_elegidos())
         return Informe(modulos=[m for m in self.ultimo_informe.modulos if m.grupo in elegidos])
 
-    def _al_cambiar_grupo(self, _grupo: str, _incluido: bool) -> None:
-        self._al_cambiar_opciones()
-
     def _al_cambiar_opciones(self, *_args: object) -> None:
         o = self.opciones()
         partes = [f"Español de {'España' if o['dialecto'] == 'es_es' else 'Latinoamérica'}",
@@ -906,7 +907,8 @@ class Ventana(QMainWindow):
 
     def _ocupado(self, si: bool) -> None:
         for w in (self.lista, self.b_carpeta, self.b_actualizar, self.b_mas, self.b_motor, self.b_secundario,
-                  self.e_contexto, self.avanzadas.contenido, *(t.casilla for t in self.grupos.values())):  # fmt: skip
+                  self.e_contexto, self.avanzadas.contenido, self.bienvenida.b_configurar, self.a_motor,
+                  *(t.casilla for t in self.grupos.values())):  # fmt: skip
             w.setEnabled(not si)
         self._actualizar_principal()
 
@@ -951,7 +953,6 @@ class Ventana(QMainWindow):
                 self.estado.setText("Análisis listo. Elige qué traducir y pulsa el botón de abajo.")
             else:
                 self._estado = "listo"
-                self.barra.setValue(1)
                 self.estado.setText("¡Listo! Abre el juego: ya está en español.")
                 self.aviso.mostrar("Traducción terminada. Abre Minecraft para verla.", "exito")
                 self._marcar_traducida()
@@ -985,6 +986,10 @@ class Ventana(QMainWindow):
     def _mostrar(self, informe: Informe, hecho: bool) -> None:
         for g, tarjeta in self.grupos.items():
             modulos = [m for m in informe.modulos if m.grupo == g]
+            if g in informe.fallidos:
+                tarjeta.fijar_incluido(False)
+                tarjeta.fijar_cantidad(None, "No se pudo leer: el motivo está en Detalles")
+                continue
             if not modulos:
                 tarjeta.fijar_cantidad(0, "No hay en esta instancia")
                 continue
@@ -1141,6 +1146,8 @@ class Ventana(QMainWindow):
         self._cancelar.set()
         for lector in self._lectores:
             lector.parar.set()
+        for lector in self._lectores:
+            lector.esperar(2)  # que no quede avisando mientras Qt se cierra
         if self._hilo is not None:
             self._hilo.quit()
             self._hilo.wait(5000)

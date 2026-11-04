@@ -48,6 +48,7 @@ class Lector(QObject):
         self.carpetas = list(carpetas)
         self.parar = threading.Event()
         self.terminado = threading.Event()
+        self._hilo: threading.Thread | None = None
 
     def ejecutar(self) -> None:
         try:
@@ -66,7 +67,12 @@ class Lector(QObject):
         """Un hilo de Python, sin padre: si la ventana se cierra antes, Qt corta la conexión y el aviso se pierde."""
         hilo = threading.Thread(target=self.ejecutar, name="leer-instancias", daemon=True)
         hilo.start()
+        self._hilo = hilo
         return hilo
+
+    def esperar(self, segundos: float) -> None:
+        if self._hilo is not None:
+            self._hilo.join(segundos)
 
 
 class ListaInstancias(QWidget):
@@ -178,8 +184,8 @@ class ListaInstancias(QWidget):
         return super().eventFilter(objeto, evento)
 
     def filtrar(self, texto: str) -> None:
-        for t in self.tarjetas:
-            t.setVisible(t.coincide(texto))
+        for t in self.tarjetas:  # la elegida se sigue viendo: si no, el botón actuaría sobre una que no está
+            t.setVisible(t.coincide(texto) or t is self._actual)
         visibles = [t for t in self.tarjetas if t.isVisibleTo(self._contenido)]
         self.vacio.setText(
             "Ninguna instancia coincide con la búsqueda." if self.tarjetas

@@ -73,6 +73,9 @@ def test_lista_busca_elige_y_muestra_los_datos(qtbot: QtBot) -> None:
     lista.al_leer(r"C:\b", ("1.21.1", "neoforge", True))
     assert atm.e_detalle.text() == "1.21.1 · NeoForge · CurseForge" and atm.e_estado.text() == "✓ Traducido"
     lista.e_buscar.setText("valle")
+    assert not valle.isHidden() and not atm.isHidden()  # ATM10 sigue a la vista porque es la elegida
+    lista.elegir(None)
+    lista.filtrar("valle")
     assert not valle.isHidden() and atm.isHidden() and lista.vacio.isHidden()
     lista.e_buscar.setText("nada que coincida")
     assert not lista.vacio.isHidden() and "Ninguna" in lista.vacio.text()
@@ -98,3 +101,13 @@ def test_flechas_para_pasar_de_instancia(qtbot: QtBot) -> None:
     b.setVisible(False)  # oculta por la búsqueda: se salta
     QTest.keyClick(c, Qt.Key.Key_Up)
     assert lista.actual() is a
+
+
+def test_buscar_no_esconde_la_instancia_elegida(qtbot: QtBot) -> None:
+    lista = instancias.ListaInstancias()
+    qtbot.addWidget(lista)
+    a = lista.agregar("Valle", "Prism Launcher", r"C:\a")
+    b = lista.agregar("ATM10", "CurseForge", r"C:\b")
+    lista.elegir(a)
+    lista.e_buscar.setText("atm")
+    assert not a.isHidden() and not b.isHidden()
