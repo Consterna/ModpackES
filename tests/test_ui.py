@@ -67,29 +67,49 @@ def _ventana(qtbot: QtBot, juego: Path) -> Ventana:
     return v
 
 
+def _analizar(qtbot: QtBot, v: Ventana) -> None:
+    """Como el jugador: el botón principal, o «Analizar de nuevo» si la instancia ya se tradujo."""
+    (v.b_principal if v.b_secundario.isHidden() else v.b_secundario).click()
+    qtbot.waitUntil(
+        lambda: v._hilo is None and v.b_principal.text().startswith(("Traducir", "Aplicar")),  # pyright: ignore[reportPrivateUsage]
+        timeout=30000,
+    )
+
+
+def _traducir(qtbot: QtBot, v: Ventana) -> None:
+    _analizar(qtbot, v)
+    v.b_principal.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+
+
 def test_analizar_traducir_y_restaurar(qtbot: QtBot, tmp_path: Path) -> None:
     juego = _modpack(tmp_path)
     v = _ventana(qtbot, juego)
     assert v.lista.count() == 1 and v.carpeta() == str(juego)
-    v.b_analizar.click()
+    v.b_principal.click()
     qtbot.waitUntil(lambda: v._hilo is None and v.ultimo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
-    assert v.tabla.rowCount() == 3 and "Costo estimado" in v.costo.text()
+    assert v.grupos["libros"].e_detalle.text() == "No hay en esta instancia"
+    assert all(v.grupos[g].e_numero.text() != "—" for g in ("mods", "misiones", "scripts"))
+    assert "Costo estimado" in v.costo.text() and v.b_principal.text().startswith(("Traducir", "Aplicar"))
     assert not (juego / "resourcepacks").exists()  # analizar no escribe
-    v.b_traducir.click()
+    v.b_principal.click()
     qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    actual = v.lista.actual()
+    assert v.b_principal.text() == "Listo: abrir la carpeta" and actual is not None and actual.traducida
     assert "«ES» Welcome to the pack" in (juego / "kubejs" / "server_scripts" / "s.js").read_text("utf-8")
     assert (juego / "resourcepacks" / "Traduccion_ES" / "pack.mcmeta").is_file()
     assert "lang:es_mx" in (juego / "options.txt").read_text("utf-8")
-    v.b_restaurar.click()
+    v.a_restaurar.trigger()
     qtbot.waitUntil(lambda: v._hilo is None and "Restaurados" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
     assert (juego / "kubejs" / "server_scripts" / "s.js").read_text("utf-8") == "player.tell('Welcome to the pack')\n"
+    assert v.b_principal.text() == "Analizar (gratis)" and v.ultimo_informe is None
 
 
 def test_sin_instancia_avisa(qtbot: QtBot) -> None:
     v = Ventana(buscar_instancias=list)
     qtbot.addWidget(v)
-    v.b_analizar.click()
-    assert "Elige primero una instancia" in v.log.toPlainText()
+    v.b_principal.click()
+    assert "Elige primero una instancia" in v.log.toPlainText() and not v.aviso.isHidden()
 
 
 def test_error_se_muestra_y_libera_la_ventana(qtbot: QtBot, tmp_path: Path) -> None:
@@ -99,9 +119,10 @@ def test_error_se_muestra_y_libera_la_ventana(qtbot: QtBot, tmp_path: Path) -> N
     v = Ventana(buscar_instancias=rota)
     qtbot.addWidget(v)
     v.lista.setCurrentRow(0)
-    v.b_analizar.click()
+    v.b_principal.click()
     qtbot.waitUntil(lambda: v._hilo is None and "Se detuvo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
-    assert "No encuentro" in v.log.toPlainText() and v.b_analizar.isEnabled()
+    assert "No encuentro" in v.log.toPlainText() and v.b_principal.isEnabled() and v.detalles.abierta
+    assert v.b_principal.text() == "Analizar (gratis)" and v.aviso.tipo == "error"
 
 
 def test_exportar_pack_y_kit(tmp_path: Path) -> None:
@@ -173,10 +194,11 @@ def test_cambiar_de_instancia_borra_el_analisis_anterior(qtbot: QtBot, tmp_path:
     v = Ventana(buscar_instancias=instancias)
     qtbot.addWidget(v)
     v.lista.setCurrentRow(0)
-    v.b_analizar.click()
+    v.b_principal.click()
     qtbot.waitUntil(lambda: v._hilo is None and v.ultimo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
     v.lista.setCurrentRow(1)
-    assert v.ultimo_informe is None and v.tabla.rowCount() == 0 and v.costo.text() == ""
+    assert v.ultimo_informe is None and v.costo.text() == "" and v.b_principal.text() == "Analizar (gratis)"
+    assert all(t.e_numero.text() == "—" for t in v.grupos.values())
 
 
 def test_error_no_previsto_libera_la_ventana_y_queda_en_el_registro(
@@ -192,9 +214,9 @@ def test_error_no_previsto_libera_la_ventana_y_queda_en_el_registro(
     ruta = registro.configurar(tmp_path / "datos")
     try:
         v = _ventana(qtbot, _modpack(tmp_path))
-        v.b_analizar.click()
+        v.b_principal.click()
         qtbot.waitUntil(lambda: v._hilo is None and "Se detuvo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
-        assert v.b_analizar.isEnabled() and "Error no previsto: RuntimeError: fallo inventado" in v.log.toPlainText()
+        assert v.b_principal.isEnabled() and "Error no previsto: RuntimeError: fallo inventado" in v.log.toPlainText()
         texto = v.copiar_diagnostico()
         from PySide6.QtWidgets import QApplication
 
@@ -217,8 +239,7 @@ def test_corregir_desde_la_ventana_y_volver_a_traducir_sin_pagar(qtbot: QtBot, t
     )
     qtbot.addWidget(v)
     v.lista.setCurrentRow(0)
-    v.b_traducir.click()
-    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    _traducir(qtbot, v)
     enviados = sum(len(lote.entradas) for lote in motor.lotes_recibidos)
 
     with Memoria(configuracion.ruta_memoria()) as memoria:
@@ -240,8 +261,7 @@ def test_corregir_desde_la_ventana_y_volver_a_traducir_sin_pagar(qtbot: QtBot, t
         d.buscar()
         assert [c.traduccion for c in d.resultados] == ["Te damos la bienvenida al pack"]
 
-    v.b_traducir.click()
-    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    _traducir(qtbot, v)
     assert sum(len(lote.entradas) for lote in motor.lotes_recibidos) == enviados  # no se pidió nada nuevo
     script = (juego / "kubejs" / "server_scripts" / "s.js").read_text("utf-8")
     assert script == "player.tell('Te damos la bienvenida al pack')\n"
@@ -262,11 +282,77 @@ def test_la_ambientacion_se_guarda_por_instancia(qtbot: QtBot, tmp_path: Path) -
     qtbot.addWidget(v)
     v.lista.setCurrentRow(0)
     v.e_contexto.setText("Granja acogedora")
-    v.b_traducir.click()
-    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    _traducir(qtbot, v)
     assert motor.lotes_recibidos and all(lote.contexto == "Granja acogedora" for lote in motor.lotes_recibidos)
     assert configuracion.leer_preferencias()["contextos"] == {str(a): "Granja acogedora"}
     v.lista.setCurrentRow(1)
     assert v.e_contexto.text() == ""
     v.lista.setCurrentRow(0)
     assert v.e_contexto.text() == "Granja acogedora"
+
+
+def test_un_grupo_desmarcado_no_se_traduce_ni_se_cobra(qtbot: QtBot, tmp_path: Path) -> None:
+    from traductor_es import configuracion
+
+    antes = configuracion.leer_preferencias()
+    juego = _modpack(tmp_path)
+    (juego / "kubejs" / "server_scripts" / "s.js").write_text("player.tell('Never translate this one')\n", "utf-8")
+    try:
+        v = _ventana(qtbot, juego)
+        _analizar(qtbot, v)
+        assert v.grupos["scripts"].e_numero.text() == "1"
+        con_scripts = v.b_principal.text()
+        v.grupos["scripts"].fijar_incluido(False)
+        assert v.b_principal.text() != con_scripts and not v.grupos["scripts"].activa
+        for g in ("mods", "libros", "misiones"):
+            v.grupos[g].fijar_incluido(False)
+        assert not v.b_principal.isEnabled() and "Marca al menos" in v.b_principal.text()
+        v.grupos["misiones"].fijar_incluido(True)
+        v.b_principal.click()
+        qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+        assert "Never translate" in (juego / "kubejs" / "server_scripts" / "s.js").read_text("utf-8")
+        capitulo = juego / "config" / "ftbquests" / "quests" / "chapters" / "a.snbt"
+        assert "«ES» Getting Started" in capitulo.read_text("utf-8")
+        assert configuracion.leer_preferencias()["grupos"] == ["misiones"]
+    finally:
+        configuracion.guardar_preferencias(antes)  # las demás pruebas abren la ventana con todos los grupos
+
+
+def test_las_tarjetas_muestran_version_loader_y_estado(qtbot: QtBot, tmp_path: Path) -> None:
+    v = _ventana(qtbot, _modpack(tmp_path))
+    actual = v.lista.actual()
+    assert actual is not None
+    qtbot.waitUntil(lambda: "1.20.1" in actual.e_detalle.text(), timeout=10000)
+    assert actual.e_detalle.text() == "1.20.1 · Forge · Prism Launcher" and actual.traducida is False
+    assert v.e_titulo.text() == "Prueba" and str(tmp_path) in v.e_ruta.texto_completo()
+
+
+def test_elegir_el_tema_lo_aplica_y_lo_recuerda(qtbot: QtBot) -> None:
+    from traductor_es import configuracion
+    from traductor_es.ui import tema
+
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    instalado = tema.tema()
+    assert instalado is not None
+    try:
+        v.a_temas["claro"].trigger()
+        assert tema.actual() is tema.CLARO and configuracion.leer_preferencias()["tema"] == "claro"
+        v.a_temas["oscuro"].trigger()
+        assert tema.actual() is tema.OSCURO and v.a_temas["oscuro"].isChecked()
+    finally:
+        v.elegir_tema("sistema")
+
+
+def test_el_estado_del_motor_se_ve_arriba(qtbot: QtBot) -> None:
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    v.c_motor.setCurrentIndex(v.c_motor.findData("gemini"))
+    assert v.b_motor.text() == "Gemini · falta la clave" and v.pasos.estado(0) == "actual"
+    v.c_motor.setCurrentIndex(v.c_motor.findData("lmstudio"))
+    assert v.b_motor.text() == "LM Studio · listo" and v.pasos.estado(0) == "hecho"
+    assert "LM Studio" in v.dialogo_motor.guia.text()
+    v.abrir_motor()
+    assert v.dialogo_motor.isVisible()
+    v.dialogo_motor.reject()
+    v.c_motor.setCurrentIndex(v.c_motor.findData("gemini"))

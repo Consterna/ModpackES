@@ -9,8 +9,17 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from PySide6.QtCore import QObject, QSize, Qt, Signal, Slot
-from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QCheckBox, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from . import iconos, tema
 
@@ -118,18 +127,23 @@ class TarjetaInstancia(Tarjeta):
         capa.setContentsMargins(10, 8, 10, 8)
         capa.setSpacing(2)
         self.e_nombre = etiqueta(nombre, "subtitulo")
-        self.e_detalle = etiqueta(f"{lanzador} · leyendo…", "tenue")
+        self.e_detalle = etiqueta(f"{lanzador} · leyendo…", "tenue", ajustar=True)
         self.e_estado = etiqueta("", "tenue")
         for e in (self.e_nombre, self.e_detalle, self.e_estado):
             capa.addWidget(e)
+        self.e_estado.setVisible(False)  # hasta saber si está traducida
         self.setToolTip(ruta)
         self.setAccessibleName(f"Instancia {nombre}")
+        self.version: str | None = None
+        self.loader: str | None = None
         self.traducida: bool | None = None
 
     def fijar_datos(self, version: str | None, loader: str | None, traducida: bool | None) -> None:
+        self.version, self.loader = version, loader
         partes = [p for p in (version or "versión desconocida", LOADERS.get(loader or "", loader), self.lanzador) if p]
         self.e_detalle.setText(" · ".join(partes))
         self.traducida = traducida
+        self.e_estado.setVisible(traducida is not None)
         if traducida is None:
             self.e_estado.setText("")
         else:
@@ -138,9 +152,40 @@ class TarjetaInstancia(Tarjeta):
             repintar(self.e_estado)
         self.setAccessibleDescription(f"{self.e_detalle.text()}. {self.e_estado.text()}")
 
+    def fijar_traducida(self, traducida: bool) -> None:
+        self.fijar_datos(self.version, self.loader, traducida)
+
     def coincide(self, filtro: str) -> bool:
         f = filtro.strip().casefold()
         return not f or f in self.nombre.casefold() or f in self.lanzador.casefold()
+
+
+class EtiquetaRuta(QLabel):
+    """Una ruta que se acorta por el medio para caber en el ancho que haya; completa en el texto de ayuda."""
+
+    def __init__(self, texto: str = "", tipo: str = "tenue", padre: QWidget | None = None) -> None:
+        super().__init__(padre)
+        self.setProperty("tipo", tipo)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._completo = ""
+        self.fijar(texto)
+
+    def fijar(self, texto: str) -> None:
+        self._completo = texto
+        self.setToolTip(texto)
+        self.setAccessibleName(texto)
+        self._acortar()
+
+    def texto_completo(self) -> str:
+        return self._completo
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._acortar()
+
+    def _acortar(self) -> None:
+        ancho = max(self.width(), 40)
+        self.setText(self.fontMetrics().elidedText(self._completo, Qt.TextElideMode.ElideMiddle, ancho))
 
 
 class Pasos(QWidget):
@@ -220,6 +265,7 @@ class TarjetaGrupo(Tarjeta):
         self.e_detalle = etiqueta("", "tenue", ajustar=True)
         for e in (self.e_numero, self.e_titulo, self.e_detalle):
             capa.addWidget(e)
+        capa.addStretch(1)  # las tarjetas de una fila miden lo mismo: el texto queda arriba en todas
         self.fijar_activa(True)
 
     @property

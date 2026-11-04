@@ -201,6 +201,7 @@ QLabel[tipo="tenue"] {{ color: {p.tenue}; }}
 QLabel[tipo="numero"] {{ font-size: 16pt; font-weight: 600; }}
 QLabel[tipo="acento"] {{ color: {p.acento}; }}
 QLabel a {{ color: {p.acento}; }}
+QScrollArea, QScrollArea > QWidget#qt_scrollarea_viewport, QScrollArea > QWidget > QWidget {{ background: transparent; }}
 QFrame[tipo="lateral"] {{ background: {p.lateral}; border-right: 1px solid {p.borde}; }}
 QFrame[tipo="separador"] {{ background: {p.borde}; border: none; max-height: 1px; min-height: 1px; }}
 QFrame[tipo="barra"] {{ background: {p.fondo}; border-bottom: 1px solid {p.borde}; }}

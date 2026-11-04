@@ -130,7 +130,7 @@ def instalar_manejadores(mostrar: Callable[[str], None] | None = None) -> None:
             donde = ruta_actual()
             mostrar(
                 f"Ocurrió un error no previsto: {valor}\n\n"
-                + (f"Quedó anotado en {donde}. Pulsa «Copiar diagnóstico» para reportarlo." if donde else "")
+                + (f"Quedó anotado en {donde}. Usa «Más ▸ Copiar diagnóstico» para reportarlo." if donde else "")
             )
 
     def en_hilo(args: threading.ExceptHookArgs) -> None:

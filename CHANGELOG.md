@@ -10,6 +10,22 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 - Aspecto nuevo: tema propio agua marina y morado, en oscuro y en claro. Sigue el modo de Windows y tiene íconos
   en los botones. Todos los textos cumplen el contraste mínimo de WCAG (4,5:1).
+- Ventana nueva, guiada en cuatro pasos (motor, analizar, traducir, listo) con un solo botón principal que
+  cambia según el paso: «Analizar (gratis)», «Traducir 295 textos · US$ 0,01» y «Listo: abrir la carpeta».
+- Las instancias salen como tarjetas con la versión de Minecraft, el loader y si ya están traducidas, con un
+  buscador. Esos datos se leen en segundo plano, sin trabar el arranque.
+- Mods, libros, misiones y scripts son tarjetas con cuántos textos faltan y una casilla para incluirlos. El
+  análisis cuenta los cuatro grupos (es gratis), y el costo y lo que se traduce siguen solo a los marcados.
+- El motor, su modelo y su clave van en el diálogo «Motor de traducción», que se abre desde la ficha de
+  arriba («Gemini · listo» o «falta la clave»).
+- Las acciones menos usadas (correcciones, restaurar, exportar, kit de servidor, diagnóstico) van en «Más».
+  Las opciones avanzadas y el registro van en secciones plegables.
+- Nombres más claros: «Español de» (antes «Base de la traducción»), «Velocidad» («Peticiones a la vez») y
+  «Más barato, pero tarda más» («Por lotes»).
+- Los avisos y errores salen en una franja dentro de la ventana, en lugar de cuadros que cortan el trabajo.
+  Solo «Restaurar» y «Traducir» siguen pidiendo confirmación.
+- La barra de progreso dice qué parte se está traduciendo y cuánto falta.
+- El engranaje de arriba elige el tema (como Windows, oscuro o claro) y el aviso de versiones nuevas.
 
 ## [2.1.1] - 2026-11-03
 

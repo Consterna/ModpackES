@@ -124,10 +124,10 @@ def test_ventana_con_un_motor_local(qtbot: QtBot, tmp_path: Path) -> None:
     assert not v.c_lotes.isEnabled() and "tu PC" in v.etiqueta_clave.text() and not v.b_clave.isEnabled()
     assert v.e_direccion.text() == "http://localhost:11434/v1" and v.e_direccion.isReadOnly()
     v.c_modelo.setCurrentText("qwen3:8b")
-    v.b_analizar.click()
+    v.b_principal.click()
     qtbot.waitUntil(lambda: v._hilo is None and v.ultimo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
-    assert "Sin costo" in v.costo.text()
-    v.b_traducir.click()
+    assert "Sin costo" in v.costo.text() and v.pasos.estado(2) == "actual"  # con un motor local no falta clave
+    v.b_principal.click()
     qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
     assert pedidos == [("ollama", None, "qwen3:8b", "http://localhost:11434/v1")]
     preferencias = configuracion.leer_preferencias()
