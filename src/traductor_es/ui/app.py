@@ -35,7 +35,7 @@ class Avisador(QObject):
 
 
 def _autoprueba(carpeta: str, salida: str) -> int:
-    ventana = Ventana(buscar_instancias=list)
+    ventana = Ventana(buscar_instancias=list, avisar_version=False)
     ventana.close()
     ventana.deleteLater()  # que Qt la destruya ahora y no Python al salir, cuando Qt ya se cerró
     QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)

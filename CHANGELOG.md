@@ -27,6 +27,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   reglas, y las correcciones del usuario no se tocan. El análisis estima el costo con la revisión.
 - Banco de referencia (148 textos propios con su traducción) y `scripts/medir_calidad.py`, que mide con
   cualquier motor los textos aceptados, el chrF, los términos del glosario respetados y el costo.
+- Aviso de versión nueva al abrir la ventana, con enlace a la descarga. Consulta GitHub sin datos del usuario,
+  no descarga nada y se puede desactivar.
 
 ### Corregido
 

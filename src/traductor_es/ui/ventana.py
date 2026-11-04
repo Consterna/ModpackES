@@ -37,7 +37,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, configuracion, registro
+from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, actualizaciones, configuracion, registro
+from ..actualizaciones import Novedad
 from ..fuentes.instancia import resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
 from ..motores import fabrica
@@ -144,7 +145,10 @@ class Ventana(QMainWindow):
         self,
         buscar_instancias: Callable[[], list[InstanciaEncontrada]] = buscar,
         fabrica_motor: FabricaMotor | None = None,
+        buscar_novedad: Callable[[], Novedad | None] | None = None,
+        avisar_version: bool = True,
     ) -> None:
+        """`buscar_novedad` reemplaza la consulta a GitHub (pruebas); `avisar_version=False` no consulta nada."""
         super().__init__()
         self.setWindowTitle(f"{NOMBRE} {__version__} · Traductor de modpacks al español")
         self.resize(1100, 800)
@@ -161,6 +165,12 @@ class Ventana(QMainWindow):
         self._construir()
         self.actualizar_instancias()
         self._actualizar_estado_clave()
+        self._hilo_novedad: QThread | None = None
+        self._consulta_novedad: Consulta | None = None
+        por_defecto = actualizaciones.buscar if avisar_version and not self._es_prueba() else None
+        funcion = buscar_novedad or por_defecto
+        if funcion is not None and self.c_avisar.isChecked():
+            self._buscar_novedad(funcion)
 
     # ------------------------------------------------------------------ construcción
     def _construir(self) -> None:
@@ -235,6 +245,10 @@ class Ventana(QMainWindow):
         self.c_activar = QCheckBox("Activar el pack y poner el juego en español (con Minecraft cerrado)")
         self.c_activar.setChecked(True)
         formulario.addRow("", self.c_activar)
+        self.c_avisar = QCheckBox("Avisar al abrir si hay una versión nueva (consulta GitHub; no descarga nada)")
+        self.c_avisar.setChecked(bool(self._preferencias.get("avisar_version", True)))
+        self.c_avisar.toggled.connect(self._guardar_aviso)
+        formulario.addRow("", self.c_avisar)
         clave = QHBoxLayout()
         self.etiqueta_clave = QLabel()
         self.b_clave = QPushButton("Guardar clave…")
@@ -305,8 +319,12 @@ class Ventana(QMainWindow):
         self.b_diagnostico.clicked.connect(self.copiar_diagnostico)
         self.b_registro = QPushButton("Abrir registro")
         self.b_registro.clicked.connect(self._abrir_registro)
+        self.novedad = QLabel()
+        self.novedad.setOpenExternalLinks(True)
+        self.novedad.setVisible(False)
         pie.addWidget(self.b_diagnostico)
         pie.addWidget(self.b_registro)
+        pie.addWidget(self.novedad)
         pie.addWidget(self.creditos, 1)
         capa.addLayout(pie)
 
@@ -672,11 +690,50 @@ class Ventana(QMainWindow):
             "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "motor": o["motor"],
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
-            "revisar": o["revisar"],
+            "revisar": o["revisar"], "avisar_version": self.c_avisar.isChecked(),
         }  # fmt: skip
         configuracion.guardar_preferencias(dict(self._preferencias))
 
+    # ------------------------------------------------------------------ versión nueva
+    def _guardar_aviso(self, activo: bool) -> None:
+        self._preferencias["avisar_version"] = activo
+        configuracion.guardar_preferencias(dict(self._preferencias))
+
+    def _buscar_novedad(self, funcion: Callable[[], Novedad | None]) -> None:
+        def como_lista() -> list[str]:
+            n = funcion()
+            return [n.version, n.enlace] if n else []
+
+        self._hilo_novedad = QThread(self)  # con padre: Qt lo libera junto con la ventana
+        self._consulta_novedad = Consulta(como_lista)
+        self._consulta_novedad.moveToThread(self._hilo_novedad)
+        self._hilo_novedad.finished.connect(self._consulta_novedad.deleteLater)
+        self._hilo_novedad.started.connect(self._consulta_novedad.ejecutar)
+        self._consulta_novedad.listo.connect(self._mostrar_novedad)
+        self._consulta_novedad.fallo.connect(self._novedad_fallo)
+        self._hilo_novedad.start()
+
+    def _novedad_fallo(self, _mensaje: str) -> None:
+        self._fin_novedad()  # sin aviso: se vuelve a intentar en el próximo arranque
+
+    def _fin_novedad(self) -> None:
+        if self._hilo_novedad is not None:
+            self._hilo_novedad.quit()
+            self._hilo_novedad.wait()
+        self._hilo_novedad = None
+        self._consulta_novedad = None
+
+    def _mostrar_novedad(self, datos: list[str]) -> None:
+        self._fin_novedad()
+        if len(datos) == 2:
+            version, enlace = datos
+            self.novedad.setText(f'<a href="{enlace}"><b>Versión nueva: {version}</b></a>')
+            self.novedad.setToolTip("Abre la página de descarga en GitHub")
+            self.novedad.setVisible(True)
+            self.escribir(f"Hay una versión nueva de {NOMBRE}: {version} ({enlace})")
+
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._fin_novedad()
         self._cancelar.set()
         if self._hilo is not None:
             self._hilo.quit()

@@ -137,7 +137,8 @@ Vuelve a pulsar «Traducir». Lo que ya estaba traducido sale de la memoria sin 
 
 Solo los textos que hay que traducir, con los códigos cambiados por marcadores, la clave del mod como
 contexto y la ambientación si la escribiste. Van únicamente al motor que elijas; con LM Studio u Ollama no
-salen de tu PC. No se envía nada más. Ten en cuenta que, según las condiciones de Google, los datos de la capa
+salen de tu PC. No se envía nada más. Al abrirse, la app consulta en GitHub si hay una versión nueva (sin
+enviar datos tuyos); se desactiva con la casilla «Avisar al abrir si hay una versión nueva». Ten en cuenta que, según las condiciones de Google, los datos de la capa
 gratuita de Gemini pueden usarse para mejorar sus productos; revisa las condiciones del proveedor que uses.
 </details>
 
