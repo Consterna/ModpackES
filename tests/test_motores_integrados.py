@@ -212,3 +212,18 @@ def test_linea_de_comandos_rechaza_combinaciones_imposibles(tmp_path: Path, caps
     assert "MODPACKES_CLAVE_OPENROUTER" in capsys.readouterr().out
     assert cli(["analizar", str(juego), "--motor", "ollama", "--modelo", "m"]) == 0
     assert "US$ 0.00" in capsys.readouterr().out
+
+
+def test_el_modelo_escrito_se_recuerda_al_cambiar_de_motor_sin_usarlo(qtbot: QtBot) -> None:
+    """Regresión: lo escrito para un motor se perdía si se cambiaba de motor antes de analizar o traducir."""
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    v.c_motor.setCurrentIndex(v.c_motor.findData("ollama"))
+    v.c_modelo.setCurrentText("qwen3:8b")
+    v.c_motor.setCurrentIndex(v.c_motor.findData("personalizado"))
+    v.e_direccion.setText("http://127.0.0.1:9999/v1")
+    v.c_motor.setCurrentIndex(v.c_motor.findData("gemini"))
+    v.c_motor.setCurrentIndex(v.c_motor.findData("ollama"))
+    assert v.c_modelo.currentText() == "qwen3:8b"
+    v.c_motor.setCurrentIndex(v.c_motor.findData("personalizado"))
+    assert v.e_direccion.text() == "http://127.0.0.1:9999/v1"

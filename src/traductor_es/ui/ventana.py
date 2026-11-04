@@ -162,6 +162,7 @@ class Ventana(QMainWindow):
         self._cancelar = threading.Event()
         self.ultimo_informe: Informe | None = None
         self._preferencias: dict[str, Any] = configuracion.leer_preferencias()
+        self._motor_anterior: str | None = None
         self._construir()
         self.actualizar_instancias()
         self._actualizar_estado_clave()
@@ -362,8 +363,7 @@ class Ventana(QMainWindow):
             self.e_contexto.setText(self._contexto_de(str(actual.data(Qt.ItemDataRole.UserRole))))
 
     def _contexto_de(self, carpeta: str) -> str:
-        contextos: Any = self._preferencias.get("contextos", {})
-        return str(cast(dict[str, Any], contextos).get(carpeta, "")) if isinstance(contextos, dict) else ""
+        return _diccionario(self._preferencias.get("contextos")).get(carpeta, "")
 
     def _elegir_carpeta(self) -> None:
         carpeta = QFileDialog.getExistingDirectory(self, "Carpeta de la instancia")
@@ -378,7 +378,17 @@ class Ventana(QMainWindow):
         return str(self.c_motor.currentData())
 
     def _al_cambiar_motor(self) -> None:
+        anterior = self._motor_anterior
+        if anterior is not None:  # lo escrito para el motor anterior se recuerda aunque todavía no se haya usado
+            self._preferencias["modelos"] = _diccionario(self._preferencias.get("modelos")) | {
+                anterior: self.c_modelo.currentText().strip()
+            }
+            if anterior == "personalizado":
+                self._preferencias["direcciones"] = _diccionario(self._preferencias.get("direcciones")) | {
+                    anterior: self.e_direccion.text().strip()
+                }
         motor = self.motor_elegido()
+        self._motor_anterior = motor
         es_gemini = motor == fabrica.GEMINI
         guardada = _diccionario(self._preferencias.get("direcciones")).get(motor, "")
         self.e_direccion.setText(guardada or fabrica.direccion_por_defecto(motor))
@@ -676,8 +686,7 @@ class Ventana(QMainWindow):
 
     def _guardar_preferencias(self, carpeta: str) -> None:
         o = self.opciones()
-        anteriores = self._preferencias.get("contextos", {})
-        contextos: dict[str, str] = dict(anteriores) if isinstance(anteriores, dict) else {}  # pyright: ignore[reportUnknownArgumentType]
+        contextos = _diccionario(self._preferencias.get("contextos"))
         if o["contexto"]:
             contextos[carpeta] = o["contexto"]
         else:
