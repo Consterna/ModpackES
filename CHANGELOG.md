@@ -6,6 +6,10 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+## [2.1.1] - 2026-11-03
+
+Arreglos que encontró el análisis de seguridad de GitHub (CodeQL) después de publicar la 2.1.0.
+
 ### Corregido
 
 - En las guías de GuideME y Lavender, el texto de un comentario `<!-- … -->` de varias líneas se tomaba como
@@ -93,6 +97,7 @@ Farming Crossing 4 (1.20.1, Forge).
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
 
-[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.1.0...HEAD
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/Consterna/ModpackES/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/Consterna/ModpackES/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/Consterna/ModpackES/releases/tag/v2.0.0
