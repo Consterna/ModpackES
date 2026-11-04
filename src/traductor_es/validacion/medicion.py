@@ -186,7 +186,7 @@ def medir(
             segundos_rev = time.perf_counter() - inicio
             hechas: dict[tuple[str, str], str] = {}
             for a, textos in por_ambito.items():  # lo rehecho ya está en la memoria: no se pide nada nuevo
-                hechas.update({(a, o): t for o, t in traductor.traducir(textos, a).traducciones.items()})
+                hechas.update({(a, o): t for o, t in traductor.conocidas(textos, a).items()})
             despues = _medir(
                 f"{nombre or motor.nombre} + revisión", banco, hechas,
                 informe.costo(modelo, False, motor_id, revisar=True), segundos + segundos_rev,

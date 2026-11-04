@@ -195,7 +195,7 @@ class Proceso:
                     informe.revision_automatica = revision.ResumenRevision()
                 informe.revision_automatica.sumar(hecha)
                 if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
-                    resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
+                    resultado.traducciones = self.traductor.conocidas(textos, modulo.ambito)
             resumen = modulo.escribir(resultado.traducciones)
             self.registro(f"   {resumen}")
             informe.modulos.append(

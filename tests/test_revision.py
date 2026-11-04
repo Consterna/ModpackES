@@ -140,3 +140,22 @@ def test_el_costo_con_revision_es_mayor_solo_por_misiones_y_libros() -> None:
     con = con_misiones.costo("gemini-3.8-flash", False, revisar=True) or 0
     assert 1.2 * sin < con < 1.7 * sin
     assert solo_mods.costo("gemini-3.8-flash", False, revisar=True) == solo_mods.costo("gemini-3.8-flash", False)
+
+
+def test_tras_la_revision_no_se_vuelve_a_pedir_lo_rechazado(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regresión: juntar lo rehecho volvía a mandar al motor los textos que las reglas habían rechazado."""
+    monkeypatch.setattr(vanilla, "raices_de_lanzadores", list)
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    capitulo = juego / "config" / "ftbquests" / "quests" / "chapters" / "a.snbt"
+    capitulo.parent.mkdir(parents=True)
+    # La segunda frase vuelve del simulador en inglés: la regla de inglés residual la rechaza siempre
+    largo = "You will need to find the key of the old tower and bring it to the mayor of the town"
+    capitulo.write_text(f'{{ title: "Find iron ore", subtitle: "{largo}" }}', encoding="utf-8")
+    motor = Simulador(marcar=frozenset({"«ES» Find iron ore"}))
+    with Memoria(tmp_path / "m.db") as memoria, Proceso(juego, motor, memoria=memoria, revisar=True) as p:
+        informe = p.ejecutar(activar=False)
+    assert informe.revision_automatica is not None and informe.revision_automatica.corregidos == 1
+    pedidos = [
+        lote for lote in motor.lotes_recibidos if lote.tarea == "traducir" for e in lote.entradas if largo in e.texto
+    ]
+    assert len(pedidos) == 2  # la ronda normal y su reintento; nada más después de la revisión
