@@ -356,3 +356,65 @@ def test_el_estado_del_motor_se_ve_arriba(qtbot: QtBot) -> None:
     assert v.dialogo_motor.isVisible()
     v.dialogo_motor.reject()
     v.c_motor.setCurrentIndex(v.c_motor.findData("gemini"))
+
+
+def test_bienvenida_la_primera_vez(qtbot: QtBot) -> None:
+    from traductor_es import configuracion
+
+    antes = configuracion.leer_preferencias()
+    try:
+        configuracion.guardar_preferencias({})
+        v = Ventana(buscar_instancias=list)
+        qtbot.addWidget(v)
+        assert not v.bienvenida.isHidden()
+        v.bienvenida.b_configurar.click()
+        assert v.dialogo_motor.isVisible()
+        v.dialogo_motor.reject()
+        v.bienvenida.b_entendido.click()
+        assert v.bienvenida.isHidden() and configuracion.leer_preferencias()["bienvenida_vista"] is True
+        otra = Ventana(buscar_instancias=list)
+        qtbot.addWidget(otra)
+        assert otra.bienvenida.isHidden()
+    finally:
+        configuracion.guardar_preferencias(antes)
+
+
+def test_soltar_la_carpeta_de_un_modpack(qtbot: QtBot, tmp_path: Path) -> None:
+    from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl
+    from PySide6.QtGui import QDropEvent
+
+    juego = _modpack(tmp_path)
+    suelta = tmp_path / "suelta.txt"
+    suelta.write_text("x", encoding="utf-8")
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    datos = QMimeData()
+    datos.setUrls([QUrl.fromLocalFile(str(juego)), QUrl.fromLocalFile(str(suelta)), QUrl("https://example.com")])
+    assert v.carpetas_soltadas(datos) == [str(juego)]
+    v.dropEvent(QDropEvent(QPointF(5, 5), Qt.DropAction.CopyAction, datos, Qt.MouseButton.LeftButton,
+                           Qt.KeyboardModifier.NoModifier))  # fmt: skip
+    actual = v.lista.actual()
+    assert v.lista.count() == 1 and v.carpeta() == str(juego) and actual is not None and actual.nombre == "Pack"
+    assert not v.agregar_carpeta(str(tmp_path)) and "no parece una instancia" in v.aviso.e_texto.text()
+    assert v.lista.count() == 1
+
+
+def test_atajos_de_teclado(qtbot: QtBot) -> None:
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    assert {a.key().toString() for a in v.atajos} == {"Ctrl+F", "F5", "Ctrl+Return", "Ctrl+Enter"}
+
+
+def test_la_misma_carpeta_con_otras_barras_no_se_repite(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = _modpack(tmp_path)
+    v = _ventana(qtbot, juego)
+    assert v.agregar_carpeta(str(juego).replace("\\", "/"))
+    assert v.lista.count() == 1 and v.carpeta() == str(juego)
+
+
+def test_cancelar_no_se_muestra_como_error(qtbot: QtBot) -> None:
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    v._cancelar.set()  # pyright: ignore[reportPrivateUsage]
+    v._fallar("Cancelado. Lo traducido hasta ahora quedó guardado en la memoria.")  # pyright: ignore[reportPrivateUsage]
+    assert v.aviso.tipo == "info" and not v.detalles.abierta and v.estado.text() == "Se detuvo."

@@ -6,7 +6,8 @@ import threading
 from collections.abc import Iterable
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, Signal, Slot
+from PySide6.QtCore import QEvent, QObject, Qt, Signal, Slot
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QFrame, QLabel, QLineEdit, QScrollArea, QVBoxLayout, QWidget
 
 from ..fuentes.deteccion import detectar
@@ -83,6 +84,7 @@ class ListaInstancias(QWidget):
         self.e_buscar.setAccessibleName("Buscar instancia")
         self.e_buscar.setClearButtonEnabled(True)
         self.e_buscar.textChanged.connect(self.filtrar)
+        self.e_buscar.installEventFilter(self)  # flecha abajo desde el buscador: a la primera instancia
         capa.addWidget(self.e_buscar)
         self._contenido = QWidget()
         self._capa = QVBoxLayout(self._contenido)
@@ -93,6 +95,7 @@ class ListaInstancias(QWidget):
         desplazable.setWidgetResizable(True)
         desplazable.setFrameShape(QFrame.Shape.NoFrame)
         desplazable.setWidget(self._contenido)
+        self._desplazable = desplazable
         desplazable.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         capa.addWidget(desplazable, 1)
         self.vacio: QLabel = etiqueta(
@@ -115,6 +118,7 @@ class ListaInstancias(QWidget):
     def agregar(self, nombre: str, lanzador: str, carpeta: str) -> TarjetaInstancia:
         t = TarjetaInstancia(nombre, lanzador, carpeta)
         t.pulsada.connect(lambda: self.elegir(t))
+        t.installEventFilter(self)
         self._capa.insertWidget(self._capa.count() - 1, t)
         self.tarjetas.append(t)
         self.vacio.setVisible(False)
@@ -149,6 +153,29 @@ class ListaInstancias(QWidget):
             t.fijar_activa(t is tarjeta)
         self._actual = tarjeta
         self.elegida.emit(tarjeta.ruta if tarjeta else "")
+
+    def mover(self, paso: int) -> None:
+        """Elige la instancia visible anterior (-1) o siguiente (+1) y le pasa el foco."""
+        visibles = [t for t in self.tarjetas if not t.isHidden()]
+        if not visibles:
+            return
+        i = visibles.index(self._actual) if self._actual in visibles else -1
+        destino = visibles[max(0, min(len(visibles) - 1, i + paso))]
+        self.elegir(destino)
+        destino.setFocus()
+        self._desplazable.ensureWidgetVisible(destino)
+
+    def eventFilter(self, objeto: QObject, evento: QEvent) -> bool:
+        """El área desplazable se queda con las flechas: se atienden antes, en las tarjetas y el buscador."""
+        if evento.type() == QEvent.Type.KeyPress and isinstance(evento, QKeyEvent):
+            tecla = evento.key()
+            if tecla == Qt.Key.Key_Down:
+                self.mover(1)
+                return True
+            if tecla == Qt.Key.Key_Up and objeto is not self.e_buscar:
+                self.mover(-1)
+                return True
+        return super().eventFilter(objeto, evento)
 
     def filtrar(self, texto: str) -> None:
         for t in self.tarjetas:

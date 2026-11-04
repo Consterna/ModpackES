@@ -9,8 +9,18 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
-from PySide6.QtCore import QObject, QSize, Qt, QThread, QUrl, Signal, Slot
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QDesktopServices, QKeySequence, QPixmap, QShortcut
+from PySide6.QtCore import QMimeData, QObject, QSize, Qt, QThread, QUrl, Signal, Slot
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QCloseEvent,
+    QDesktopServices,
+    QDragEnterEvent,
+    QDropEvent,
+    QKeySequence,
+    QPixmap,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -48,6 +58,7 @@ from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
 from ..salida import exportar
 from . import correcciones, iconos, tema
+from .bienvenida import TarjetaBienvenida
 from .componentes import (
     Aviso,
     BotonPrincipal,
@@ -240,8 +251,12 @@ class Ventana(QMainWindow):
         self.setCentralWidget(central)
         atajos = [("Ctrl+F", self.lista.e_buscar.setFocus), ("F5", self.actualizar_instancias),
                   ("Ctrl+Return", self.b_principal.click), ("Ctrl+Enter", self.b_principal.click)]  # fmt: skip
+        self.atajos: list[QShortcut] = []
         for tecla, funcion in atajos:
-            QShortcut(QKeySequence(tecla), self).activated.connect(funcion)
+            atajo = QShortcut(QKeySequence(tecla), self)
+            atajo.activated.connect(funcion)
+            self.atajos.append(atajo)
+        self.setAcceptDrops(True)  # soltar la carpeta de un modpack en cualquier parte de la ventana
         self.c_motor.setCurrentIndex(max(0, self.c_motor.findData(self._preferencias.get("motor", fabrica.GEMINI))))
         self.c_motor.currentIndexChanged.connect(self._al_cambiar_motor)
         self._al_cambiar_motor()
@@ -346,6 +361,11 @@ class Ventana(QMainWindow):
         capa.setSpacing(14)
         self.aviso = Aviso()
         capa.addWidget(self.aviso)
+        self.bienvenida = TarjetaBienvenida()
+        self.bienvenida.configurar.connect(self.abrir_motor)
+        self.bienvenida.cerrada.connect(self._bienvenida_vista)
+        self.bienvenida.setVisible(not self._preferencias.get("bienvenida_vista", False))
+        capa.addWidget(self.bienvenida)
         self.e_titulo = etiqueta("Elige una instancia", "titulo")
         self.e_ruta = EtiquetaRuta(SIN_INSTANCIA)
         capa.addWidget(self.e_titulo)
@@ -546,10 +566,34 @@ class Ventana(QMainWindow):
         if carpeta:
             self.agregar_carpeta(carpeta)
 
-    def agregar_carpeta(self, carpeta: str) -> None:
-        tarjeta = self.lista.tarjeta_de(carpeta) or self.lista.agregar(Path(carpeta).name, "Carpeta", carpeta)
+    def agregar_carpeta(self, carpeta: str) -> bool:
+        ruta = Path(carpeta)
+        carpeta = str(ruta)  # el diálogo y lo soltado usan «/»: igual que en la lista, para no repetirla
+        if resolver_carpeta_juego(ruta) is None:
+            self.avisar(f"«{ruta.name}» no parece una instancia de Minecraft: no tiene las carpetas mods ni config.")
+            return False
+        nombre = ruta.parent.name if ruta.name.lower() in ("minecraft", ".minecraft") else ruta.name
+        tarjeta = self.lista.tarjeta_de(carpeta) or self.lista.agregar(nombre or carpeta, "Carpeta", carpeta)
         self._leer_datos([carpeta])
         self.lista.elegir(tarjeta)
+        return True
+
+    @staticmethod
+    def carpetas_soltadas(datos: QMimeData) -> list[str]:
+        rutas = [Path(u.toLocalFile()) for u in datos.urls() if u.isLocalFile()]
+        return [str(r) for r in rutas if r.is_dir()]
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if self._hilo is None and self.carpetas_soltadas(event.mimeData()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        carpetas = self.carpetas_soltadas(event.mimeData())
+        if self._hilo is not None or not carpetas:
+            return
+        event.acceptProposedAction()
+        for carpeta in carpetas:
+            self.agregar_carpeta(carpeta)
 
     # ------------------------------------------------------------------ motor y clave
     def motor_elegido(self) -> str:
@@ -901,6 +945,9 @@ class Ventana(QMainWindow):
             self._mostrar(resultado, hecho=accion == "traducir")
             if accion == "analizar":
                 self._estado = "traducir"
+                if not self.bienvenida.isHidden():
+                    self.bienvenida.setVisible(False)
+                    self._bienvenida_vista()
                 self.estado.setText("Análisis listo. Elige qué traducir y pulsa el botón de abajo.")
             else:
                 self._estado = "listo"
@@ -930,8 +977,10 @@ class Ventana(QMainWindow):
         self._ocupado(False)
         self.estado.setText("Se detuvo.")
         self.escribir(f"✖ {mensaje}")
-        self.detalles.fijar_abierta(True)
-        self.avisar(mensaje, "error", anotar=False)
+        cancelado = self._cancelar.is_set()  # lo pidió el jugador: no es un error
+        if not cancelado:
+            self.detalles.fijar_abierta(True)
+        self.avisar(mensaje, "info" if cancelado else "error", anotar=False)
 
     def _mostrar(self, informe: Informe, hecho: bool) -> None:
         for g, tarjeta in self.grupos.items():
@@ -1033,6 +1082,7 @@ class Ventana(QMainWindow):
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
             "revisar": o["revisar"], "avisar_version": self.c_avisar.isChecked(),
             "tema": self._preferencias.get("tema", "sistema"),
+            "bienvenida_vista": bool(self._preferencias.get("bienvenida_vista", False)),
         }  # fmt: skip
         configuracion.guardar_preferencias(dict(self._preferencias))
 
@@ -1042,6 +1092,10 @@ class Ventana(QMainWindow):
         if instalado is not None:
             instalado.elegir(preferencia)
         self._preferencias["tema"] = preferencia
+        configuracion.guardar_preferencias(dict(self._preferencias))
+
+    def _bienvenida_vista(self) -> None:
+        self._preferencias["bienvenida_vista"] = True
         configuracion.guardar_preferencias(dict(self._preferencias))
 
     def _guardar_aviso(self, activo: bool) -> None:

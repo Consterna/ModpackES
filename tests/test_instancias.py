@@ -9,6 +9,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
@@ -78,3 +79,22 @@ def test_lista_busca_elige_y_muestra_los_datos(qtbot: QtBot) -> None:
     lista.limpiar()
     assert lista.count() == 0 and lista.carpeta() is None
     assert elegidas == [r"C:\b", ""]
+
+
+def test_flechas_para_pasar_de_instancia(qtbot: QtBot) -> None:
+    from PySide6.QtTest import QTest
+
+    lista = instancias.ListaInstancias()
+    qtbot.addWidget(lista)
+    a = lista.agregar("A", "Prism Launcher", r"C:\a")
+    b = lista.agregar("B", "Prism Launcher", r"C:\b")
+    c = lista.agregar("C", "Prism Launcher", r"C:\c")
+    QTest.keyClick(lista.e_buscar, Qt.Key.Key_Down)
+    assert lista.actual() is a
+    QTest.keyClick(a, Qt.Key.Key_Down)
+    QTest.keyClick(b, Qt.Key.Key_Down)
+    QTest.keyClick(c, Qt.Key.Key_Down)  # la última: se queda
+    assert lista.actual() is c
+    b.setVisible(False)  # oculta por la búsqueda: se salta
+    QTest.keyClick(c, Qt.Key.Key_Up)
+    assert lista.actual() is a

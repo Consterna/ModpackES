@@ -6,6 +6,13 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Agregado
+
+- Bienvenida la primera vez, con los tres pasos y un botón para configurar el motor.
+- Arrastrar la carpeta de un modpack a la ventana la agrega a la lista.
+- Atajos: Ctrl+F busca una instancia, F5 vuelve a buscarlas, Ctrl+Enter pulsa el botón principal y las
+  flechas pasan de una instancia a otra.
+
 ### Cambiado
 
 - Aspecto nuevo: tema propio agua marina y morado, en oscuro y en claro. Sigue el modo de Windows y tiene íconos
