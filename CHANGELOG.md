@@ -29,6 +29,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   cualquier motor los textos aceptados, el chrF, los términos del glosario respetados y el costo.
 - Aviso de versión nueva al abrir la ventana, con enlace a la descarga. Consulta GitHub sin datos del usuario,
   no descarga nada y se puede desactivar.
+- Instalador (`ModpackES-instalador.exe`, Inno Setup) que se instala para el usuario sin permisos de
+  administrador. Arranca en 1,1 s frente a 2,7 s del portable, que se sigue publicando.
 
 ### Corregido
 

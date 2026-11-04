@@ -21,8 +21,8 @@ No sé cuánto tarda la aprobación ni si aceptan proyectos de una sola persona:
 Cuando aprueben el proyecto, en SignPath:
 
 1. Agrega el sistema de compilación de confianza **GitHub.com** a la organización y vincúlalo al proyecto.
-2. Crea una configuración de artefacto cuya raíz sea un `<zip-file>` que contenga `ModpackES.exe` (el artefacto
-   que sube el CI es un zip con ese archivo).
+2. Crea una configuración de artefacto cuya raíz sea un `<zip-file>` con dos `<pe-file>` a firmar:
+   `ModpackES.exe` y `ModpackES-instalador.exe` (el artefacto que sube el CI es un zip con los dos).
 3. Crea una política de firma (por ejemplo `release-signing`) y un token de API para el CI.
 
 Guía oficial: [docs.signpath.io/trusted-build-systems/github](https://docs.signpath.io/trusted-build-systems/github).

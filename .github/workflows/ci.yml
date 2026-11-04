@@ -58,10 +58,18 @@ jobs:
       - name: Probar el .exe
         run: uv run python scripts/probar_exe.py
 
+      - name: Construir el instalador (Inno Setup, viene en la imagen de windows-latest)
+        run: uv run python scripts/construir_exe.py --instalador
+
+      - name: Probar el instalador (instalar, usar y desinstalar)
+        run: uv run python scripts/probar_exe.py --instalador
+
       - id: subir
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ModpackES-exe
-          path: dist/ModpackES.exe
+          path: |
+            dist/ModpackES.exe
+            dist/ModpackES-instalador.exe
           if-no-files-found: error
           retention-days: 14

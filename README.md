@@ -13,7 +13,8 @@ todos los mods, con un par de clics.
 ![Windows 10 y 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
 ![Minecraft 1.7.10 a 26.x](https://img.shields.io/badge/Minecraft-1.7.10%20a%2026.x-62B47A)
 
-[**Descargar ModpackES.exe**](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe)
+[**Descargar el instalador**](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES-instalador.exe)
+· [versión portable](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe)
 · [Cómo se usa](#cómo-se-usa) · [Preguntas frecuentes](#preguntas-frecuentes) · [Cambios](CHANGELOG.md)
 
 <img src="docs/captura.png" alt="Ventana de ModpackES con un modpack analizado" width="820">
@@ -46,9 +47,12 @@ sin modificar el mod: la app avisa cuáles son.
 
 ## Cómo se usa
 
-1. Descarga [`ModpackES.exe`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe).
-   No necesita instalación.
-2. Cierra Minecraft y abre `ModpackES.exe`.
+1. Descarga e instala
+   [`ModpackES-instalador.exe`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES-instalador.exe):
+   se instala solo para tu usuario, sin pedir permisos de administrador, y arranca más rápido. Si prefieres no
+   instalar nada, usa la versión portable
+   [`ModpackES.exe`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe).
+2. Cierra Minecraft y abre ModpackES.
 3. Elige la instancia de la lista. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher,
    GDLauncher y el launcher oficial; si no aparece, usa «Elegir carpeta…».
 4. Elige el motor (ver [Motores](#motores)). Con Gemini, pulsa «Guardar clave…» y pega tu clave de
@@ -198,8 +202,10 @@ del juego, un JDK 17 o superior (sirve el de Prism Launcher).
 uv sync
 uv run python scripts/verificar.py            # ruff, pyright estricto, compileall y pytest con cobertura
 uv run python scripts/verificar.py --rapido   # sin las pruebas de Java ni el corpus real
-uv run python scripts/construir_exe.py        # dist/ModpackES.exe
+uv run python scripts/construir_exe.py        # dist/ModpackES.exe (portable)
+uv run python scripts/construir_exe.py --instalador  # dist/ModpackES-instalador.exe (necesita Inno Setup 6.3+)
 uv run python scripts/probar_exe.py           # arranca el .exe y analiza un modpack de prueba
+uv run python scripts/probar_exe.py --instalador  # instala en una carpeta temporal, prueba y desinstala
 ```
 
 Los datos de la app (memoria, glosario, preferencias y `registro.log`) van a `%LOCALAPPDATA%\traductor-es`;
