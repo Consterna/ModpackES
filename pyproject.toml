@@ -75,6 +75,7 @@ max-complexity = 15  # más que esto se parte en funciones con nombre
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLC0415", "S101", "E501"]  # los datos de prueba reales (JSON, SNBT) van en una línea
+"src/traductor_es/ui/tema.py" = ["E501"]  # cada regla de la hoja QSS va en una línea
 
 [tool.pyright]
 include = ["src", "tests"]

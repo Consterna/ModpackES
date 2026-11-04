@@ -8,6 +8,9 @@ Qt for Python (PySide6 y Shiboken6) se ofrece bajo LGPL-3.0, GPL-2.0 o GPL-3.0; 
 GPL-3.0, compatible con su propia licencia, y todo su código fuente está publicado. Qt es © The Qt Company
 Ltd. y otros colaboradores.
 
+Los íconos de la interfaz son de [Lucide](https://lucide.dev) 1.60.0 (licencia ISC; los derivados de Feather,
+con licencia MIT). El texto completo de ambas licencias va en `src/traductor_es/ui/iconos/LICENSE.txt`.
+
 ModpackES no está afiliado a Mojang Studios, Microsoft ni Google. Minecraft es una marca de Mojang
 Studios. Gemini es una marca de Google LLC.
 
