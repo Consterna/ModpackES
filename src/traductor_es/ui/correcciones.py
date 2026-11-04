@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -29,8 +32,8 @@ class DialogoCorrecciones(QDialog):
         self.setWindowTitle(f"Correcciones ({dialecto})")
         self.resize(980, 620)
         self.dialecto = dialecto
-        self._propia = memoria is None
-        self.memoria = memoria or Memoria(configuracion.ruta_memoria())
+        #: Inyectada en las pruebas; si no, se abre la del usuario solo durante cada operación
+        self._inyectada = memoria
         self.resultados: list[Coincidencia] = []
         self._construir()
         self.buscar()
@@ -90,7 +93,8 @@ class DialogoCorrecciones(QDialog):
 
     # ------------------------------------------------------------------ acciones
     def buscar(self) -> None:
-        self.resultados = self.memoria.buscar(self.e_buscar.text(), self.dialecto)
+        with self._memoria() as memoria:
+            self.resultados = memoria.buscar(self.e_buscar.text(), self.dialecto)
         self.tabla.setRowCount(len(self.resultados))
         for fila, c in enumerate(self.resultados):
             valores = [c.origen, ("★ " if c.corregida else "") + c.traduccion, _AMBITOS.get(c.ambito, c.ambito)]
@@ -121,7 +125,8 @@ class DialogoCorrecciones(QDialog):
         if c is None:
             return
         try:
-            self.memoria.corregir(c.origen, self.dialecto, self.t_correccion.toPlainText())
+            with self._memoria() as memoria:
+                memoria.corregir(c.origen, self.dialecto, self.t_correccion.toPlainText())
         except ValueError as e:
             self.estado.setText(f"✖ {e}")
             return
@@ -131,7 +136,8 @@ class DialogoCorrecciones(QDialog):
         c = self._actual()
         if c is None:
             return
-        self.memoria.quitar_correccion(c.origen, self.dialecto)
+        with self._memoria() as memoria:
+            memoria.quitar_correccion(c.origen, self.dialecto)
         self._refrescar(c, "Corrección quitada: vuelve la traducción de la memoria.")
 
     def _refrescar(self, c: Coincidencia, mensaje: str) -> None:
@@ -150,10 +156,14 @@ class DialogoCorrecciones(QDialog):
         self.b_quitar.setEnabled(c is not None and c.corregida)
         self.t_correccion.setReadOnly(c is None)
 
-    def done(self, resultado: int) -> None:
-        if self._propia:
-            self.memoria.cerrar()
-        super().done(resultado)
+    @contextmanager
+    def _memoria(self) -> Generator[Memoria]:
+        """Sin conexión abierta entre operaciones: si se cierra la ventana principal, no queda nada colgado."""
+        if self._inyectada is not None:
+            yield self._inyectada
+            return
+        with Memoria(configuracion.ruta_memoria()) as memoria:
+            yield memoria
 
 
 def mostrar(padre: QWidget, dialecto: str) -> None:
