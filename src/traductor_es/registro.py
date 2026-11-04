@@ -97,8 +97,14 @@ def ultimas_lineas(n: int = 150) -> list[str]:
 
 
 def _sin_carpeta_personal(texto: str) -> str:
-    casa = str(Path.home())
-    return texto.replace(casa, "~").replace(casa.replace("\\", "/"), "~") if casa not in {"", "/", "\\"} else texto
+    """Cambia la carpeta del usuario por «~», con barras de cualquier tipo y sin distinguir mayúsculas (Windows)."""
+    casa = str(Path.home()).rstrip("\\/")
+    if len(casa) < 3:
+        return texto
+    barra = r"[\\/]+"
+    cuerpo = barra.join(re.escape(p) for p in re.split(barra, casa) if p)
+    patron = (barra if casa.startswith(("/", "\\")) else "") + cuerpo
+    return re.sub(patron, "~", texto, flags=re.IGNORECASE)
 
 
 def diagnostico(extra: Mapping[str, str] | None = None, lineas: int = 150) -> str:

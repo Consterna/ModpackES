@@ -68,6 +68,9 @@ def test_diagnostico_sin_carpeta_personal_ni_clave(monkeypatch: pytest.MonkeyPat
     texto = registro.diagnostico({"Instancia": str(casa / "instancias" / "FC4")})
     assert f"ModpackES {__version__}" in texto and "Sistema:" in texto and "PySide6" in texto
     assert str(casa) not in texto and "~" in texto
+    # Regresión: la misma carpeta escrita con otras mayúsculas o con «/» también se tapa
+    otra = registro.diagnostico({"a": str(casa).lower(), "b": str(casa).replace("\\", "/").upper()})
+    assert "fulano" not in otra.lower()
     assert CLAVE not in texto and "Instancia en" in texto
 
 
