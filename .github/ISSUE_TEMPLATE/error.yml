@@ -11,7 +11,7 @@ body:
     attributes:
       label: Versión de ModpackES
       description: Aparece abajo a la derecha de la ventana.
-      placeholder: "2.1.1"
+      placeholder: "2.2.0"
     validations:
       required: true
   - type: input
