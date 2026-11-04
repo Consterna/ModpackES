@@ -202,6 +202,7 @@ QLabel[tipo="numero"] {{ font-size: 16pt; font-weight: 600; }}
 QLabel[tipo="acento"] {{ color: {p.acento}; }}
 QLabel a {{ color: {p.acento}; }}
 QFrame[tipo="lateral"] {{ background: {p.lateral}; border-right: 1px solid {p.borde}; }}
+QFrame[tipo="separador"] {{ background: {p.borde}; border: none; max-height: 1px; min-height: 1px; }}
 QFrame[tipo="barra"] {{ background: {p.fondo}; border-bottom: 1px solid {p.borde}; }}
 QFrame[tipo="tarjeta"] {{ background: {p.tarjeta}; border: 1px solid {p.borde}; border-radius: 10px; }}
 QFrame[tipo="tarjeta"][activa="true"] {{ background: {p.tarjeta_activa}; border: 1px solid {p.morado}; }}
