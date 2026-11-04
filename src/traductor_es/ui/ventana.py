@@ -151,7 +151,7 @@ class Ventana(QMainWindow):
         """`buscar_novedad` reemplaza la consulta a GitHub (pruebas); `avisar_version=False` no consulta nada."""
         super().__init__()
         self.setWindowTitle(f"{NOMBRE} {__version__} · Traductor de modpacks al español")
-        self.resize(1100, 800)
+        self.resize(1120, 920)  # entra en una pantalla de 1080 px con la barra de tareas
         self._buscar_instancias = buscar_instancias
         self._fabrica_motor: FabricaMotor = fabrica_motor or fabrica.crear
         self._hilo: QThread | None = None
@@ -303,6 +303,7 @@ class Ventana(QMainWindow):
         cabecera.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         cabecera.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla.setMinimumHeight(185)  # las 4 filas del análisis sin desplazarse
         capa.addWidget(self.tabla, 3)
         self.costo = QLabel()
         capa.addWidget(self.costo)
