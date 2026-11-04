@@ -102,6 +102,14 @@ class Memoria:
             )
             self._db.commit()
 
+    def correcciones(self, dialecto: str) -> dict[str, str]:
+        """Todas las correcciones de una variante: {original: traducción}."""
+        with self._lock:
+            filas = self._db.execute(
+                "SELECT origen, traduccion FROM correcciones WHERE dialecto=?", (dialecto,)
+            ).fetchall()
+        return {str(o): str(t) for o, t in filas}
+
     def correccion(self, origen: str, dialecto: str) -> str | None:
         with self._lock:
             fila = self._db.execute(

@@ -71,10 +71,13 @@ class Traductor:
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
-    def _conocida(self, nucleo: str, ambito: str) -> str | None:
-        """Lo que el usuario corrigió o fijó manda; después, lo ya traducido; después, los nombres oficiales."""
+    def _conocida(self, nucleo: str, ambito: str, correcciones: Mapping[str, str]) -> str | None:
+        """Lo que el usuario corrigió o fijó manda; después, lo ya traducido; después, los nombres oficiales.
+
+        `correcciones` se lee una vez por llamada pública (son pocas): así no se consulta la base por cada texto.
+        """
         return (
-            self.memoria.correccion(nucleo, self.dialecto)
+            correcciones.get(nucleo)
             or self.glosario.fijo(nucleo)
             or self.memoria.obtener(nucleo, self.dialecto, ambito)
             or self.glosario.exacto(nucleo)
@@ -82,13 +85,25 @@ class Traductor:
 
     def pendientes(self, textos: Iterable[str], ambito: str) -> list[str]:
         """Núcleos únicos que habría que mandar al motor (lo demás sale de memoria o glosario)."""
+        correcciones = self.memoria.correcciones(self.dialecto)
         vistos: set[str] = set()
         for t in textos:
             if es_traducible(t):
                 nucleo = separar_bordes(t)[1]
-                if nucleo not in vistos and self._conocida(nucleo, ambito) is None:
+                if nucleo not in vistos and self._conocida(nucleo, ambito, correcciones) is None:
                     vistos.add(nucleo)
         return sorted(vistos)
+
+    def conocidas(self, textos: Iterable[str], ambito: str) -> dict[str, str]:
+        """{texto: traducción} de lo que ya se sabe (corrección, glosario o memoria), sin pedir nada al motor."""
+        correcciones = self.memoria.correcciones(self.dialecto)
+        salida: dict[str, str] = {}
+        for t in {t for t in textos if es_traducible(t)}:
+            inicio, nucleo, fin = separar_bordes(t)
+            hecho = self._conocida(nucleo, ambito, correcciones)
+            if hecho is not None:
+                salida[t] = inicio + hecho + fin
+        return salida
 
     # ------------------------------------------------------------------ traducción
     def traducir(self, textos: Iterable[str], ambito: str, pistas: Mapping[str, str] | None = None) -> Resultado:
@@ -109,11 +124,7 @@ class Traductor:
             if resultado.rechazados:
                 n = len(resultado.rechazados)
                 self.registro(f"{n} textos se quedan en inglés porque no pasaron la validación.")
-        for t in unicos:
-            inicio, nucleo, fin = separar_bordes(t)
-            hecho = self._conocida(nucleo, ambito)
-            if hecho is not None:
-                resultado.traducciones[t] = inicio + hecho + fin
+        resultado.traducciones = self.conocidas(unicos, ambito)
         return resultado
 
     def _lotes(self, nucleos: list[str], lim_chars: int, lim_items: int) -> list[list[str]]:
