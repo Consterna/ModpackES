@@ -195,3 +195,25 @@ def test_linea_de_etiquetas_mal_formada_no_se_cuelga() -> None:
     assert [s.texto for s in segmentos] == ["Título", linea]  # no son solo etiquetas: queda como texto
     _, solo = markdown.segmentar('<GameScene zoom="2" />\n<ItemImage id="ae2:controller"/>\n')
     assert solo == []
+
+
+def test_comentario_de_varias_lineas_no_se_traduce() -> None:
+    """Regresión (CodeQL py/bad-tag-filter): el texto de un <!-- … --> de varias líneas se tomaba como párrafo."""
+    md = "\n".join(
+        [
+            "Primer párrafo.",
+            "",
+            "<!-- Nota para quien edita la guía:",
+            "esto no lo ve el jugador",
+            "```",
+            "ni esto",
+            "-->",
+            "Segundo párrafo.",
+            "<!-- comentario de una línea -->",
+            "Tercero.",
+        ]
+    )
+    lineas, segs = markdown.segmentar(md)
+    assert [s.texto for s in segs] == ["Primer párrafo.", "Segundo párrafo.", "Tercero."]
+    salida = markdown.reconstruir(lineas, segs, {"Segundo párrafo.": "Second paragraph."})
+    assert "esto no lo ve el jugador" in salida and "Second paragraph." in salida

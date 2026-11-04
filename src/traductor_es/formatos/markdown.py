@@ -17,6 +17,8 @@ _TITULO_JSON = re.compile(r'^(\s*"title"\s*:\s*")((?:[^"\\]|\\.)*)("\s*,?\s*)$')
 #: tardara un tiempo exponencial en descartarse (ReDoS).
 _SOLO_ETIQUETA = re.compile(r"^\s*(?:</?[A-Za-z][^<>]*>\s*)+$")
 _COMENTARIO = re.compile(r"^\s*<!--.*-->\s*$")
+#: Línea que abre un comentario sin cerrarlo: lo que sigue hasta el «-->» tampoco es texto.
+_ABRE_COMENTARIO = re.compile(r"^\s*<!--(?!.*-->)")
 _ENCABEZADO = re.compile(r"^(\s*#{1,6}\s+)(.+?)(\s*)$")
 _LISTA = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+)(.+?)(\s*)$")
 _CITA = re.compile(r"^(\s*>\s?)(.+?)(\s*)$")
@@ -90,14 +92,19 @@ def segmentar(md: str) -> tuple[list[str], list[Segmento]]:
             segs.append(Segmento(parrafo[0], parrafo[-1] + 1, sangria, texto))
             parrafo.clear()
 
-    en_codigo = False
+    en_codigo = en_comentario = False
     while i < n:
         linea = limpia(i)
-        if _VALLA.match(linea):
+        if en_comentario:
+            en_comentario = "-->" not in linea
+        elif _VALLA.match(linea):
             cerrar_parrafo()
             en_codigo = not en_codigo
         elif en_codigo:
             pass
+        elif _ABRE_COMENTARIO.match(linea):
+            cerrar_parrafo()
+            en_comentario = True
         elif _separa_parrafos(linea):
             cerrar_parrafo()
         elif m := (_ENCABEZADO.match(linea) or _LISTA.match(linea) or _CITA.match(linea)):

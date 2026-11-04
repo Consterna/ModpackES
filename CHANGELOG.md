@@ -6,6 +6,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Corregido
+
+- En las guías de GuideME y Lavender, el texto de un comentario `<!-- … -->` de varias líneas se tomaba como
+  párrafo y se traducía. Ahora se deja como está, igual que los comentarios de una línea.
+
 ### Seguridad
 
 - Una guía de GuideME o Lavender con una línea de etiquetas mal formada podía dejar la app trabada un tiempo
