@@ -11,7 +11,9 @@ import pytest
 
 from traductor_es import __version__, configuracion, registro
 
-CLAVE = "AIzaSyD-prueba-0123456789abcdefghijklmn"
+#: Clave falsa con la forma de una de Google. Se arma en dos partes para que el escaneo de secretos de GitHub no
+#: la confunda con una clave real filtrada.
+CLAVE = "AIza" + "SyD-prueba-0123456789abcdefghijklmn"
 
 
 @pytest.fixture(autouse=True)
