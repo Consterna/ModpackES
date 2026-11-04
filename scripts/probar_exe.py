@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -51,7 +52,7 @@ def probar(exe: Path) -> int:
 
 
 def probar_instalador(instalador: Path) -> int:
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:  # el desinstalador puede tardar en soltarla
         destino = Path(tmp) / "ModpackES"
         silencio = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]
         proc = subprocess.run(
@@ -64,6 +65,10 @@ def probar_instalador(instalador: Path) -> int:
         codigo = probar(exe)
         desinstalador = destino / "unins000.exe"
         quitar = subprocess.run([str(desinstalador), *silencio], timeout=300, check=False)
+        # El desinstalador de Inno Setup sigue desde una copia temporal: se le da un rato para terminar de borrar
+        limite = time.monotonic() + 60
+        while exe.exists() and time.monotonic() < limite:
+            time.sleep(0.5)
         if quitar.returncode != 0 or exe.exists():
             print(f"FALLA: el desinstalador terminó con código {quitar.returncode} o dejó el programa")
             return 1
