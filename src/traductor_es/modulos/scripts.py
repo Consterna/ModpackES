@@ -93,6 +93,19 @@ def _plantilla_segura(c: javascript.CadenaJs) -> bool:
     return c.comilla != "`" or c.texto.count("${") == len(_EXPRESION.findall(c.texto))
 
 
+def _es_sumidero(c: javascript.CadenaJs, llamadas: frozenset[str]) -> bool:
+    """La cadena se le pasa directamente a algo que le muestra texto al jugador (`tell`, `Text.of`…)."""
+    return c.funcion in llamadas or (c.funcion in AYUDAS_TEXTO and c.receptor in RECEPTORES_TEXTO)
+
+
+def es_texto_de_funcion(c: javascript.CadenaJs, funciones: set[tuple[str, int]]) -> bool:
+    """La cadena va en la posición de un parámetro que la función solo muestra (ver `flujo_js.funciones_de_texto`)."""
+    if c.receptor is not None or c.funcion is None or c.comparada or (c.funcion, c.arg) not in funciones:
+        return False  # una llamada con receptor (`x.f(...)`) es un método, no la función del script
+    t = c.texto.strip()
+    return _plantilla_segura(c) and es_traducible(t) and not parece_clave(t) and any(ch.isalpha() for ch in t)
+
+
 def textos_armados(
     src: str, cadenas: list[javascript.CadenaJs], flujo: flujo_js.Flujo, tablas: frozenset[str]
 ) -> list[javascript.CadenaJs]:
@@ -232,6 +245,10 @@ class ScriptsKubeJS:
                     en_comando[c.inicio] = cmd
             vistas = {c.inicio for c in elegidas}
             elegidas += [c for c in textos_armados(src, cadenas, flujo, tablas) if c.inicio not in vistas]
+            propias = flujo_js.funciones_de_texto(src, cadenas, patron, lambda c: _es_sumidero(c, llamadas))
+            if propias:  # funciones del propio script cuyo parámetro solo se muestra
+                vistas = {c.inicio for c in elegidas}
+                elegidas += [c for c in cadenas if c.inicio not in vistas and es_texto_de_funcion(c, propias)]
             if self.exhaustivo:
                 vistas = {c.inicio for c in elegidas}
                 elegidas += [

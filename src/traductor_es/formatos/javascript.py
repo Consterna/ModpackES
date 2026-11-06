@@ -31,6 +31,7 @@ class CadenaJs:
     comparada: bool  #: está junto a un ==, !=, case… (es lógica, no texto)
     #: Llamadas que la envuelven, de fuera hacia dentro: «ItemEvents.tooltip», «onEvent:item.tooltip»…
     contexto: tuple[str, ...] = ()
+    arg: int = -1  #: posición (desde 0) del argumento de la llamada en la que está; -1 si no es un argumento
 
 
 @dataclass(slots=True)
@@ -39,6 +40,7 @@ class _Marco:
     funcion: str | None = None
     receptor: str | None = None
     primera: str | None = None  #: primera cadena pasada directamente a esta llamada (p. ej. el evento de onEvent)
+    arg: int = 0  #: en qué argumento va el escaneo (cuenta las comas de esta llamada)
 
     def nombre(self) -> str:
         base = f"{self.receptor}.{self.funcion}" if self.receptor else str(self.funcion)
@@ -178,13 +180,16 @@ def escanear(src: str) -> list[CadenaJs]:
             if pila and pila[-1].tipo == "(" and pila[-1].primera is None:
                 pila[-1].primera = texto
             contexto = tuple(m.nombre() for m in pila if m.tipo == "(" and m.funcion)
-            res.append(CadenaJs(i, fin, c, texto, funcion, receptor, _comparada(src, i, fin), contexto))
+            argumento = marco.arg if marco and marco.tipo == "(" else -1
+            res.append(CadenaJs(i, fin, c, texto, funcion, receptor, _comparada(src, i, fin), contexto, argumento))
             i = fin
             continue
         if c == "(":
             pila.append(_Marco("(", *_llamada(src, i)))
         elif c in "[{":
             pila.append(_Marco(c))
+        elif c == "," and pila and pila[-1].tipo == "(":
+            pila[-1].arg += 1
         elif c in ")]}" and pila:
             pila.pop()
         i += 1
