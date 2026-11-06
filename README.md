@@ -44,6 +44,7 @@ y **cualquier lanzador**, y escribe a la vez las siete variantes de español del
 | Libros guía | Patchouli, Mantle (Tinkers), Citadel (Alex's Mobs), GuideME (AE2), Lavender. Modonomicon va por claves de idioma | Resource pack (o en su sitio, si es un libro propio del modpack) |
 | Scripts de KubeJS | Lo que ve el jugador: `tell`, `notify`, `displayName`, `Text.of`, tooltips, información de JEI/REI/EMI, los mensajes armados por partes antes de un `tell`, y el texto de `tellraw`, `title` y `say` en `runCommand` | En su sitio, con copia de seguridad |
 | Datapacks y tips | Funciones (`.mcfunction`: `tellraw`, `title`, `say`), títulos y descripciones de logros, y consejos de pantalla de carga (mod Tips). Se buscan por su estructura (`data/<espacio>/functions/…`), estén en `kubejs/data`, `global_packs`, `datapacks`, `config/openloader` o en los datapacks de un mundo, sueltos o dentro de un `.zip`. Los componentes de texto valen en JSON (hasta 1.21.4) y en SNBT (desde 1.21.5) | En su sitio, con copia de seguridad |
+| Texto escrito en el código de los mods | Mensajes de chat, de la barra de acción y tooltips que un mod tiene en su código Java. Un resource pack no los alcanza: la app los traduce a una tabla que lee el mod de apoyo **ModpackES Runtime** (solo cliente, Forge 1.20.1 por ahora) | Tabla en el resource pack; el mod se instala solo si lo pides |
 
 Lo que el mod ya trae en español no se toca, y si existe una variante (por ejemplo `es_es`) se copia a las
 demás sin gastar. Los libros antiguos de Patchouli que guardan el texto dentro del jar no se pueden traducir
@@ -84,6 +85,8 @@ pedido al motor juzga cada traducción nueva al estilo de [GEMBA-MQM](https://ac
 traducir indicando el error. La nueva traducción tiene que pasar las mismas reglas; si no, queda la anterior.
 Tus correcciones nunca se revisan. Sube el costo de esos textos (el análisis lo incluye) y sus marcas no son
 infalibles: sirven para decidir qué rehacer, no como nota de calidad.
+
+**Texto del código de los mods** (opcional): activa «Incluir texto escrito en el código de los mods» en «Opciones avanzadas» y pulsa **Más ▸ Instalar el mod de apoyo**. La app traduce las frases que encuentra en el código de los mods y el mod de apoyo las muestra en español en el chat, la barra de acción y los tooltips. Solo cambia un texto si es **idéntico** al de la tabla (no hay traducción en vivo ni en internet), no cubre pantallas ni frases con nombres o números en medio, y por ahora existe para Forge 1.20.1. **Más ▸ Quitar el mod de apoyo** lo retira de la carpeta mods; en la línea de comandos: `modpackes instalar-runtime RUTA [--quitar]` y `--java` en `analizar` y `traducir`. Para comprobarlo en el juego, con el mod instalado y el juego en español, escribe `/tellraw @s "TPA request expired!"` (o cualquier frase de la tabla).
 
 **Más ▸ Qué queda en inglés** (o `modpackes cobertura RUTA [--java]`) lista lo que no se traduce y por qué, sin cambiar nada: frases de scripts cuyo uso no se entiende y texto escrito en el código de los mods, que un resource pack no puede alcanzar. El análisis ya avisa de las frases de scripts.
 

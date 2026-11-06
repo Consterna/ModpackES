@@ -24,7 +24,8 @@ MAX_EJEMPLOS = 3
 #: `method_43470` (Fabric) y los `TextComponent`, `StringTextComponent` y `TextComponentString` anteriores.
 _MARCAS_TEXTO = ("literal", "m_237113_", "method_43470")
 _CLASES_TEXTO = ("TextComponent", "StringTextComponent", "TextComponentString")
-_FRASE = re.compile(r"[A-Z][A-Za-z']+(?: [A-Za-z0-9,.'!?:%\-]+){2,}[.!?:]?")
+#: Una frase en inglés: puede empezar con códigos de color (§c) y llevar %s, números y puntuación.
+_FRASE = re.compile(r"(?:§[0-9a-fk-or])*[A-Z][A-Za-z']+(?: [§A-Za-z0-9,.'!?:%\-]+){2,}[.!?:]?")
 _ESPANOL = re.compile(r"\b(de|la|el|los|las|con|sin|para|por|una|un|del)\b")
 #: Frases de registros y errores internos: casi nunca llegan al jugador.
 _INTERNO = re.compile(
@@ -112,9 +113,11 @@ def _frases_de_clase(datos: bytes) -> list[str]:
     ]  # fmt: skip
 
 
-def textos_en_java(instancia: Instancia, progreso: Callable[[int, int], None] = lambda _a, _b: None) -> list[Hallazgo]:
-    """Frases en inglés escritas en el código de los mods. Un resource pack no puede traducirlas."""
-    res: list[Hallazgo] = []
+def frases_por_mod(
+    instancia: Instancia, progreso: Callable[[int, int], None] = lambda _a, _b: None
+) -> list[tuple[Path, list[str]]]:
+    """Por cada mod, las frases en inglés escritas en su código y mostradas como texto (sin repetir)."""
+    res: list[tuple[Path, list[str]]] = []
     jars = instancia.jars()
     for i, jar in enumerate(jars):
         progreso(i, len(jars))
@@ -132,11 +135,20 @@ def textos_en_java(instancia: Instancia, progreso: Callable[[int, int], None] = 
             continue
         unicas = list(dict.fromkeys(f for f in frases if es_traducible(f) and not parece_clave(f)))
         if unicas:
-            res.append(Hallazgo(
-                "java", jar.name, len(unicas),
-                "Escrito en el código del mod: un resource pack no lo traduce",
-                tuple(f[:60] for f in unicas[:MAX_EJEMPLOS]),
-            ))  # fmt: skip
+            res.append((jar, unicas))
+    return res
+
+
+def textos_en_java(instancia: Instancia, progreso: Callable[[int, int], None] = lambda _a, _b: None) -> list[Hallazgo]:
+    """Frases en inglés escritas en el código de los mods. Un resource pack no puede traducirlas."""
+    res = [
+        Hallazgo(
+            "java", jar.name, len(unicas),
+            "Escrito en el código del mod: un resource pack no lo traduce",
+            tuple(f[:60] for f in unicas[:MAX_EJEMPLOS]),
+        )
+        for jar, unicas in frases_por_mod(instancia, progreso)
+    ]  # fmt: skip
     return sorted(res, key=lambda h: -h.cantidad)
 
 
@@ -150,4 +162,4 @@ def revisar_cobertura(
     return hallazgos
 
 
-__all__ = ["Hallazgo", "revisar_cobertura"]
+__all__ = ["Hallazgo", "frases_por_mod", "revisar_cobertura"]

@@ -12,7 +12,7 @@ from typing import Self
 
 from . import configuracion
 from .fuentes.instancia import Instancia
-from .modulos import datos, libros, misiones, mods, scripts
+from .modulos import datos, libros, misiones, mods, runtime, scripts
 from .modulos.base import Contexto, Modulo, Resumen
 from .modulos.cobertura import Hallazgo, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
@@ -114,9 +114,11 @@ class Proceso:
         usar_lotes: bool = False,
         contexto: str = "",
         revisar: bool = False,
+        texto_java: bool = False,
     ) -> None:
         self.instancia = Instancia(carpeta)
         self.revisar = revisar
+        self.texto_java = texto_java
         self.registro = registro
         self.grupos = [g for g in GRUPOS if g in grupos]
         self._memoria_propia = memoria is None
@@ -158,6 +160,8 @@ class Proceso:
         lista: list[tuple[str, Modulo]] = []
         if "mods" in self.grupos:
             lista.append(("mods", mods.Mods(self.ctx)))
+            if self.texto_java:  # texto escrito en el código de los mods: lo muestra el mod de apoyo
+                lista.append(("mods", runtime.TextoDeJava(self.ctx)))
         if "libros" in self.grupos:
             lista.append(("libros", libros.Libros(self.ctx)))
         if "misiones" in self.grupos:

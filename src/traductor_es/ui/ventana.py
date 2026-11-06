@@ -47,7 +47,7 @@ from PySide6.QtWidgets import (
 
 from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, actualizaciones, configuracion, registro
 from ..actualizaciones import Novedad
-from ..fuentes.instancia import resolver_carpeta_juego
+from ..fuentes.instancia import Instancia, resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
 from ..modulos.cobertura import Hallazgo
 from ..motores import fabrica
@@ -57,7 +57,7 @@ from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
 from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
-from ..salida import exportar
+from ..salida import exportar, mod_apoyo
 from . import correcciones, iconos, tema
 from .bienvenida import TarjetaBienvenida
 from .componentes import (
@@ -160,6 +160,7 @@ class Trabajador(QObject):
                 usar_lotes=self.opciones["lotes"],
                 contexto=self.opciones["contexto"],
                 revisar=self.opciones["revisar"],
+                texto_java=self.opciones["texto_java"],
             ) as p:
                 self.registro.emit(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'}")
                 if self.accion == "analizar":
@@ -263,7 +264,7 @@ class Ventana(QMainWindow):
         self.c_motor.setCurrentIndex(max(0, self.c_motor.findData(self._preferencias.get("motor", fabrica.GEMINI))))
         self.c_motor.currentIndexChanged.connect(self._al_cambiar_motor)
         self._al_cambiar_motor()
-        for senal in (self.c_lotes.toggled, self.c_revisar.toggled, self.c_activar.toggled):
+        for senal in (self.c_lotes.toggled, self.c_revisar.toggled, self.c_activar.toggled, self.c_java.toggled):
             senal.connect(self._al_cambiar_opciones)
         self.c_hilos.valueChanged.connect(self._al_cambiar_opciones)
         self.c_dialecto.currentIndexChanged.connect(self._al_cambiar_opciones)
@@ -454,6 +455,14 @@ class Ventana(QMainWindow):
         )
         self.c_revisar.setChecked(bool(self._preferencias.get("revisar", False)))
         formulario.addRow("", self.c_revisar)
+        self.c_java = QCheckBox("Incluir texto escrito en el código de los mods (necesita el mod de apoyo)")
+        self.c_java.setToolTip(
+            "Algunos mods tienen mensajes escritos en su código y un resource pack no los alcanza. Esto los "
+            "traduce a una tabla que lee el mod de apoyo «ModpackES Runtime» (Más ▸ Instalar el mod de apoyo). "
+            "Solo Forge 1.20.1 por ahora."
+        )
+        self.c_java.setChecked(bool(self._preferencias.get("texto_java", False)))
+        formulario.addRow("", self.c_java)
         self.c_hilos = QSpinBox()
         self.c_hilos.setRange(1, 16)
         self.c_hilos.setSuffix(" pedidos a la vez")
@@ -503,6 +512,11 @@ class Ventana(QMainWindow):
         self.a_correcciones.setToolTip("Buscar y corregir a mano traducciones de la memoria")
         self.a_cobertura = agregar("Qué queda en inglés", "circle-alert", lambda: self.lanzar("cobertura"))
         self.a_cobertura.setToolTip("Lista el texto que no se puede traducir y por qué (solo lee, no cambia nada)")
+        self.a_apoyo = agregar("Instalar el mod de apoyo", "package", self._instalar_apoyo)
+        self.a_apoyo.setToolTip(
+            "Pone ModpackES Runtime en la carpeta mods: muestra en español el texto del código de los mods"
+        )
+        self.a_quitar_apoyo = agregar("Quitar el mod de apoyo", "undo-2", self._quitar_apoyo)
         self.a_restaurar = agregar("Restaurar el original…", "undo-2", self._confirmar_restaurar)
         self.a_exportar = agregar("Exportar pack…", "package", lambda: self._exportar(kit=False))
         self.a_kit = agregar("Kit de servidor…", "server", lambda: self._exportar(kit=True))
@@ -838,6 +852,7 @@ class Ventana(QMainWindow):
             "idioma": self.c_activar.isChecked(),
             "contexto": self.e_contexto.text().strip(),
             "revisar": self.c_revisar.isChecked(),
+            "texto_java": self.c_java.isChecked(),
         }
 
     def _confirmar_traducir(self) -> None:
@@ -979,6 +994,34 @@ class Ventana(QMainWindow):
         self._al_cambiar_opciones()
         self.escribir(self.estado.text())
 
+    def _con_instancia(self, accion: Callable[[Instancia], str]) -> None:
+        carpeta = self.carpeta()
+        if not carpeta:
+            self.avisar("Elige primero una instancia.")
+            return
+        try:
+            with Instancia(carpeta) as inst:
+                mensaje = accion(inst)
+        except (ValueError, OSError) as e:
+            self.avisar(str(e), "aviso", anotar=False)
+            return
+        self.escribir(mensaje)
+        self.aviso.mostrar(mensaje, "exito")
+
+    def _instalar_apoyo(self) -> None:
+        self._con_instancia(
+            lambda inst: (
+                f"Mod de apoyo instalado: {mod_apoyo.instalar(inst).name}. Abre el juego para que empiece a actuar."
+            )
+        )
+
+    def _quitar_apoyo(self) -> None:
+        def quitar(inst: Instancia) -> str:
+            quitados = mod_apoyo.quitar(inst)
+            return "Quité: " + ", ".join(p.name for p in quitados) if quitados else "No había mod de apoyo instalado."
+
+        self._con_instancia(quitar)
+
     def _mostrar_cobertura(self, hallazgos: list[Hallazgo]) -> None:
         if not hallazgos:
             self.estado.setText("No encontré texto que se quede en inglés.")
@@ -1114,7 +1157,7 @@ class Ventana(QMainWindow):
             "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "motor": o["motor"],
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
-            "revisar": o["revisar"], "avisar_version": self.c_avisar.isChecked(),
+            "revisar": o["revisar"], "texto_java": o["texto_java"], "avisar_version": self.c_avisar.isChecked(),
             "tema": self._preferencias.get("tema", "sistema"),
             "bienvenida_vista": bool(self._preferencias.get("bienvenida_vista", False)),
         }  # fmt: skip

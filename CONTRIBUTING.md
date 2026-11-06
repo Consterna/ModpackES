@@ -93,6 +93,16 @@ traduzca un caso real recortado, otra con algo que **no** debe tocarse y la de i
 originales). `uv run python scripts/descargar_corpus.py` baja partes de modpacks públicos de Modrinth a `.descargas/`
 (Git lo ignora); `uv run pytest -m corpus` los usa para comprobar que lo traducido sigue siendo válido.
 
+## El mod de apoyo (Java)
+
+`mod-runtime/forge-1.20.1/` es un mod de Forge solo de cliente que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Se compila con Gradle y ForgeGradle 6 y necesita un JDK 17:
+
+```
+uv run python scripts/construir_mod.py
+```
+
+Corre las pruebas de Java (JUnit) y deja el jar en `src/traductor_es/recursos/mods/` (Git lo ignora; el CI lo construye y `construir_exe.py` lo incluye). Un loader o versión nuevo es un proyecto nuevo en `mod-runtime/` y una entrada en `SOPORTADOS` de `salida/mod_apoyo.py`.
+
 ## Licencia de las contribuciones
 
 ModpackES usa la licencia [GPL-3.0-or-later](LICENSE). Al mandar un cambio aceptas que se publique bajo esa

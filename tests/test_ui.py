@@ -520,3 +520,23 @@ def test_soltar_rutas_que_no_son_carpetas(qtbot: QtBot, tmp_path: Path) -> None:
     assert Ventana.carpetas_soltadas(datos) == []
     datos.setUrls([QUrl.fromLocalFile(str(tmp_path))])
     assert Ventana.carpetas_soltadas(datos) == [str(tmp_path)]
+
+
+def test_opcion_de_texto_java_y_mod_de_apoyo_en_la_ventana(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traductor_es.salida import mod_apoyo
+
+    vacia = tmp_path / "sin_jars"
+    vacia.mkdir()
+    monkeypatch.setattr(mod_apoyo, "_carpeta_de_jars", lambda: vacia)  # sin importar si esta copia ya compiló el jar
+    juego = _modpack(tmp_path)
+    v = _ventana(qtbot, juego)
+    assert not v.c_java.isChecked() and v.opciones()["texto_java"] is False  # apagada por defecto
+    v.c_java.setChecked(True)
+    assert v.opciones()["texto_java"] is True
+    v.a_apoyo.trigger()  # Forge 1.20.1 sí tiene mod de apoyo, pero sin el jar empaquetado debe avisar, no romper
+    assert "no trae el mod de apoyo" in v.aviso.e_texto.text()
+    assert not list((juego / "mods").glob("modpackes_runtime-*.jar"))
+    v.a_quitar_apoyo.trigger()
+    assert "No había mod de apoyo" in v.aviso.e_texto.text()

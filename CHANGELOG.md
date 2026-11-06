@@ -8,6 +8,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Texto escrito en el código de los mods** (opcional, apagado por defecto): la app traduce las frases que encuentra en el código Java de los
+  mods y las guarda en una tabla del resource pack; el nuevo mod de apoyo **ModpackES Runtime** (solo cliente, Forge 1.20.1) las muestra en
+  español en el chat, la barra de acción y los tooltips. Solo cambia textos idénticos a los de la tabla. «Más ▸ Instalar el mod de apoyo» y
+  «Quitar el mod de apoyo», `modpackes instalar-runtime` y `--java` en `analizar` y `traducir`. El CI compila el mod con sus pruebas.
+
 - **Mensajes de chat y datos de texto**, que antes quedaban en inglés:
   - El texto de `tellraw`, `title`, `say`, `msg`, `tell` y `w` en las funciones (`.mcfunction`) y en lo que un script de
     KubeJS manda con `runCommand` o `runCommandSilent`.
