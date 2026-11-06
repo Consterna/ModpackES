@@ -9,8 +9,9 @@ from pathlib import Path
 from .copias import Respaldo
 from .resource_pack import NOMBRE
 
-#: Lo que lee el servidor: misiones y scripts de servidor. Los client_scripts los ejecuta cada jugador.
-_DEL_SERVIDOR = ("config/", "kubejs/server_scripts/", "kubejs/startup_scripts/", "patchouli_books/")
+#: Lo que lee el servidor: misiones, scripts de servidor y datos (logros, funciones).
+#: Los client_scripts los ejecuta cada jugador.
+_DEL_SERVIDOR = ("config/", "kubejs/server_scripts/", "kubejs/startup_scripts/", "kubejs/data/", "patchouli_books/")
 
 LEEME_KIT = """KIT DE TRADUCCIÓN PARA SERVIDOR
 ================================

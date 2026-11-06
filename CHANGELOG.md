@@ -6,6 +6,17 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Agregado
+
+- Mensajes de chat de los scripts de KubeJS: el texto de `tellraw`, `title` y `say` (y `msg`, `tell`, `w`)
+  cuando se manda con `runCommand` o `runCommandSilent`. Antes solo se traducía lo que pasaba por `tell`,
+  `Text.of` y similares.
+- Mensajes que un script arma por partes (`let mensaje = 'Tienes '; mensaje += efecto.name; player.tell(mensaje)`):
+  los trozos de texto, los `name` que se suman y las tablas de nombres que se suman (`nombres[clave]`). Solo
+  cuando la variable acaba en una llamada de texto como `tell`.
+- Logros (título y descripción) y funciones `.mcfunction` de `kubejs/data`, que también muestran mensajes en
+  el chat. Van en el grupo Scripts, con copia de seguridad, y entran en el kit para servidores.
+
 ## [2.2.0] - 2026-11-04
 
 Interfaz nueva: una ventana guiada en pasos, con tarjetas y un solo botón principal, y un tema propio

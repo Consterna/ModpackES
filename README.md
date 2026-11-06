@@ -42,7 +42,7 @@ y **cualquier lanzador**, y escribe a la vez las siete variantes de español del
 | Textos de mods (objetos, bloques, menús, tooltips) | `lang/*.json` (1.13+) y `.lang` (1.12 y antes), incluidos los jars anidados, KubeJS y los resource packs del modpack | Resource pack `Traduccion_ES` |
 | Misiones | FTB Quests (texto en los capítulos, carpeta `lang/` de 1.21+ y NBT de 1.12), BetterQuesting, HQM, Heracles | En su sitio, con copia de seguridad |
 | Libros guía | Patchouli, Mantle (Tinkers), Citadel (Alex's Mobs), GuideME (AE2), Lavender. Modonomicon va por claves de idioma | Resource pack (o en su sitio, si es un libro propio del modpack) |
-| Scripts de KubeJS | Lo que ve el jugador: `tell`, `displayName`, `Text.of`, tooltips, información de JEI/REI/EMI | En su sitio, con copia de seguridad |
+| Scripts de KubeJS | Lo que ve el jugador: `tell`, `displayName`, `Text.of`, tooltips, información de JEI/REI/EMI, los mensajes armados por partes antes de un `tell`, y el texto de `tellraw`, `title` y `say` en `runCommand`. También los logros y funciones de `kubejs/data` | En su sitio, con copia de seguridad |
 
 Lo que el mod ya trae en español no se toca, y si existe una variante (por ejemplo `es_es`) se copia a las
 demás sin gastar. Los libros antiguos de Patchouli que guardan el texto dentro del jar no se pueden traducir

@@ -11,7 +11,7 @@ from typing import Self
 
 from . import configuracion
 from .fuentes.instancia import Instancia
-from .modulos import libros, misiones, mods, scripts
+from .modulos import datos, libros, misiones, mods, scripts
 from .modulos.base import Contexto, Modulo, Resumen
 from .modulos.mods import es_nombre
 from .motores import fabrica
@@ -159,7 +159,7 @@ class Proceso:
         if "misiones" in self.grupos:
             lista += [("misiones", m) for m in misiones.todos(self.ctx)]
         if "scripts" in self.grupos:
-            lista.append(("scripts", scripts.ScriptsKubeJS(self.ctx)))
+            lista += [("scripts", scripts.ScriptsKubeJS(self.ctx)), ("scripts", datos.DatosKubeJS(self.ctx))]
         return [(g, m) for g, m in lista if m.detectar()]
 
     # ------------------------------------------------------------------ acciones
