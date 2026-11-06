@@ -49,6 +49,7 @@ from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, actualizaciones, configu
 from ..actualizaciones import Novedad
 from ..fuentes.instancia import resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
+from ..modulos.cobertura import Hallazgo
 from ..motores import fabrica
 from ..motores.base import Cancelado, ErrorFatal, Motor
 from ..motores.compatible import Compatible
@@ -165,6 +166,8 @@ class Trabajador(QObject):
                     resultado: object = p.analizar()
                 elif self.accion == "traducir":
                     resultado = p.ejecutar(activar=self.opciones["activar"], poner_idioma=self.opciones["idioma"])
+                elif self.accion == "cobertura":
+                    resultado = p.que_queda(java=True, progreso=self.progreso.emit)
                 else:
                     resultado = p.restaurar()
             self.terminado.emit(resultado)
@@ -498,6 +501,8 @@ class Ventana(QMainWindow):
 
         self.a_correcciones = agregar("Correcciones…", "pencil", self.abrir_correcciones)
         self.a_correcciones.setToolTip("Buscar y corregir a mano traducciones de la memoria")
+        self.a_cobertura = agregar("Qué queda en inglés", "circle-alert", lambda: self.lanzar("cobertura"))
+        self.a_cobertura.setToolTip("Lista el texto que no se puede traducir y por qué (solo lee, no cambia nada)")
         self.a_restaurar = agregar("Restaurar el original…", "undo-2", self._confirmar_restaurar)
         self.a_exportar = agregar("Exportar pack…", "package", lambda: self._exportar(kit=False))
         self.a_kit = agregar("Kit de servidor…", "server", lambda: self._exportar(kit=True))
@@ -889,7 +894,11 @@ class Ventana(QMainWindow):
         self.barra.setMaximum(0)  # sin total todavía: barra en movimiento
         self._inicio = None
         self._fase = ""
-        self.estado.setText({"analizar": "Analizando…", "traducir": "Preparando…"}.get(accion, "Restaurando…"))
+        self.estado.setText(
+            {"analizar": "Analizando…", "traducir": "Preparando…", "cobertura": "Buscando texto en inglés…"}.get(
+                accion, "Restaurando…"
+            )
+        )
         self._accion = accion
         self._antes = self._estado
         self._estado = "trabajando"
@@ -923,7 +932,10 @@ class Ventana(QMainWindow):
             self._inicio = (ahora, total)  # cada módulo cuenta desde cero
         self.barra.setMaximum(max(total, 1))
         self.barra.setValue(hechos)
-        texto = f"Traduciendo{f' {self._fase}' if self._fase else ''}… {_miles(hechos)} de {_miles(total)}"
+        if self._accion == "cobertura":
+            texto = f"Leyendo los mods… {_miles(hechos)} de {_miles(total)}"
+        else:
+            texto = f"Traduciendo{f' {self._fase}' if self._fase else ''}… {_miles(hechos)} de {_miles(total)}"
         pasado = ahora - self._inicio[0]
         if 0 < hechos < total and pasado > 3:
             texto += f" · quedan {_restante(pasado / hechos * (total - hechos))}"
@@ -956,6 +968,9 @@ class Ventana(QMainWindow):
                 self.estado.setText("¡Listo! Abre el juego: ya está en español.")
                 self.aviso.mostrar("Traducción terminada. Abre Minecraft para verla.", "exito")
                 self._marcar_traducida()
+        elif accion == "cobertura":
+            self._estado = self._antes  # no cambia nada en la instancia: el botón principal sigue como estaba
+            self._mostrar_cobertura(cast("list[Hallazgo]", resultado))
         else:
             self._olvidar_analisis()  # el texto volvió al original: lo contado antes ya no vale
             n = len(resultado) if isinstance(resultado, list) else 0  # pyright: ignore[reportUnknownArgumentType]
@@ -963,6 +978,20 @@ class Ventana(QMainWindow):
         self._ocupado(False)
         self._al_cambiar_opciones()
         self.escribir(self.estado.text())
+
+    def _mostrar_cobertura(self, hallazgos: list[Hallazgo]) -> None:
+        if not hallazgos:
+            self.estado.setText("No encontré texto que se quede en inglés.")
+            return
+        self.estado.setText(f"Quedan {len(hallazgos)} lugares con texto en inglés: el detalle está en Detalles.")
+        self.escribir("Texto que se queda en inglés aunque traduzcas todo:")
+        for h in hallazgos:
+            self.escribir(f"· [{h.categoria}] {h}")
+        self.escribir(
+            "Lo de «java» está escrito en el código del mod: un resource pack no lo alcanza. "
+            "Lo de «script» puede ser lógica y no un mensaje."
+        )
+        self.detalles.fijar_abierta(True)
 
     def _marcar_traducida(self) -> None:
         carpeta = self.carpeta()

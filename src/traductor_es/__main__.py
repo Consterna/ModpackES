@@ -85,6 +85,9 @@ def _argumentos() -> argparse.ArgumentParser:
     traducir.add_argument("--simular", action="store_true", help="prueba sin API: antepone «ES» a todo")
     traducir.add_argument("--no-activar", action="store_true", help="no tocar options.txt")
     traducir.add_argument("--no-idioma", action="store_true", help="no cambiar el idioma del juego")
+    cob = sub.add_parser("cobertura", help="dice qué texto queda en inglés y por qué (solo lee, no escribe nada)")
+    cob.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
+    cob.add_argument("--java", action="store_true", help="también el texto escrito en el código de los mods (tarda)")
     restaurar = sub.add_parser("restaurar", help="devuelve misiones, scripts y libros propios a su original")
     restaurar.add_argument("carpeta")
     modelos = sub.add_parser("modelos", help="lista los modelos que ofrece el motor")
@@ -124,6 +127,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.orden == "instancias":
             for e in buscar():
                 _escribir(f"{e.lanzador}: {e.nombre}\n    {e.juego}")
+        elif args.orden == "cobertura":
+            with Proceso(args.carpeta, Simulador(), registro=_escribir) as p:
+                _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
+                hallazgos = p.que_queda(java=args.java)
+            for h in hallazgos:
+                _escribir(f"[{h.categoria}] {h}")
+            _escribir(f"{len(hallazgos)} hallazgos." if hallazgos else "No encontré texto que quede en inglés.")
         elif args.orden == "clave":
             nombre = fabrica.MOTORES[args.motor]
             if args.accion == "guardar":

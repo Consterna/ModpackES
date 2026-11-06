@@ -9,7 +9,7 @@ import pytest
 from traductor_es.formatos import comandos
 from traductor_es.fuentes.instancia import Instancia
 from traductor_es.modulos.base import Contexto, traducir_modulo
-from traductor_es.modulos.datos import DatosKubeJS
+from traductor_es.modulos.datos import Datos
 from traductor_es.modulos.scripts import ScriptsKubeJS
 from traductor_es.motores.simulador import Simulador
 from traductor_es.nucleo.glosario import Glosario
@@ -65,14 +65,14 @@ def test_runcommand_traduce_solo_el_mensaje(tmp_path: Path, memoria: Memoria) ->
     with Instancia(juego) as inst:
         ctx = Contexto(inst, Respaldo(juego))
         resumen = traducir_modulo(ScriptsKubeJS(ctx), Traductor(Simulador(), memoria, Glosario()))
-        assert resumen.traducidos == 4 and resumen.pendientes == 0
+        assert resumen.traducidos == 5 and resumen.pendientes == 0
         nuevo = ruta.read_text(encoding="utf-8")
         assert """tellraw @a {"text": "«ES» Welcome to the village!", "color": "gold"}""" in nuevo
         assert r"""title @a actionbar {\"text\": \"«ES» Market opens soon\"}""" in nuevo
         assert "say «ES» The festival begins" in nuevo
         assert "${event.player.username}" in nuevo and "execute as @a run tellraw @s " in nuevo
         assert "times 10 70 20" in nuevo and "give @p minecraft:stone 2" in nuevo
-        assert 'tellraw @a {text:"snbt not touched"}' in nuevo
+        assert 'tellraw @a {text:"«ES» snbt not touched"}' in nuevo  # SNBT (1.21.5+): se conserva el formato
         ScriptsKubeJS(ctx).restaurar()
     assert ruta.read_text(encoding="utf-8") == SCRIPT
 
@@ -106,7 +106,7 @@ def test_logros_y_funciones(tmp_path: Path, memoria: Memoria) -> None:
     (funciones / "open.mcfunction").write_bytes(FUNCION.encode())
     with Instancia(juego) as inst:
         ctx = Contexto(inst, Respaldo(juego))
-        modulo = DatosKubeJS(ctx)
+        modulo = Datos(ctx)
         assert modulo.detectar() and modulo.describir() == "2 archivos de datos"
         resumen = traducir_modulo(modulo, Traductor(Simulador(), memoria, Glosario()))
         assert resumen.traducidos == 4 and resumen.pendientes == 0 and len(resumen.archivos) == 2

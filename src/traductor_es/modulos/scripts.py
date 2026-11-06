@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..formatos import comandos, flujo_js, javascript, json_texto
+from ..formatos import comandos, componente, flujo_js, javascript
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, contar, parece_clave
 
@@ -23,6 +23,9 @@ LLAMADAS_TEXTO = frozenset({
     "tell", "statusMessage", "setStatusMessage", "displayClientMessage", "sendSystemMessage", "sendMessage",
     "displayName", "setDisplayName", "tooltip", "addTooltip", "title", "setTitle", "subtitle", "setSubtitle",
     "lore", "setLore", "actionbar", "setActionbar",
+    # Del código de KubeJS (ramas 2001 y 2101, core/PlayerKJS, ServerPlayerKJS y MessageSenderKJS):
+    # `notify(título, texto)`, `kick(motivo)`, y el título de `openChestGUI` / `openInventoryGUI`
+    "notify", "kick", "openChestGUI", "openInventoryGUI",
 })  # fmt: skip
 #: Llamadas que ejecutan un comando: si es `tellraw`, `title`, `say`…, el texto del mensaje se traduce.
 LLAMADAS_COMANDO = frozenset({"runCommand", "runCommandSilent"})
@@ -70,6 +73,21 @@ def es_texto_visible(c: javascript.CadenaJs) -> bool:
     return c.funcion in LLAMADAS_EN_EVENTO and any(ctx.startswith(EVENTOS_TEXTO) for ctx in c.contexto)
 
 
+_LOGICA = ("recipes", "tags", "loot", "worldgen", "registry", "highPriorityData")
+
+
+def parece_frase_sin_elegir(c: javascript.CadenaJs) -> bool:
+    """Una cadena con aspecto de frase (3 palabras o más, empieza en mayúscula) fuera de recetas y etiquetas."""
+    t = c.texto.strip()
+    return (
+        not c.comparada
+        and t[:1].isupper()
+        and len(t.split()) >= 3
+        and _parece_texto(t)
+        and not any(m in ctx for ctx in c.contexto for m in _LOGICA)
+    )
+
+
 def _plantilla_segura(c: javascript.CadenaJs) -> bool:
     return c.comilla != "`" or c.texto.count("${") == len(_EXPRESION.findall(c.texto))
 
@@ -106,14 +124,14 @@ def unidades_comando(cmd: comandos.Comando) -> list[str]:
     """Los textos que ve el jugador dentro de un comando de chat."""
     if not cmd.json:
         return [cmd.cuerpo] if _parece_texto(cmd.cuerpo) else []
-    partes = json_texto.extraer(cmd.cuerpo, literal=True)  # None: no es JSON (p. ej. SNBT), no se toca
-    return [p for p in partes or [] if es_traducible(p) and not parece_clave(p)]
+    partes = componente.unidades(cmd.cuerpo)  # None: formato que no se reconoce, no se toca
+    return [p for p in partes or [] if not parece_clave(p)]
 
 
 def aplicar_comando(cmd: comandos.Comando, traducciones: Mapping[str, str]) -> str:
     if not cmd.json:
         return cmd.prefijo + traducciones.get(cmd.cuerpo, cmd.cuerpo)
-    return cmd.prefijo + json_texto.reconstruir(cmd.cuerpo, traducciones, literal=True)
+    return cmd.prefijo + componente.reconstruir(cmd.cuerpo, traducciones)
 
 
 def comando_visible(c: javascript.CadenaJs) -> comandos.Comando | None:
@@ -158,6 +176,7 @@ class ScriptsKubeJS:
     def __init__(self, ctx: Contexto) -> None:
         self.ctx = ctx
         self._scripts: list[_Script] = []
+        self.sin_elegir: list[tuple[Path, list[str]]] = []
 
     def _archivos(self) -> list[Path]:
         juego = self.ctx.instancia.juego
@@ -182,8 +201,14 @@ class ScriptsKubeJS:
                 self.ctx.registro(f"{ruta.name}: no pude leerlo con seguridad, se deja igual")
         return leidos
 
+    def candidatas(self) -> list[tuple[Path, list[str]]]:
+        """Por script, las frases que no se eligieron para traducir (para el informe de cobertura)."""
+        self.recolectar()
+        return self.sin_elegir
+
     def recolectar(self) -> list[Pieza]:
         self._scripts = []
+        self.sin_elegir = []
         leidos = self._leer()
         flujos = [flujo_js.analizar(src, _LLAMADAS_RE) for _, src, _ in leidos]
         # Una tabla de nombres se define en un archivo y se usa en otro
@@ -201,6 +226,10 @@ class ScriptsKubeJS:
             elegidas += [c for c in textos_armados(src, cadenas, flujo, tablas) if c.inicio not in vistas]
             if elegidas:
                 self._scripts.append(_Script(ruta, src, cadenas, elegidas, en_comando))
+            vistas = {c.inicio for c in elegidas}
+            frases = [c.texto for c in cadenas if c.inicio not in vistas and parece_frase_sin_elegir(c)]
+            if frases:
+                self.sin_elegir.append((ruta, frases))
         return [
             Pieza(t, f"script: {c.funcion or 'mensaje'}")
             for s in self._scripts

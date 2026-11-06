@@ -13,6 +13,7 @@ from . import configuracion
 from .fuentes.instancia import Instancia
 from .modulos import datos, libros, misiones, mods, scripts
 from .modulos.base import Contexto, Modulo, Resumen
+from .modulos.cobertura import Hallazgo, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
 from .motores import fabrica
 from .motores.base import Motor
@@ -56,6 +57,8 @@ class Informe:
     revision_automatica: revision.ResumenRevision | None = None
     pack_activado: list[str] = field(default_factory=list[str])
     fallidos: list[str] = field(default_factory=list[str])  #: grupos que el análisis no pudo leer
+    #: Lo que queda en inglés aunque se traduzca todo, y por qué (ver `modulos/cobertura.py`)
+    cobertura: list[Hallazgo] = field(default_factory=list[Hallazgo])
 
     @property
     def a_traducir(self) -> int:
@@ -159,14 +162,19 @@ class Proceso:
         if "misiones" in self.grupos:
             lista += [("misiones", m) for m in misiones.todos(self.ctx)]
         if "scripts" in self.grupos:
-            lista += [("scripts", scripts.ScriptsKubeJS(self.ctx)), ("scripts", datos.DatosKubeJS(self.ctx))]
+            lista += [("scripts", scripts.ScriptsKubeJS(self.ctx)), ("scripts", datos.Datos(self.ctx))]
         return [(g, m) for g, m in lista if m.detectar()]
 
     # ------------------------------------------------------------------ acciones
+    def que_queda(self, java: bool = False, progreso: Callable[[int, int], None] | None = None) -> list[Hallazgo]:
+        """Lo que quedaría en inglés. Solo lee. `java`: también el texto escrito en el código de los mods (tarda)."""
+        return revisar_cobertura(self.ctx, java, progreso or (lambda _a, _b: None))
+
     def analizar(self) -> Informe:
         """Cuenta lo que hay que traducir. Solo lee: no escribe nada en la instancia."""
         self._preparar_glosario()
         informe = Informe()
+        scripts_leidos: list[scripts.ScriptsKubeJS] = []
         for grupo, modulo in self.modulos():
             try:
                 piezas = modulo.recolectar()
@@ -175,12 +183,29 @@ class Proceso:
                 if grupo not in informe.fallidos:
                     informe.fallidos.append(grupo)
                 continue
+            if isinstance(modulo, scripts.ScriptsKubeJS):
+                scripts_leidos.append(modulo)
             pendientes = self.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre, modulo.describir(), len({p.texto for p in piezas}),
                               len(pendientes), sum(len(t) for t in pendientes))
             )  # fmt: skip
+        informe.avisos.extend(self._avisos_de_cobertura(informe, scripts_leidos))
         return informe
+
+    def _avisos_de_cobertura(self, informe: Informe, scripts_leidos: list[scripts.ScriptsKubeJS]) -> list[str]:
+        """Lo barato de saber antes de traducir: frases de scripts que parecen texto y no se tocan.
+
+        Se apoya en lo que el análisis ya leyó y nunca lo detiene.
+        """
+        for s in scripts_leidos:
+            informe.cobertura += hallazgos_de_scripts(self.instancia.juego, s.sin_elegir)
+        if not informe.cobertura:
+            return []
+        return [
+            f"{sum(h.cantidad for h in informe.cobertura)} frases de {len(informe.cobertura)} scripts parecen texto "
+            "pero no se traducen (puede ser lógica). Detalle con «modpackes cobertura»."
+        ]
 
     def ejecutar(self, activar: bool = True, poner_idioma: bool = True) -> Informe:
         self._preparar_glosario()

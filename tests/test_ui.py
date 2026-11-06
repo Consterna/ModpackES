@@ -465,3 +465,19 @@ def test_un_grupo_que_no_se_puede_leer_queda_fuera(
     _analizar(qtbot, v)
     assert not v.grupos["scripts"].incluido and "No se pudo leer" in v.grupos["scripts"].e_detalle.text()
     assert v.b_principal.isEnabled()
+
+
+def test_que_queda_en_ingles_solo_lee(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = _modpack(tmp_path)
+    ruta = juego / "kubejs" / "server_scripts" / "s.js"
+    ruta.write_text(
+        ruta.read_text("utf-8") + "\nlet nota = 'This sentence looks like a message but is not used'\n",
+        encoding="utf-8",
+    )
+    antes = ruta.read_bytes()
+    v = _ventana(qtbot, juego)
+    v.a_cobertura.trigger()
+    qtbot.waitUntil(lambda: v._hilo is None and "lugares" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert "This sentence looks like a message" in v.log.toPlainText()
+    assert ruta.read_bytes() == antes and not (juego / "resourcepacks").exists()  # solo lee
+    assert v.b_principal.isEnabled()  # el botón principal sigue disponible

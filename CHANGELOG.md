@@ -8,14 +8,24 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
-- Mensajes de chat de los scripts de KubeJS: el texto de `tellraw`, `title` y `say` (y `msg`, `tell`, `w`)
-  cuando se manda con `runCommand` o `runCommandSilent`. Antes solo se traducía lo que pasaba por `tell`,
-  `Text.of` y similares.
-- Mensajes que un script arma por partes (`let mensaje = 'Tienes '; mensaje += efecto.name; player.tell(mensaje)`):
-  los trozos de texto, los `name` que se suman y las tablas de nombres que se suman (`nombres[clave]`). Solo
-  cuando la variable acaba en una llamada de texto como `tell`.
-- Logros (título y descripción) y funciones `.mcfunction` de `kubejs/data`, que también muestran mensajes en
-  el chat. Van en el grupo Scripts, con copia de seguridad, y entran en el kit para servidores.
+- **Mensajes de chat y datos de texto**, que antes quedaban en inglés:
+  - El texto de `tellraw`, `title`, `say`, `msg`, `tell` y `w` en las funciones (`.mcfunction`) y en lo que un script de
+    KubeJS manda con `runCommand` o `runCommandSilent`.
+  - Títulos y descripciones de logros, y los consejos de las pantallas de carga (mod Tips, en sus dos formatos).
+  - Mensajes que un script arma por partes (`mensaje += efecto.name; player.tell(mensaje)`), con sus tablas de nombres.
+  - `notify`, `kick`, `openChestGUI` y `openInventoryGUI` de KubeJS (métodos tomados del código de KubeJS 1.20 y 1.21).
+- Estos datos se buscan por su estructura y no por la carpeta de un modpack: `kubejs/data`, `global_packs`, `datapacks`,
+  `config/openloader`, los datapacks de un mundo y cualquier otra con `data/<espacio>/functions/…`, sueltos o dentro de un `.zip`
+  (se reescribe el zip y se guarda el original). Los componentes de texto valen en JSON y en SNBT (1.21.5 y posteriores).
+- **Más ▸ Qué queda en inglés** y `modpackes cobertura`: lista lo que no se puede traducir y por qué (frases de scripts cuyo uso
+  no se entiende y texto escrito en el código de los mods, leído de la tabla de constantes de cada clase). Solo lee.
+  El análisis avisa de las frases de scripts que parecen texto.
+- Pruebas con modpacks públicos de Modrinth (9 más en `scripts/descargar_corpus.py`) y con la instancia propia: lo traducido
+  sigue siendo válido, repetir no cambia nada y restaurar devuelve los bytes originales.
+
+### Cambiado
+
+- El kit para servidores incluye las funciones y los logros traducidos dondequiera que estén.
 
 ## [2.2.0] - 2026-11-04
 

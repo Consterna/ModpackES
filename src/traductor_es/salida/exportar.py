@@ -6,12 +6,13 @@ import io
 import zipfile
 from pathlib import Path
 
+from ..modulos.datos import clasificar
 from .copias import Respaldo
 from .resource_pack import NOMBRE
 
-#: Lo que lee el servidor: misiones, scripts de servidor y datos (logros, funciones).
+#: Lo que lee el servidor: misiones y scripts de servidor, más los datos (logros y funciones) donde estén.
 #: Los client_scripts los ejecuta cada jugador.
-_DEL_SERVIDOR = ("config/", "kubejs/server_scripts/", "kubejs/startup_scripts/", "kubejs/data/", "patchouli_books/")
+_DEL_SERVIDOR = ("config/", "kubejs/server_scripts/", "kubejs/startup_scripts/", "patchouli_books/")
 
 LEEME_KIT = """KIT DE TRADUCCIÓN PARA SERVIDOR
 ================================
@@ -35,6 +36,12 @@ def _agregar_carpeta(zf: zipfile.ZipFile, carpeta: Path, prefijo: str = "") -> i
     return n
 
 
+def _es_dato_del_servidor(relativa: str) -> bool:
+    """Funciones y logros de un datapack los lee el servidor; los tips son de cliente."""
+    formato = clasificar(Path(relativa))
+    return formato is not None and formato.nombre != "tip"
+
+
 def exportar_pack(juego: Path, destino: Path) -> int:
     """El resource pack de la traducción como .zip listo para compartir. Devuelve cuántos archivos lleva."""
     pack = juego / "resourcepacks" / NOMBRE
@@ -48,7 +55,7 @@ def exportar_pack(juego: Path, destino: Path) -> int:
 def exportar_kit_servidor(juego: Path, destino: Path) -> int:
     """Kit para servidores: archivos traducidos que lee el servidor, el resource pack y unas instrucciones."""
     respaldo = Respaldo(juego)
-    archivos = [r for r in respaldo.registrados() if r.startswith(_DEL_SERVIDOR)]
+    archivos = [r for r in respaldo.registrados() if r.startswith(_DEL_SERVIDOR) or _es_dato_del_servidor(r)]
     pack = juego / "resourcepacks" / NOMBRE
     if not archivos and not (pack / "pack.mcmeta").is_file():
         raise ValueError("Todavía no hay nada traducido para el servidor: traduce primero.")
