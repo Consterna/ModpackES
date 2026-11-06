@@ -56,8 +56,8 @@ def test_cobertura_de_scripts_y_java(tmp_path: Path) -> None:
         sin_java = revisar_cobertura(Contexto(inst, Respaldo(juego)))
         con_java = revisar_cobertura(Contexto(inst, Respaldo(juego)), java=True)
     assert [(h.categoria, h.donde) for h in sin_java] == [("script", "kubejs/server_scripts/a.js")]
-    assert sin_java[0].cantidad == 2  # `tell` ya se traduce; recetas y comparaciones no cuentan
-    assert "This should be a debug message here" in sin_java[0].ejemplos
+    assert sin_java[0].cantidad == 1  # `tell` ya se traduce; recetas, comparaciones y console.log no cuentan
+    assert sin_java[0].ejemplos == ("The market is closed today",)
     de_java = [h for h in con_java if h.categoria == "java"]
     assert len(de_java) == 1
     assert set(de_java[0].ejemplos) == {"You can't use this item here!", "Click the block to open the menu"}
@@ -69,5 +69,26 @@ def test_analizar_avisa_sin_detener_el_analisis(tmp_path: Path) -> None:
     (juego / "kubejs" / "server_scripts" / "a.js").write_text(SCRIPT, encoding="utf-8")
     with Proceso(juego, Simulador(), grupos=["scripts"]) as p:
         informe = p.analizar()
-    assert any("2 frases de 1 scripts" in a for a in informe.avisos)
+    assert any("1 frases de 1 scripts" in a for a in informe.avisos)
     assert informe.modulos and informe.modulos[0].grupo == "scripts"
+
+
+def test_formatos_desconocidos_se_informan_sin_tocar(tmp_path: Path) -> None:
+    import json
+
+    from traductor_es.modulos.cobertura import formatos_desconocidos
+
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    quiz = juego / "kubejs" / "data" / "a" / "quizzes" / "q1.json"
+    quiz.parent.mkdir(parents=True)
+    quiz.write_text(json.dumps({"title": "What do cows eat for breakfast?", "id": "x"}), encoding="utf-8")
+    conocido = juego / "kubejs" / "data" / "a" / "advancements" / "g.json"
+    conocido.parent.mkdir(parents=True)
+    conocido.write_text(json.dumps({"display": {"title": {"text": "A conocido title here"}}}), encoding="utf-8")
+    receta = juego / "kubejs" / "data" / "a" / "recipes" / "r.json"
+    receta.parent.mkdir(parents=True)
+    receta.write_text(json.dumps({"result": {"text": "Not shown to the player, a recipe"}}), encoding="utf-8")
+    antes = quiz.read_bytes()
+    hallazgos = formatos_desconocidos(juego)
+    assert [(h.categoria, h.donde, h.cantidad) for h in hallazgos] == [("formato", "kubejs/data/a/quizzes", 1)]
+    assert hallazgos[0].ejemplos == ("What do cows eat for breakfast?",) and quiz.read_bytes() == antes

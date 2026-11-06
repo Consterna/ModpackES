@@ -115,10 +115,12 @@ class Proceso:
         contexto: str = "",
         revisar: bool = False,
         texto_java: bool = False,
+        scripts_exhaustivo: bool = False,
     ) -> None:
         self.instancia = Instancia(carpeta)
         self.revisar = revisar
         self.texto_java = texto_java
+        self.scripts_exhaustivo = scripts_exhaustivo
         self.registro = registro
         self.grupos = [g for g in GRUPOS if g in grupos]
         self._memoria_propia = memoria is None
@@ -167,7 +169,10 @@ class Proceso:
         if "misiones" in self.grupos:
             lista += [("misiones", m) for m in misiones.todos(self.ctx)]
         if "scripts" in self.grupos:
-            lista += [("scripts", scripts.ScriptsKubeJS(self.ctx)), ("scripts", datos.Datos(self.ctx))]
+            lista += [
+                ("scripts", scripts.ScriptsKubeJS(self.ctx, self.scripts_exhaustivo)),
+                ("scripts", datos.Datos(self.ctx)),
+            ]
         return [(g, m) for g, m in lista if m.detectar()]
 
     # ------------------------------------------------------------------ acciones

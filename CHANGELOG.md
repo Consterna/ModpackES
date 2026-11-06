@@ -19,13 +19,17 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   - Títulos y descripciones de logros, y los consejos de las pantallas de carga (mod Tips, en sus dos formatos).
   - Mensajes que un script arma por partes (`mensaje += efecto.name; player.tell(mensaje)`), con sus tablas de nombres.
   - `notify`, `kick`, `openChestGUI` y `openInventoryGUI` de KubeJS (métodos tomados del código de KubeJS 1.20 y 1.21).
+- **Modo exhaustivo** para los scripts de KubeJS (opcional, apagado por defecto; `--exhaustivo` y una casilla en «Opciones avanzadas»): traduce también toda frase que parezca texto aunque no se sepa dónde se muestra. Puede tocar lógica; todo queda con copia de seguridad. Nunca toca `console.log` ni comparaciones.
+- Los métodos de texto de KubeJS ahora dependen de la versión (`notify`, `openChestGUI`… solo donde existen), comprobados en el código de KubeJS de 1.12 a 26.x (`formatos/kubejs_api.py`).
+- Mercado de Farming for Blockheads (`farmingforblockheads_compat`): se traducen los nombres de las pestañas.
+- El informe «Qué queda en inglés» también avisa de carpetas de datos con frases en inglés cuyo formato la app no conoce.
 - Estos datos se buscan por su estructura y no por la carpeta de un modpack: `kubejs/data`, `global_packs`, `datapacks`,
   `config/openloader`, los datapacks de un mundo y cualquier otra con `data/<espacio>/functions/…`, sueltos o dentro de un `.zip`
   (se reescribe el zip y se guarda el original). Los componentes de texto valen en JSON y en SNBT (1.21.5 y posteriores).
 - **Más ▸ Qué queda en inglés** y `modpackes cobertura`: lista lo que no se puede traducir y por qué (frases de scripts cuyo uso
   no se entiende y texto escrito en el código de los mods, leído de la tabla de constantes de cada clase). Solo lee.
   El análisis avisa de las frases de scripts que parecen texto.
-- Pruebas con modpacks públicos de Modrinth (9 más en `scripts/descargar_corpus.py`) y con la instancia propia: lo traducido
+- Pruebas con modpacks públicos de Modrinth (16 más en `scripts/descargar_corpus.py`, de 1.16.5 a 26.x con Forge, NeoForge, Fabric y Quilt) y con la instancia propia: lo traducido
   sigue siendo válido, repetir no cambia nada y restaurar devuelve los bytes originales.
 
 ### Cambiado

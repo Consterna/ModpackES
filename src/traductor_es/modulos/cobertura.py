@@ -17,6 +17,7 @@ from pathlib import Path
 from ..fuentes.instancia import Instancia
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, parece_clave
+from .datos import clasificar, recorrer
 from .scripts import ScriptsKubeJS
 
 MAX_EJEMPLOS = 3
@@ -56,7 +57,7 @@ _TAMANO_CONSTANTE = {
 class Hallazgo:
     """Una cosa que queda en inglés: dónde, cuántos textos y unos ejemplos."""
 
-    categoria: str  #: «script» o «java»
+    categoria: str  #: «script», «formato» o «java»
     donde: str
     cantidad: int
     motivo: str
@@ -152,11 +153,57 @@ def textos_en_java(instancia: Instancia, progreso: Callable[[int, int], None] = 
     return sorted(res, key=lambda h: -h.cantidad)
 
 
+#: Carpetas de un datapack o resource pack que no llevan texto para el jugador (o que ya se traducen por otro lado).
+_SIN_TEXTO = frozenset({
+    "recipes", "recipe", "tags", "loot_tables", "loot_table", "predicates", "worldgen", "dimension", "dimension_type",
+    "structures", "structure", "lang", "textures", "models", "blockstates", "sounds", "particles", "shaders", "font",
+    "atlases", "item_modifiers", "chat_type", "damage_type", "enchantment", "trim_pattern", "trim_material",
+    "banner_pattern", "jukebox_song", "painting_variant", "patchouli_books", "optifine", "equipment", "items",
+})  # fmt: skip
+#: Un valor de texto con aspecto de frase en inglés dentro de un JSON.
+_TEXTO_JSON = re.compile(r'"(?:text|title|description|message|tip|name|lore)"\s*:\s*"([A-Z][^"\\]{11,})"')
+_TAMANO_MAXIMO = 300_000
+
+
+def formatos_desconocidos(juego: Path) -> list[Hallazgo]:
+    """Carpetas de datos o recursos con frases en inglés cuyo formato la app no conoce (no se tocan)."""
+    por_carpeta: dict[str, list[str]] = {}
+    for ruta in recorrer(juego):
+        partes = ruta.relative_to(juego).parts
+        if ruta.suffix != ".json" or clasificar(Path(*partes)) is not None:
+            continue
+        ancla = next(
+            (i for i, parte in enumerate(partes) if parte in ("data", "assets") and len(partes) - i >= 4), None
+        )
+        if ancla is None or partes[ancla + 2] in _SIN_TEXTO:
+            continue
+        try:
+            if ruta.stat().st_size > _TAMANO_MAXIMO:
+                continue
+            frases = [
+                f
+                for f in _TEXTO_JSON.findall(ruta.read_text(encoding="utf-8-sig", errors="ignore"))
+                if es_traducible(f)
+            ]
+        except OSError:
+            continue
+        if frases:
+            por_carpeta.setdefault("/".join(partes[: ancla + 3]), []).extend(frases)
+    return [
+        Hallazgo(
+            "formato", carpeta, len(frases), "Formato que la app no conoce: no se traduce (no se toca ningún archivo)",
+            tuple(f[:60] for f in frases[:MAX_EJEMPLOS]),
+        )
+        for carpeta, frases in sorted(por_carpeta.items(), key=lambda kv: -len(kv[1]))
+    ]  # fmt: skip
+
+
 def revisar_cobertura(
     ctx: Contexto, java: bool = False, progreso: Callable[[int, int], None] = lambda _a, _b: None
 ) -> list[Hallazgo]:
     """Lo que queda en inglés. El análisis del código Java tarda (lee todos los mods): solo si se pide."""
     hallazgos = hallazgos_de_scripts(ctx.instancia.juego, ScriptsKubeJS(ctx).candidatas())
+    hallazgos += formatos_desconocidos(ctx.instancia.juego)
     if java:
         hallazgos += textos_en_java(ctx.instancia, progreso)
     return hallazgos

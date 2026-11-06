@@ -91,6 +91,16 @@ def _nodos_tip(datos: Any) -> list[tuple[dict[str, Any], str]]:
     return nodos
 
 
+def _nodos_mercado(datos: Any) -> list[tuple[dict[str, Any], str]]:
+    """Mercado de Farming for Blockheads: el `name` de cada `customCategories.<id>` (lo que se ve en las pestañas)."""
+    if not isinstance(datos, dict):
+        return []
+    categorias = cast("dict[str, Any]", datos).get("customCategories")
+    if not isinstance(categorias, dict):
+        return []
+    return [n for c in cast("dict[str, Any]", categorias).values() for n in _nodos(c, ("name",))]
+
+
 def _unidades_json(texto: str, nodos: Callable[[Any], list[tuple[dict[str, Any], str]]]) -> list[str]:
     return [u for d, k in nodos(json.loads(texto)) for u in _traducibles(componente.unidades(_componente(d[k])))]
 
@@ -129,6 +139,11 @@ FORMATOS: tuple[Formato, ...] = (
         lambda t: _unidades_json(t, _nodos_logro), lambda t, tr: _reescribir_json(t, tr, _nodos_logro),
     ),
     Formato(
+        "mercado", "pestaña de un mercado",
+        lambda r: _es(r, "data", ("farmingforblockheads_compat",), ".json"),
+        lambda t: _unidades_json(t, _nodos_mercado), lambda t, tr: _reescribir_json(t, tr, _nodos_mercado),
+    ),
+    Formato(
         "tip", "consejo de las pantallas de carga",
         lambda r: _es(r, "assets", ("tips",), ".json") or (_es(r, "data", ("tips",), ".json") and r[1] == "tipsmod"),
         lambda t: _unidades_json(t, _nodos_tip), lambda t, tr: _reescribir_json(t, tr, _nodos_tip),
@@ -147,7 +162,7 @@ def clasificar(ruta: Path) -> Formato | None:
     return None
 
 
-def _recorrer(juego: Path) -> Iterator[Path]:
+def recorrer(juego: Path) -> Iterator[Path]:
     """Cada archivo de la instancia, sin entrar en mods, cachés ni mundos (de un mundo solo sus datapacks)."""
     base = len(juego.parts)
     for raiz, carpetas, archivos in os.walk(juego):
@@ -165,7 +180,7 @@ def _recorrer(juego: Path) -> Iterator[Path]:
 def buscar_archivos(juego: Path) -> list[tuple[Path, Formato]]:
     """Todos los archivos de texto conocidos que están sueltos en la instancia."""
     encontrados: list[tuple[Path, Formato]] = []
-    for ruta in _recorrer(juego):
+    for ruta in recorrer(juego):
         if (formato := clasificar(ruta.relative_to(juego))) is not None:
             encontrados.append((ruta, formato))
     return encontrados
@@ -185,7 +200,7 @@ def _entradas_del_zip(ruta: Path) -> list[tuple[str, Formato]]:
 def buscar_zips(juego: Path) -> list[tuple[Path, list[tuple[str, Formato]]]]:
     """Los .zip con texto conocido dentro (datapacks de `global_packs`, `datapacks`, mundos…)."""
     res: list[tuple[Path, list[tuple[str, Formato]]]] = []
-    for ruta in _recorrer(juego):
+    for ruta in recorrer(juego):
         if ruta.suffix.lower() == ".zip" and (entradas := _entradas_del_zip(ruta)):
             res.append((ruta, entradas))
     return res

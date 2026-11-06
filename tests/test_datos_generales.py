@@ -182,3 +182,22 @@ def test_datapack_comprimido_se_traduce_y_se_restaura(tmp_path: Path, memoria: M
         assert ruta.read_bytes() == despues  # repetir no cambia nada
         assert Datos(ctx).restaurar() == [ruta]
     assert ruta.read_bytes() == original
+
+
+def test_mercado_de_farming_for_blockheads(tmp_path: Path, memoria: Memoria) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    ruta = juego / "kubejs" / "data" / "farmingforblockheads" / "farmingforblockheads_compat" / "kits.json"
+    contenido = {
+        "customCategories": {"kits": {"name": "Clothes and Decoration Kits", "icon": {"item": "minecraft:stone"}}},
+        "customEntries": [{"output": {"item": "x:y", "nbt": {"Name": "Item name stays"}}}],
+    }
+    ruta.parent.mkdir(parents=True)
+    ruta.write_text(json.dumps(contenido), encoding="utf-8")
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego))
+        traducir_modulo(Datos(ctx), Traductor(Simulador(), memoria, Glosario()))
+        nuevo = json.loads(ruta.read_text("utf-8"))
+        assert nuevo["customCategories"]["kits"]["name"] == "«ES» Clothes and Decoration Kits"
+        assert nuevo["customEntries"] == contenido["customEntries"] and nuevo["customCategories"]["kits"]["icon"]
+        Datos(ctx).restaurar()
+    assert json.loads(ruta.read_text("utf-8")) == contenido

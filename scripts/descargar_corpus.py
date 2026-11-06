@@ -45,6 +45,21 @@ PACKS = {
     "better-mc-forge-bmc4": "https://cdn.modrinth.com/data/4BV47HRn/versions/bdRIjRgs/Better%20MC%20%5BFORGE%5D%201.20.1%201.20.1%20v59.mrpack",
     # 1.20.1 fabric · kubejs, datapacks .zip
     "landscapes-reimagined-genesis": "https://cdn.modrinth.com/data/MdznSbKA/versions/pBrfi38A/Landscapes%20Reimagined%20Genesis%203.2.mrpack",
+    # Más versiones y loaders (1.16.5, 1.18.2, 1.19.2 Quilt, 1.20.1, 1.21.11 y 26.x): SNBT y formatos viejos
+    # 1.19.2 quilt · kubejs 171 / data 1297 / funciones 9 / logros 130 / zips 0
+    "taidumcraft": "https://cdn.modrinth.com/data/qH6Phyax/versions/dmDeTjMb/TaidumCraft.mrpack",
+    # 26.1.2 fabric · kubejs 0 / data 0 / funciones 5 / logros 176 / zips 0
+    "legacies": "https://cdn.modrinth.com/data/nWCaRO9f/versions/x4WpILDH/Legacies%2026-v4.1.mrpack",
+    # 1.16.5 forge · kubejs 125 / data 5 / funciones 0 / logros 0 / zips 0
+    "techblock-skytech-3": "https://cdn.modrinth.com/data/jRXzxVGA/versions/IHN5lWsY/TechBlock%20-%20SkyTech%203%201.2.1.mrpack",
+    # 1.18.2 forge · kubejs 7 / data 0 / funciones 0 / logros 0 / zips 0
+    "adventures-of-berk": "https://cdn.modrinth.com/data/zTK0MLqP/versions/yIog8kuK/Adventures%20of%20Berk%200.0.1.mrpack",
+    # 1.20.1 fabric · kubejs 3 / data 258 / funciones 0 / logros 123 / zips 0
+    "spectral-creation": "https://cdn.modrinth.com/data/eqbP6Ycz/versions/iJhfeFZL/Spectral%20Creation%201.20.1-7.1.1.mrpack",
+    # 1.18.2 forge · kubejs 0 / data 0 / funciones 0 / logros 0 / zips 16
+    "kings-dragons-of-berk": "https://cdn.modrinth.com/data/UmIII5vC/versions/b82038X3/Kings_dragon%201.0.0.mrpack",
+    # 1.21.11 fabric · kubejs 0 / data 0 / funciones 0 / logros 0 / zips 6
+    "better-adventures-plus-plus": "https://cdn.modrinth.com/data/23niDfW7/versions/e18PwvTU/Better%20Adventures%2B%2B%201.3.mrpack",
 }
 
 #: Qué se baja de cada pack (rutas dentro del .mrpack).

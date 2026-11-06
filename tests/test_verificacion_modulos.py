@@ -274,3 +274,26 @@ def test_namespace_imposible_no_tumba_el_resto(tmp_path: Path, memoria: Memoria,
     assert json.loads((pack / "assets" / "ok" / "lang" / "es_mx.json").read_text("utf-8")) == {"b": "«ES» Good one"}
     assert resumen.pendientes >= 1 and any("no se puede guardar" in a for a in avisos)
     assert not (tmp_path / "Pack" / "minecraft" / "lang").exists()  # nada se escribió fuera del pack
+
+
+EXHAUSTIVO = """const aviso = 'The harvest festival starts tomorrow evening'
+console.log('This is only a debug line for the log here')
+if (nombre == 'Some Name With Spaces') return
+function f(e) { e.player.tell('Welcome to the farm') }
+"""
+
+
+def test_modo_exhaustivo_traduce_mas_pero_no_los_registros_ni_las_comparaciones(
+    tmp_path: Path, memoria: Memoria
+) -> None:
+    juego, ruta = _script(tmp_path, EXHAUSTIVO.encode())
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego))
+        normal = traducir_modulo(ScriptsKubeJS(ctx), Traductor(Simulador(), memoria, Glosario()))
+        assert normal.traducidos == 1  # solo el `tell`
+        ScriptsKubeJS(ctx).restaurar()
+        todo = traducir_modulo(ScriptsKubeJS(ctx, exhaustivo=True), Traductor(Simulador(), memoria, Glosario()))
+    nuevo = ruta.read_text("utf-8")
+    assert todo.traducidos == 2 and "'«ES» The harvest festival starts tomorrow evening'" in nuevo
+    assert "'This is only a debug line for the log here'" in nuevo  # console.log no es para el jugador
+    assert "'Some Name With Spaces'" in nuevo  # una comparación es lógica

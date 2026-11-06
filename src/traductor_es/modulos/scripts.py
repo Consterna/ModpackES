@@ -12,21 +12,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..formatos import comandos, componente, flujo_js, javascript
+from ..formatos.kubejs_api import llamadas_de_texto
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, contar, parece_clave
 
 AMBITO = "script"
 CARPETAS = ("kubejs/client_scripts", "kubejs/server_scripts", "kubejs/startup_scripts")
 
-#: Llamadas cuyo argumento de texto es siempre algo que ve el jugador.
-LLAMADAS_TEXTO = frozenset({
-    "tell", "statusMessage", "setStatusMessage", "displayClientMessage", "sendSystemMessage", "sendMessage",
-    "displayName", "setDisplayName", "tooltip", "addTooltip", "title", "setTitle", "subtitle", "setSubtitle",
-    "lore", "setLore", "actionbar", "setActionbar",
-    # Del código de KubeJS (ramas 2001 y 2101, core/PlayerKJS, ServerPlayerKJS y MessageSenderKJS):
-    # `notify(título, texto)`, `kick(motivo)`, y el título de `openChestGUI` / `openInventoryGUI`
-    "notify", "kick", "openChestGUI", "openInventoryGUI",
-})  # fmt: skip
+#: Llamadas cuyo argumento de texto es siempre algo que ve el jugador (de todas las versiones de KubeJS; la lista por
+#: versión está en `formatos/kubejs_api.py`).
+LLAMADAS_TEXTO = llamadas_de_texto(None)
 #: Llamadas que ejecutan un comando: si es `tellraw`, `title`, `say`…, el texto del mensaje se traduce.
 LLAMADAS_COMANDO = frozenset({"runCommand", "runCommandSilent"})
 #: `Text.of("…")`, `Text.red("…")`, `Component.literal("…")`…
@@ -42,11 +37,16 @@ EVENTOS_TEXTO = (
     "onEvent:client.generate_assets",
 )  # fmt: skip
 LLAMADAS_EN_EVENTO = frozenset({"add", "addAll", "insert", "addAdvanced", "addItem", "addFluid", "addLang", "addLine"})
-#: Las llamadas de texto (`tell`, `Text.of`…) como expresión regular: sirve para ver qué variables acaban en un mensaje.
-_LLAMADAS_RE = (
-    rf"\b(?:{'|'.join(sorted(LLAMADAS_TEXTO))})|\b(?:{'|'.join(sorted(RECEPTORES_TEXTO))})"
-    rf"\.(?:{'|'.join(sorted(AYUDAS_TEXTO))})"
-)
+
+
+def _llamadas_re(llamadas: frozenset[str]) -> str:
+    """Las llamadas de texto (`tell`, `Text.of`…) como regex, para saber qué variables acaban en un mensaje."""
+    return (
+        rf"\b(?:{'|'.join(sorted(llamadas))})|\b(?:{'|'.join(sorted(RECEPTORES_TEXTO))})"
+        rf"\.(?:{'|'.join(sorted(AYUDAS_TEXTO))})"
+    )
+
+
 _EXPRESION = re.compile(r"\$\{[^{}\n]*\}")
 
 
@@ -61,12 +61,12 @@ def _seguro(c: javascript.CadenaJs, traduccion: str) -> bool:
     return c.comilla != "`" or traduccion.count("${") == c.texto.count("${")
 
 
-def es_texto_visible(c: javascript.CadenaJs) -> bool:
+def es_texto_visible(c: javascript.CadenaJs, llamadas: frozenset[str] = LLAMADAS_TEXTO) -> bool:
     if c.comparada or not _parece_texto(c.texto):
         return False
     if c.comilla == "`" and c.texto.count("${") != len(_EXPRESION.findall(c.texto)):
         return False  # plantilla con expresiones complejas: no se puede proteger con seguridad
-    if c.funcion in LLAMADAS_TEXTO:
+    if c.funcion in llamadas:
         return True
     if c.funcion in AYUDAS_TEXTO and c.receptor in RECEPTORES_TEXTO:
         return True
@@ -81,6 +81,7 @@ def parece_frase_sin_elegir(c: javascript.CadenaJs) -> bool:
     t = c.texto.strip()
     return (
         not c.comparada
+        and c.receptor != "console"  # los registros del script no los ve el jugador
         and t[:1].isupper()
         and len(t.split()) >= 3
         and _parece_texto(t)
@@ -173,8 +174,13 @@ class ScriptsKubeJS:
     nombre = "Scripts de KubeJS"
     ambito = AMBITO
 
-    def __init__(self, ctx: Contexto) -> None:
+    def __init__(self, ctx: Contexto, exhaustivo: bool = False) -> None:
+        """`exhaustivo`: traduce también toda cadena con aspecto de frase, aunque no se sepa dónde se muestra.
+
+        Puede tocar lógica del script (una frase que se compara o se guarda), por eso es opcional.
+        """
         self.ctx = ctx
+        self.exhaustivo = exhaustivo
         self._scripts: list[_Script] = []
         self.sin_elegir: list[tuple[Path, list[str]]] = []
 
@@ -210,20 +216,27 @@ class ScriptsKubeJS:
         self._scripts = []
         self.sin_elegir = []
         leidos = self._leer()
-        flujos = [flujo_js.analizar(src, _LLAMADAS_RE) for _, src, _ in leidos]
+        llamadas = llamadas_de_texto(self.ctx.instancia.version.partes)  # las de esta versión de KubeJS
+        patron = _llamadas_re(llamadas)
+        flujos = [flujo_js.analizar(src, patron) for _, src, _ in leidos]
         # Una tabla de nombres se define en un archivo y se usa en otro
         tablas: frozenset[str] = frozenset(t for f in flujos for t in f.tablas)
         for (ruta, src, cadenas), flujo in zip(leidos, flujos, strict=True):
             elegidas: list[javascript.CadenaJs] = []
             en_comando: dict[int, comandos.Comando] = {}
             for c in cadenas:
-                if es_texto_visible(c):
+                if es_texto_visible(c, llamadas):
                     elegidas.append(c)
                 elif (cmd := comando_visible(c)) is not None:
                     elegidas.append(c)
                     en_comando[c.inicio] = cmd
             vistas = {c.inicio for c in elegidas}
             elegidas += [c for c in textos_armados(src, cadenas, flujo, tablas) if c.inicio not in vistas]
+            if self.exhaustivo:
+                vistas = {c.inicio for c in elegidas}
+                elegidas += [
+                    c for c in cadenas if c.inicio not in vistas and parece_frase_sin_elegir(c) and _plantilla_segura(c)
+                ]
             if elegidas:
                 self._scripts.append(_Script(ruta, src, cadenas, elegidas, en_comando))
             vistas = {c.inicio for c in elegidas}

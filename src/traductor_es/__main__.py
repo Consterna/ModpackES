@@ -80,6 +80,11 @@ def _argumentos() -> argparse.ArgumentParser:
         p.add_argument("--contexto", default="", help="ambientación del modpack para el tono y los términos")
         p.add_argument("--revisar", action="store_true", help="revisión automática de misiones y libros (cuesta más)")
         p.add_argument(
+            "--exhaustivo",
+            action="store_true",
+            help="en los scripts de KubeJS traduce toda frase, aunque no se sepa dónde se muestra (puede tocar lógica)",
+        )
+        p.add_argument(
             "--java",
             action="store_true",
             help="también el texto escrito en el código de los mods (lo muestra el mod de apoyo; ver instalar-runtime)",
@@ -122,6 +127,7 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
         args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
         hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
         texto_java=args.java,
+        scripts_exhaustivo=args.exhaustivo,
     ) as p:  # fmt: skip
         _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
         if args.orden == "analizar":
