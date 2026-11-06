@@ -73,7 +73,10 @@ class Carpeta:
     def leer(self, ruta: str) -> bytes:
         if not ruta.startswith(self._prefijo):
             raise KeyError(ruta)
-        return (self.raiz / ruta[len(self._prefijo) :]).read_bytes()
+        destino = (self.raiz / ruta[len(self._prefijo) :]).resolve()
+        if not destino.is_relative_to(self.raiz.resolve()):  # «../» o una ruta absoluta: nunca se sale de la carpeta
+            raise KeyError(ruta)
+        return destino.read_bytes()
 
     def cerrar(self) -> None:
         return None

@@ -52,6 +52,17 @@ jobs:
       - name: Puerta de calidad (ruff, pyright y pytest con el validador Java)
         run: uv run python scripts/verificar.py
 
+      - id: java17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"  # ForgeGradle 6 (Forge 1.20.1) pide Java 17
+
+      - name: Compilar el mod de apoyo (ModpackES Runtime) con sus pruebas
+        run: uv run python scripts/construir_mod.py
+        env:
+          JAVA_HOME: ${{ steps.java17.outputs.path }}
+
       - name: Construir ModpackES.exe
         run: uv run python scripts/construir_exe.py
 

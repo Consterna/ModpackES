@@ -465,3 +465,78 @@ def test_un_grupo_que_no_se_puede_leer_queda_fuera(
     _analizar(qtbot, v)
     assert not v.grupos["scripts"].incluido and "No se pudo leer" in v.grupos["scripts"].e_detalle.text()
     assert v.b_principal.isEnabled()
+
+
+def test_que_queda_en_ingles_solo_lee(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = _modpack(tmp_path)
+    ruta = juego / "kubejs" / "server_scripts" / "s.js"
+    ruta.write_text(
+        ruta.read_text("utf-8") + "\nlet nota = 'This sentence looks like a message but is not used'\n",
+        encoding="utf-8",
+    )
+    antes = ruta.read_bytes()
+    v = _ventana(qtbot, juego)
+    v.a_cobertura.trigger()
+    qtbot.waitUntil(lambda: v._hilo is None and "lugares" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert "This sentence looks like a message" in v.log.toPlainText()
+    assert ruta.read_bytes() == antes and not (juego / "resourcepacks").exists()  # solo lee
+    assert v.b_principal.isEnabled()  # el botón principal sigue disponible
+
+
+def test_sin_instancia_elegida_no_lanza_nada(qtbot: QtBot, tmp_path: Path) -> None:
+    v = Ventana(buscar_instancias=lambda: [], fabrica_motor=siempre(Simulador()))
+    qtbot.addWidget(v)
+    v.lanzar("analizar")
+    v.a_cobertura.trigger()
+    assert v._hilo is None and v.carpeta() is None  # pyright: ignore[reportPrivateUsage]
+
+
+def test_instancia_sin_version_detectable_se_recupera(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = tmp_path / "Pack" / "minecraft"
+    (juego / "mods").mkdir(parents=True)  # sin lanzador, sin log y sin mods con versión
+    v = _ventana(qtbot, juego)
+    v.b_principal.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Se detuvo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert v.b_principal.isEnabled() and "Traceback" not in v.log.toPlainText()
+
+
+def test_cobertura_sin_nada_que_decir(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.a": "Iron Plate"}))
+    v = _ventana(qtbot, juego)
+    v.a_cobertura.trigger()
+    qtbot.waitUntil(lambda: v._hilo is None and "No encontré" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+
+
+def test_soltar_rutas_que_no_son_carpetas(qtbot: QtBot, tmp_path: Path) -> None:
+    from PySide6.QtCore import QMimeData, QUrl
+
+    archivo = tmp_path / "x.txt"
+    archivo.write_text("x", encoding="utf-8")
+    datos = QMimeData()
+    datos.setUrls(
+        [QUrl.fromLocalFile(str(archivo)), QUrl.fromLocalFile(str(tmp_path / "no_existe")), QUrl("https://x.y/z")]
+    )
+    assert Ventana.carpetas_soltadas(datos) == []
+    datos.setUrls([QUrl.fromLocalFile(str(tmp_path))])
+    assert Ventana.carpetas_soltadas(datos) == [str(tmp_path)]
+
+
+def test_opcion_de_texto_java_y_mod_de_apoyo_en_la_ventana(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traductor_es.salida import mod_apoyo
+
+    vacia = tmp_path / "sin_jars"
+    vacia.mkdir()
+    monkeypatch.setattr(mod_apoyo, "_carpeta_de_jars", lambda: vacia)  # sin importar si esta copia ya compiló el jar
+    juego = _modpack(tmp_path)
+    v = _ventana(qtbot, juego)
+    assert not v.c_java.isChecked() and v.opciones()["texto_java"] is False  # apagada por defecto
+    v.c_java.setChecked(True)
+    assert v.opciones()["texto_java"] is True
+    v.a_apoyo.trigger()  # Forge 1.20.1 sí tiene mod de apoyo, pero sin el jar empaquetado debe avisar, no romper
+    assert "no trae el mod de apoyo" in v.aviso.e_texto.text()
+    assert not list((juego / "mods").glob("modpackes_runtime-*.jar"))
+    v.a_quitar_apoyo.trigger()
+    assert "No había mod de apoyo" in v.aviso.e_texto.text()

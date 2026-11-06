@@ -1,0 +1,151 @@
+"""Texto del código de los mods: la tabla para el mod de apoyo y su instalación en mods/."""
+
+import json
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+
+from traductor_es.__main__ import main
+from traductor_es.fuentes import vanilla
+from traductor_es.fuentes.instancia import Instancia
+from traductor_es.modulos.base import Contexto, traducir_modulo
+from traductor_es.modulos.runtime import RUTA_TABLA, TextoDeJava
+from traductor_es.motores.simulador import Simulador
+from traductor_es.nucleo.dialectos import VARIANTES
+from traductor_es.nucleo.glosario import Glosario
+from traductor_es.nucleo.mascara import enmascarar
+from traductor_es.nucleo.memoria import Memoria
+from traductor_es.nucleo.traductor import Traductor
+from traductor_es.proceso import Proceso
+from traductor_es.salida import mod_apoyo
+from traductor_es.salida.copias import Respaldo
+from traductor_es.salida.resource_pack import PackSalida
+
+from . import fabrica
+from .test_cobertura import _clase  # pyright: ignore[reportPrivateUsage]
+
+FRASES = {
+    "A": "You can't use chat, you've been muted by an admin!",
+    "B": "Click §ahere§r to open the menu %s now",
+    "C": "§cThe market isn't open today, come back later!",
+}
+
+
+@pytest.fixture(autouse=True)
+def _sin_lanzadores(monkeypatch: pytest.MonkeyPatch) -> None:
+    def ninguno() -> list[Path]:
+        return []
+
+    monkeypatch.setattr(vanilla, "raices_de_lanzadores", ninguno)
+
+
+@pytest.fixture
+def memoria() -> Iterator[Memoria]:
+    with Memoria(":memory:") as m:
+        yield m
+
+
+def _instancia_con_mod(tmp_path: Path, version: str = "1.20.1", loader: str | None = "forge") -> Path:
+    juego = fabrica.prism(tmp_path, version, loader)
+    fabrica.jar(
+        juego / "mods" / "m.jar",
+        {
+            "com/m/Chat.class": _clase("literal", *FRASES.values()),
+            "com/m/Otra.class": _clase("nada", "Another English sentence here"),  # no construye texto
+        },
+    )
+    return juego
+
+
+def test_tabla_con_las_frases_del_codigo(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _instancia_con_mod(tmp_path)
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego), pack=PackSalida(inst))
+        modulo = TextoDeJava(ctx)
+        resumen = traducir_modulo(modulo, Traductor(Simulador(), memoria, Glosario()))
+        pack = ctx.pack_listo().raiz
+    assert resumen.traducidos == 3 and len(resumen.archivos) == len(VARIANTES)
+    for variante in VARIANTES:
+        crudo = (pack / RUTA_TABLA.format(variante=variante)).read_bytes()
+        tabla = json.loads(crudo.decode("utf-8"))
+        assert set(tabla) == set(FRASES.values())  # la clave es el inglés exacto
+        for ingles, espanol in tabla.items():
+            assert espanol.startswith("«ES» ")
+            assert sorted(enmascarar(espanol).tokens) == sorted(enmascarar(ingles).tokens)  # §a, §r y %s intactos
+        assert "Another English sentence here" not in json.dumps(tabla)
+
+
+def test_sin_frases_no_crea_nada(tmp_path: Path, memoria: Memoria) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.a": "Iron Plate"}))
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego), pack=PackSalida(inst))
+        resumen = traducir_modulo(TextoDeJava(ctx), Traductor(Simulador(), memoria, Glosario()))
+    assert resumen.archivos == [] and not (juego / "resourcepacks" / "Traduccion_ES" / "assets").exists()
+
+
+def test_proceso_solo_incluye_el_modulo_si_se_pide(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _instancia_con_mod(tmp_path)
+    with Proceso(juego, Simulador(), memoria=memoria, grupos=["mods"]) as p:
+        assert not any(isinstance(m, TextoDeJava) for _, m in p.modulos())
+        sin = p.analizar()
+    with Proceso(juego, Simulador(), memoria=memoria, grupos=["mods"], texto_java=True) as p:
+        assert any(isinstance(m, TextoDeJava) for _, m in p.modulos())
+        con = p.analizar()
+        p.ejecutar(activar=False, poner_idioma=False)
+    assert con.a_traducir == sin.a_traducir + 3
+    assert (juego / "resourcepacks" / "Traduccion_ES" / RUTA_TABLA.format(variante="es_mx")).is_file()
+
+
+# ------------------------------------------------------------------ mod de apoyo
+def _jars(tmp_path: Path, *nombres: str) -> Path:
+    carpeta = tmp_path / "empaquetados"
+    carpeta.mkdir()
+    for n in nombres:
+        (carpeta / n).write_bytes(b"PK-" + n.encode())
+    return carpeta
+
+
+def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
+    casos = [
+        ("1.20.1", "forge", "forge-1.20.1"),
+        ("1.20.1", "fabric", None),
+        ("1.21.1", "neoforge", None),
+        ("1.12.2", "forge", None),
+    ]
+    for i, (version, loader, esperado) in enumerate(casos):
+        juego = fabrica.prism(tmp_path / str(i), version, loader)
+        with Instancia(juego) as inst:
+            assert mod_apoyo.destino_de(inst) == esperado
+
+
+def test_instalar_reemplaza_versiones_y_respeta_otros_mods(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1", "forge")
+    (juego / "mods" / "otro-mod.jar").write_bytes(b"otro")
+    (juego / "mods" / "modpackes_runtime-forge-1.20.1-0.0.9.jar").write_bytes(b"viejo")
+    carpeta = _jars(tmp_path, "modpackes_runtime-forge-1.20.1-0.1.0.jar", "modpackes_runtime-forge-1.20.1-0.0.9.jar")
+    with Instancia(juego) as inst:
+        final = mod_apoyo.instalar(inst, carpeta)
+        assert final.name == "modpackes_runtime-forge-1.20.1-0.1.0.jar" and final.read_bytes().startswith(b"PK-")
+        assert [p.name for p in mod_apoyo.instalados(inst)] == [final.name]  # la versión vieja ya no está
+        assert (juego / "mods" / "otro-mod.jar").read_bytes() == b"otro"
+        assert mod_apoyo.quitar(inst) == [final] and mod_apoyo.quitar(inst) == []
+    assert (juego / "mods" / "otro-mod.jar").is_file()  # nunca toca otro mod
+
+
+def test_instalar_con_errores_claros(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path / "a", "1.20.1", "fabric")
+    with Instancia(juego) as inst, pytest.raises(ValueError, match="Todavía no hay mod de apoyo"):
+        mod_apoyo.instalar(inst, tmp_path)
+    juego2 = fabrica.prism(tmp_path / "b", "1.20.1", "forge")
+    with Instancia(juego2) as inst, pytest.raises(ValueError, match="no trae el mod de apoyo"):
+        mod_apoyo.instalar(inst, tmp_path / "no_hay")
+
+
+def test_cli_instalar_runtime_sin_soporte(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    juego = fabrica.prism(tmp_path, "1.21.1", "neoforge")
+    assert main(["instalar-runtime", str(juego.parent)]) != 0
+    assert "Todavía no hay mod de apoyo" in capsys.readouterr().out  # los errores van por la salida normal
+    assert main(["instalar-runtime", str(juego.parent), "--quitar"]) == 0
+    assert "No había mod de apoyo" in capsys.readouterr().out

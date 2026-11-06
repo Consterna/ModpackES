@@ -196,3 +196,12 @@ def test_sin_nada_que_escribir_no_crea_pack(tmp_path: Path, memoria: Memoria, mo
     with Instancia(juego) as inst:
         traducir_modulo(Mods(Contexto(inst, Respaldo(juego))), Traductor(Simulador(), memoria, Glosario()))
     assert not (juego / "resourcepacks" / "Traduccion_ES").exists()
+
+
+def test_metodos_de_texto_de_kubejs_por_version() -> None:
+    from traductor_es.formatos.kubejs_api import llamadas_de_texto
+
+    assert {"tell", "setStatusMessage", "kick"} <= llamadas_de_texto((1, 12, 2))
+    assert "notify" not in llamadas_de_texto((1, 16, 5)) and "notify" in llamadas_de_texto((1, 19, 2))
+    assert "openChestGUI" not in llamadas_de_texto((1, 19, 2)) and "openChestGUI" in llamadas_de_texto((1, 20, 1))
+    assert "openChestGUI" in llamadas_de_texto((26, 1, 0)) and "openChestGUI" in llamadas_de_texto(None)

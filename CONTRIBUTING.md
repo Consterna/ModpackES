@@ -78,11 +78,30 @@ referencia también baja el puntaje, así que revisa los ejemplos que lista el s
 | `src/traductor_es/nucleo` | Marcadores de códigos, memoria y correcciones, glosario, variantes de español y el orquestador de traducción |
 | `src/traductor_es/formatos` | Lectura y escritura sin pérdidas: SNBT, JSON, NBT, `.lang`, JavaScript y markdown |
 | `src/traductor_es/fuentes` | Lanzadores, versión, loader, jars y prioridad de los resource packs |
-| `src/traductor_es/modulos` | Misiones, libros, scripts y mods: qué se traduce y dónde se escribe |
+| `src/traductor_es/modulos` | Misiones, libros, scripts, datos (funciones, logros, tips) y mods: qué se traduce y dónde se escribe; `cobertura.py` dice qué queda en inglés |
 | `src/traductor_es/motores` | Gemini, el motor compatible con OpenAI, las instrucciones comunes a todos, la fábrica de motores y el simulador para pruebas |
 | `src/traductor_es/salida` | Resource pack, `options.txt`, copias de seguridad y exportación |
 | `src/traductor_es/validacion` | Reglas de calidad, revisión automática, medición con el banco de referencia y el validador con los parsers del juego (Java) |
 | `src/traductor_es/ui` | La ventana y el editor de correcciones (PySide6) |
+
+## Agregar un formato de texto nuevo
+
+Los archivos de texto de datapacks y packs de recursos (funciones, logros, tips…) se reconocen por su ruta y su formato,
+no por el modpack. Para agregar uno, escribe un `Formato` en `src/traductor_es/modulos/datos.py` (qué ruta lo reconoce,
+cómo saca los textos y cómo los reescribe), cita su documentación en un comentario y agrega a `tests/` una prueba que
+traduzca un caso real recortado, otra con algo que **no** debe tocarse y la de ida y vuelta (restaurar devuelve los bytes
+originales). `uv run python scripts/descargar_corpus.py` baja partes de modpacks públicos de Modrinth a `.descargas/`
+(Git lo ignora); `uv run pytest -m corpus` los usa para comprobar que lo traducido sigue siendo válido.
+
+## El mod de apoyo (Java)
+
+`mod-runtime/forge-1.20.1/` es un mod de Forge solo de cliente que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Se compila con Gradle y ForgeGradle 6 y necesita un JDK 17:
+
+```
+uv run python scripts/construir_mod.py
+```
+
+Corre las pruebas de Java (JUnit) y deja el jar en `src/traductor_es/recursos/mods/` (Git lo ignora; el CI lo construye y `construir_exe.py` lo incluye). Un loader o versión nuevo es un proyecto nuevo en `mod-runtime/` y una entrada en `SOPORTADOS` de `salida/mod_apoyo.py`.
 
 ## Licencia de las contribuciones
 
