@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from .modulos.base import Contexto, Modulo, Resumen
 from .modulos.cobertura import Hallazgo, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
 from .motores import fabrica
-from .motores.base import Motor
+from .motores.base import ErrorFatal, Motor
 from .motores.compatible import Compatible
 from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
@@ -119,7 +120,7 @@ class Proceso:
         self.registro = registro
         self.grupos = [g for g in GRUPOS if g in grupos]
         self._memoria_propia = memoria is None
-        self.memoria = memoria or Memoria(configuracion.ruta_memoria())
+        self.memoria = memoria or self._abrir_memoria()
         self.glosario = Glosario()
         self.ctx = Contexto(
             self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
@@ -166,6 +167,17 @@ class Proceso:
         return [(g, m) for g, m in lista if m.detectar()]
 
     # ------------------------------------------------------------------ acciones
+    def _abrir_memoria(self) -> Memoria:
+        """La memoria de traducciones del usuario. Si el archivo está dañado, dice cuál es y no falla a medias."""
+        ruta = configuracion.ruta_memoria()
+        try:
+            return Memoria(ruta)
+        except sqlite3.Error as e:
+            self.instancia.cerrar()
+            raise ErrorFatal(
+                f"La memoria de traducciones está dañada ({e}). Muévela o bórrala y vuelve a intentarlo: {ruta}"
+            ) from e
+
     def que_queda(self, java: bool = False, progreso: Callable[[int, int], None] | None = None) -> list[Hallazgo]:
         """Lo que quedaría en inglés. Solo lee. `java`: también el texto escrito en el código de los mods (tarda)."""
         return revisar_cobertura(self.ctx, java, progreso or (lambda _a, _b: None))

@@ -481,3 +481,42 @@ def test_que_queda_en_ingles_solo_lee(qtbot: QtBot, tmp_path: Path) -> None:
     assert "This sentence looks like a message" in v.log.toPlainText()
     assert ruta.read_bytes() == antes and not (juego / "resourcepacks").exists()  # solo lee
     assert v.b_principal.isEnabled()  # el botón principal sigue disponible
+
+
+def test_sin_instancia_elegida_no_lanza_nada(qtbot: QtBot, tmp_path: Path) -> None:
+    v = Ventana(buscar_instancias=lambda: [], fabrica_motor=siempre(Simulador()))
+    qtbot.addWidget(v)
+    v.lanzar("analizar")
+    v.a_cobertura.trigger()
+    assert v._hilo is None and v.carpeta() is None  # pyright: ignore[reportPrivateUsage]
+
+
+def test_instancia_sin_version_detectable_se_recupera(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = tmp_path / "Pack" / "minecraft"
+    (juego / "mods").mkdir(parents=True)  # sin lanzador, sin log y sin mods con versión
+    v = _ventana(qtbot, juego)
+    v.b_principal.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Se detuvo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert v.b_principal.isEnabled() and "Traceback" not in v.log.toPlainText()
+
+
+def test_cobertura_sin_nada_que_decir(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.a": "Iron Plate"}))
+    v = _ventana(qtbot, juego)
+    v.a_cobertura.trigger()
+    qtbot.waitUntil(lambda: v._hilo is None and "No encontré" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+
+
+def test_soltar_rutas_que_no_son_carpetas(qtbot: QtBot, tmp_path: Path) -> None:
+    from PySide6.QtCore import QMimeData, QUrl
+
+    archivo = tmp_path / "x.txt"
+    archivo.write_text("x", encoding="utf-8")
+    datos = QMimeData()
+    datos.setUrls(
+        [QUrl.fromLocalFile(str(archivo)), QUrl.fromLocalFile(str(tmp_path / "no_existe")), QUrl("https://x.y/z")]
+    )
+    assert Ventana.carpetas_soltadas(datos) == []
+    datos.setUrls([QUrl.fromLocalFile(str(tmp_path))])
+    assert Ventana.carpetas_soltadas(datos) == [str(tmp_path)]
