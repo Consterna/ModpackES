@@ -111,7 +111,7 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
     casos = [
         ("1.20.1", "forge", "forge-1.20.1"),
         ("1.21.1", "neoforge", "neoforge-1.21.1"),
-        ("1.20.1", "fabric", None),
+        ("1.20.1", "fabric", "fabric-1.20.1"),
         ("1.21.1", "fabric", None),
         ("1.21.4", "neoforge", None),
         ("1.20.1", "neoforge", None),
@@ -138,7 +138,7 @@ def test_instalar_reemplaza_versiones_y_respeta_otros_mods(tmp_path: Path) -> No
 
 
 def test_instalar_con_errores_claros(tmp_path: Path) -> None:
-    juego = fabrica.prism(tmp_path / "a", "1.20.1", "fabric")
+    juego = fabrica.prism(tmp_path / "a", "1.21.1", "fabric")
     with Instancia(juego) as inst, pytest.raises(ValueError, match="Todavía no hay mod de apoyo"):
         mod_apoyo.instalar(inst, tmp_path)
     juego2 = fabrica.prism(tmp_path / "b", "1.20.1", "forge")

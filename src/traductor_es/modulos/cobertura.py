@@ -70,7 +70,10 @@ class Hallazgo:
 
 
 _TITULOS = {
-    "java": "Escrito en el código de los mods (un resource pack no lo alcanza; el mod de apoyo cubre Forge y NeoForge)",
+    "java": (
+        "Escrito en el código de los mods "
+        "(un resource pack no lo alcanza; el mod de apoyo cubre Forge, NeoForge y Fabric)"
+    ),
     "script": "Frases de scripts que parecen texto y no se tocaron (pueden ser lógica o un mensaje armado distinto)",
     "formato": "Carpetas con frases en inglés cuyo formato la app no conoce (no se tocó ningún archivo)",
 }

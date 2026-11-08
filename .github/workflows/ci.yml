@@ -58,7 +58,7 @@ jobs:
           java-version: "17"  # ForgeGradle 6 (Forge 1.20.1) pide Java 17
 
       # Con las dos versiones instaladas (17 aquí y 21 más arriba), el script elige la que pide cada mod
-      # (Forge 1.20.1: Java 17; NeoForge 1.21.1: Java 21) por las variables JAVA_HOME_17_X64 y JAVA_HOME_21_X64.
+      # (Forge 1.20.1: Java 17; NeoForge 1.21.1 y Fabric 1.20.1: Java 21) por las variables JAVA_HOME_17_X64 y JAVA_HOME_21_X64.
       - name: Compilar los mods de apoyo (ModpackES Runtime) con sus pruebas
         run: uv run python scripts/construir_mod.py
 

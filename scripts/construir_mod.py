@@ -1,11 +1,12 @@
 """Compila el mod de apoyo (ModpackES Runtime) y deja el jar donde la aplicación lo busca.
 
-Uso:  uv run python scripts/construir_mod.py [forge-1.20.1 | neoforge-1.21.1 | todos] [--sin-pruebas]
+Uso:  uv run python scripts/construir_mod.py [forge-1.20.1 | neoforge-1.21.1 | fabric-1.20.1 | todos] [--sin-pruebas]
 
-Sin nombre compila todos. Cada uno necesita su JDK (Forge 1.20.1: 17; NeoForge 1.21.1: 21), que se toma de JAVA_HOME
-o de `.herramientas/jdk-<versión>*` si existe, y acceso a internet la primera vez, para bajar Gradle, el loader y
-Minecraft. El resultado queda en `src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo
-construye el mismo comando (`.github/workflows/ci.yml`).
+Sin nombre compila todos. Cada uno necesita su JDK (Forge 1.20.1: 17; NeoForge 1.21.1 y Fabric 1.20.1: 21) y su
+Gradle, que se toman de JAVA_HOME (o JAVA_HOME_<versión>_X64) y de `.herramientas/` si existen, y acceso a
+internet la primera vez, para bajar el loader y Minecraft. El resultado queda en
+`src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo construye el mismo comando
+(`.github/workflows/ci.yml`).
 """
 
 from __future__ import annotations
@@ -19,8 +20,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "src" / "traductor_es" / "recursos" / "mods"
-#: proyecto → versión de Java que pide su compilación
-PROYECTOS = {"forge-1.20.1": 17, "neoforge-1.21.1": 21}
+#: proyecto → (versión de Java, versión de Gradle) que pide su compilación
+PROYECTOS = {"forge-1.20.1": (17, "8.8"), "neoforge-1.21.1": (21, "9.2.1"), "fabric-1.20.1": (21, "9.8.2")}
 
 
 def _herramientas() -> Path:
@@ -50,14 +51,15 @@ def _version_de_java(java: Path) -> str:
 
 def _gradle(proyecto: Path) -> list[str]:
     envoltorio = proyecto / ("gradlew.bat" if os.name == "nt" else "gradlew")
-    mayor = "8" if proyecto.name.startswith("forge") else "9"  # ForgeGradle 6 va con Gradle 8; NeoForge con Gradle 9
-    local = sorted(HERRAMIENTAS.glob(f"gradle-{mayor}*/bin/gradle" + (".bat" if os.name == "nt" else "")))
-    return [str(local[-1])] if local else [str(envoltorio)]  # el de .herramientas si está; si no, el del proyecto
+    local = (
+        HERRAMIENTAS / f"gradle-{PROYECTOS[proyecto.name][1]}" / "bin" / ("gradle.bat" if os.name == "nt" else "gradle")
+    )
+    return [str(local)] if local.is_file() else [str(envoltorio)]  # el de .herramientas si está; si no, el del proyecto
 
 
 def construir(nombre: str, sin_pruebas: bool) -> int:
     proyecto = RAIZ / "mod-runtime" / nombre
-    jdk = _jdk(PROYECTOS[nombre])
+    jdk = _jdk(PROYECTOS[nombre][0])
     entorno = {**os.environ, "JAVA_HOME": str(jdk), "PATH": str(jdk / "bin") + os.pathsep + os.environ["PATH"]}
     hosts = HERRAMIENTAS / "hosts-java.txt"
     if hosts.is_file():
@@ -72,7 +74,11 @@ def construir(nombre: str, sin_pruebas: bool) -> int:
     codigo = subprocess.run(orden, cwd=proyecto, env=entorno, check=False).returncode
     if codigo:
         return codigo
-    jars = sorted((proyecto / "build" / "libs").glob("modpackes_runtime-*.jar"))
+    jars = sorted(
+        j
+        for j in (proyecto / "build" / "libs").glob("modpackes_runtime-*.jar")
+        if not j.stem.endswith(("-sources", "-dev"))
+    )
     if not jars:
         print(f"{nombre}: la compilación terminó pero no hay jar en build/libs.", file=sys.stderr)
         return 1

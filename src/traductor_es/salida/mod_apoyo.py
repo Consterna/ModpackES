@@ -18,6 +18,7 @@ PREFIJO = "modpackes_runtime-"
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("forge", (1, 20, 1)): "forge-1.20.1",
     ("neoforge", (1, 21, 1)): "neoforge-1.21.1",
+    ("fabric", (1, 20, 1)): "fabric-1.20.1",
 }
 _NOMBRE = re.compile(rf"{re.escape(PREFIJO)}(?P<destino>[a-z]+-[\d.]+)-(?P<version>[\w.+-]+)\.jar")
 

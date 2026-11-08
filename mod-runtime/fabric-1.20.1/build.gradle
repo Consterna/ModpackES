@@ -1,0 +1,54 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+}
+
+base {
+	archivesName = "modpackes_runtime-fabric-${project.minecraft_version}"
+}
+
+version = project.mod_version
+group = project.mod_group_id
+
+repositories {
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+processResources {
+	def propiedades = [
+		version    : project.mod_version,
+		mod_id     : project.mod_id,
+		mod_name   : project.mod_name,
+		mod_license: project.mod_license,
+		mod_authors: project.mod_authors,
+		mod_description: project.mod_description,
+		minecraft_version: project.minecraft_version,
+		loader_version: project.loader_version,
+	]
+	inputs.properties propiedades
+	filesMatching("fabric.mod.json") {
+		expand propiedades
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 17 // Minecraft 1.20.1 funciona con Java 17
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.named('test', Test).configure {
+	useJUnitPlatform()
+}
