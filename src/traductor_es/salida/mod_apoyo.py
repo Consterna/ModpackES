@@ -20,9 +20,22 @@ SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("forge", (1, 20, 1)): "forge-1.20.1",
     ("neoforge", (1, 21, 1)): "neoforge-1.21.1",
     ("fabric", (1, 19, 4)): "fabric-1.19.4",
+    # Un jar sirve para varias versiones cuando el mismo código compila y pasa las pruebas contra cada una de ellas
+    ("fabric", (1, 20, 0)): "fabric-1.20.1",
     ("fabric", (1, 20, 1)): "fabric-1.20.1",
+    ("fabric", (1, 20, 2)): "fabric-1.20.1",
+    ("fabric", (1, 21, 0)): "fabric-1.21.1",
     ("fabric", (1, 21, 1)): "fabric-1.21.1",
+    ("fabric", (1, 21, 2)): "fabric-1.21.4",
+    ("fabric", (1, 21, 3)): "fabric-1.21.4",
     ("fabric", (1, 21, 4)): "fabric-1.21.4",
+    ("fabric", (1, 21, 5)): "fabric-1.21.5",
+    ("fabric", (1, 21, 6)): "fabric-1.21.5",
+    ("fabric", (1, 21, 7)): "fabric-1.21.5",
+    ("fabric", (1, 21, 8)): "fabric-1.21.5",
+    ("fabric", (1, 21, 9)): "fabric-1.21.5",
+    ("fabric", (1, 21, 10)): "fabric-1.21.5",
+    ("fabric", (1, 21, 11)): "fabric-1.21.11",
 }
 #: Combinaciones que no tendrán mod de apoyo y por qué (para decírselo al jugador en vez de «todavía no»).
 IMPOSIBLES: dict[tuple[str, tuple[int, ...]], str] = {

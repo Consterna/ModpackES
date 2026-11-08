@@ -31,6 +31,7 @@ processResources {
 		mod_authors: project.mod_authors,
 		mod_description: project.mod_description,
 		minecraft_version: project.minecraft_version,
+		minecraft_range: project.findProperty('minecraft_range') ?: project.minecraft_version,
 		loader_version: project.loader_version,
 	]
 	inputs.properties propiedades

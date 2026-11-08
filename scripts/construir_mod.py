@@ -29,6 +29,8 @@ PROYECTOS = {
     "fabric-1.20.1": (21, "9.8.2"),
     "fabric-1.21.1": (21, "9.8.2"),
     "fabric-1.21.4": (21, "9.8.2"),
+    "fabric-1.21.5": (21, "9.8.2"),
+    "fabric-1.21.11": (21, "9.8.2"),
 }
 
 
@@ -65,7 +67,7 @@ def _gradle(proyecto: Path) -> list[str]:
     return [str(local)] if local.is_file() else [str(envoltorio)]  # el de .herramientas si está; si no, el del proyecto
 
 
-def construir(nombre: str, sin_pruebas: bool) -> int:
+def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = None) -> int:
     proyecto = RAIZ / "mod-runtime" / nombre
     jdk = _jdk(PROYECTOS[nombre][0])
     entorno = {**os.environ, "JAVA_HOME": str(jdk), "PATH": str(jdk / "bin") + os.pathsep + os.environ["PATH"]}
@@ -76,11 +78,14 @@ def construir(nombre: str, sin_pruebas: bool) -> int:
         entorno["JAVA_TOOL_OPTIONS"] = f"{entorno.get('JAVA_TOOL_OPTIONS', '')} -Djdk.net.hosts.file={hosts}".strip()
     if HERRAMIENTAS.is_dir():  # la caché de Gradle y del loader queda junto al proyecto y no en la carpeta del usuario
         entorno.setdefault("GRADLE_USER_HOME", str(HERRAMIENTAS / "gradle-home"))
-    orden = [*_gradle(proyecto), "build", "--no-daemon", "--console=plain"]
+    # Con propiedades (`-P`) solo se comprueba que el mismo código compila y pasa sus pruebas con otra versión
+    # de Minecraft: no se toca ningún jar.
+    orden = [*_gradle(proyecto), "test" if propiedades else "build", "--no-daemon", "--console=plain"]
+    orden += [f"-P{p}" for p in propiedades or []]
     if sin_pruebas:
         orden += ["-x", "test"]
     codigo = subprocess.run(orden, cwd=proyecto, env=entorno, check=False).returncode
-    if codigo:
+    if codigo or propiedades:
         return codigo
     jars = sorted(
         j
@@ -103,10 +108,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("proyecto", nargs="?", default="todos", choices=[*PROYECTOS, "todos"])
     ap.add_argument("--sin-pruebas", action="store_true", help="compila sin correr las pruebas de Java")
+    ap.add_argument(
+        "--propiedad", action="append", metavar="CLAVE=VALOR", default=[],
+        help="prueba el mismo código con otra versión (p. ej. minecraft_version=1.21.8); no genera jar",
+    )  # fmt: skip
     args = ap.parse_args()
     elegidos = list(PROYECTOS) if args.proyecto == "todos" else [args.proyecto]
     for nombre in elegidos:
-        if (codigo := construir(nombre, args.sin_pruebas)) != 0:
+        if (codigo := construir(nombre, args.sin_pruebas, args.propiedad)) != 0:
             return codigo
     return 0
 
