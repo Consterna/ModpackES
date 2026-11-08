@@ -1,11 +1,11 @@
 """Compila el mod de apoyo (ModpackES Runtime) y deja el jar donde la aplicación lo busca.
 
-Uso:  uv run python scripts/construir_mod.py [--sin-pruebas]
+Uso:  uv run python scripts/construir_mod.py [forge-1.20.1 | neoforge-1.21.1 | todos] [--sin-pruebas]
 
-Necesita un JDK 17 (la variable JAVA_HOME, o la carpeta `.herramientas/jdk-17*` si existe) y acceso a internet la
-primera vez, para bajar Gradle, Forge y Minecraft. El resultado queda en `src/traductor_es/recursos/mods/`, que Git
-ignora.
-En GitHub Actions el jar lo construye el mismo comando (`.github/workflows/release.yml`).
+Sin nombre compila todos. Cada uno necesita su JDK (Forge 1.20.1: 17; NeoForge 1.21.1: 21), que se toma de JAVA_HOME
+o de `.herramientas/jdk-<versión>*` si existe, y acceso a internet la primera vez, para bajar Gradle, el loader y
+Minecraft. El resultado queda en `src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo
+construye el mismo comando (`.github/workflows/ci.yml`).
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-PROYECTO = RAIZ / "mod-runtime" / "forge-1.20.1"
 DESTINO = RAIZ / "src" / "traductor_es" / "recursos" / "mods"
+#: proyecto → versión de Java que pide su compilación
+PROYECTOS = {"forge-1.20.1": 17, "neoforge-1.21.1": 21}
 
 
 def _herramientas() -> Path:
@@ -33,45 +34,66 @@ def _herramientas() -> Path:
 HERRAMIENTAS = _herramientas()
 
 
-def _jdk17() -> Path:
-    candidatos = [Path(os.environ["JAVA_HOME"])] if os.environ.get("JAVA_HOME") else []
-    candidatos += sorted(HERRAMIENTAS.glob("jdk-17*"))
+def _jdk(version: int) -> Path:
+    ejecutable = "java.exe" if os.name == "nt" else "java"
+    candidatos = [Path(os.environ[v]) for v in ("JAVA_HOME", f"JAVA_HOME_{version}_X64") if os.environ.get(v)]
+    candidatos += sorted(HERRAMIENTAS.glob(f"jdk-{version}*"))
     for c in candidatos:
-        if (c / "bin" / ("java.exe" if os.name == "nt" else "java")).is_file():
+        if (c / "bin" / ejecutable).is_file() and f'"{version}.' in _version_de_java(c / "bin" / ejecutable):
             return c
-    raise SystemExit("No encuentro un JDK 17: define JAVA_HOME o ponlo en .herramientas/jdk-17*.")
+    raise SystemExit(f"No encuentro un JDK {version}: define JAVA_HOME o ponlo en .herramientas/jdk-{version}*.")
 
 
-def _gradle() -> list[str]:
-    envoltorio = PROYECTO / ("gradlew.bat" if os.name == "nt" else "gradlew")
-    local = sorted(HERRAMIENTAS.glob("gradle-*/bin/gradle" + (".bat" if os.name == "nt" else "")))
-    return [str(local[-1])] if local else [str(envoltorio)]
+def _version_de_java(java: Path) -> str:
+    return subprocess.run([str(java), "-version"], capture_output=True, text=True, check=False).stderr
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--sin-pruebas", action="store_true", help="compila sin correr las pruebas de Java")
-    args = ap.parse_args()
-    jdk = _jdk17()
+def _gradle(proyecto: Path) -> list[str]:
+    envoltorio = proyecto / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    mayor = "8" if proyecto.name.startswith("forge") else "9"  # ForgeGradle 6 va con Gradle 8; NeoForge con Gradle 9
+    local = sorted(HERRAMIENTAS.glob(f"gradle-{mayor}*/bin/gradle" + (".bat" if os.name == "nt" else "")))
+    return [str(local[-1])] if local else [str(envoltorio)]  # el de .herramientas si está; si no, el del proyecto
+
+
+def construir(nombre: str, sin_pruebas: bool) -> int:
+    proyecto = RAIZ / "mod-runtime" / nombre
+    jdk = _jdk(PROYECTOS[nombre])
     entorno = {**os.environ, "JAVA_HOME": str(jdk), "PATH": str(jdk / "bin") + os.pathsep + os.environ["PATH"]}
-    if HERRAMIENTAS.is_dir():  # la caché de Gradle y de Forge queda junto al proyecto y no en la carpeta del usuario
+    hosts = HERRAMIENTAS / "hosts-java.txt"
+    if hosts.is_file():
+        # Solo para Java y solo en esta compilación: ayuda si el DNS del equipo falla con algunos servidores. Va en
+        # JAVA_TOOL_OPTIONS porque así llega a todos los Java que se lanzan (cliente de Gradle, su proceso y ayudantes).
+        entorno["JAVA_TOOL_OPTIONS"] = f"{entorno.get('JAVA_TOOL_OPTIONS', '')} -Djdk.net.hosts.file={hosts}".strip()
+    if HERRAMIENTAS.is_dir():  # la caché de Gradle y del loader queda junto al proyecto y no en la carpeta del usuario
         entorno.setdefault("GRADLE_USER_HOME", str(HERRAMIENTAS / "gradle-home"))
-    orden = [*_gradle(), "build", "--no-daemon", "--console=plain"]
-    if args.sin_pruebas:
+    orden = [*_gradle(proyecto), "build", "--no-daemon", "--console=plain"]
+    if sin_pruebas:
         orden += ["-x", "test"]
-    codigo = subprocess.run(orden, cwd=PROYECTO, env=entorno, check=False).returncode
+    codigo = subprocess.run(orden, cwd=proyecto, env=entorno, check=False).returncode
     if codigo:
         return codigo
-    jars = sorted((PROYECTO / "build" / "libs").glob("modpackes_runtime-*.jar"))
+    jars = sorted((proyecto / "build" / "libs").glob("modpackes_runtime-*.jar"))
     if not jars:
-        print("La compilación terminó pero no hay jar en build/libs.", file=sys.stderr)
+        print(f"{nombre}: la compilación terminó pero no hay jar en build/libs.", file=sys.stderr)
         return 1
     DESTINO.mkdir(parents=True, exist_ok=True)
-    for viejo in DESTINO.glob("modpackes_runtime-*.jar"):
+    for viejo in DESTINO.glob(f"modpackes_runtime-{nombre}-*.jar"):
         viejo.unlink()
     final = DESTINO / jars[-1].name
     shutil.copyfile(jars[-1], final)
     print(f"Mod de apoyo listo: {final}")
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("proyecto", nargs="?", default="todos", choices=[*PROYECTOS, "todos"])
+    ap.add_argument("--sin-pruebas", action="store_true", help="compila sin correr las pruebas de Java")
+    args = ap.parse_args()
+    elegidos = list(PROYECTOS) if args.proyecto == "todos" else [args.proyecto]
+    for nombre in elegidos:
+        if (codigo := construir(nombre, args.sin_pruebas)) != 0:
+            return codigo
     return 0
 
 

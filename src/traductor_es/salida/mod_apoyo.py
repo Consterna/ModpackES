@@ -15,7 +15,10 @@ from ..fuentes.instancia import Instancia
 
 PREFIJO = "modpackes_runtime-"
 #: (loader, versión de Minecraft) para los que hay mod de apoyo. Cada entrada es un proyecto en `mod-runtime/`.
-SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {("forge", (1, 20, 1)): "forge-1.20.1"}
+SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
+    ("forge", (1, 20, 1)): "forge-1.20.1",
+    ("neoforge", (1, 21, 1)): "neoforge-1.21.1",
+}
 _NOMBRE = re.compile(rf"{re.escape(PREFIJO)}(?P<destino>[a-z]+-[\d.]+)-(?P<version>[\w.+-]+)\.jar")
 
 

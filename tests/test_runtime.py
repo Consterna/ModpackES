@@ -110,8 +110,11 @@ def _jars(tmp_path: Path, *nombres: str) -> Path:
 def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
     casos = [
         ("1.20.1", "forge", "forge-1.20.1"),
+        ("1.21.1", "neoforge", "neoforge-1.21.1"),
         ("1.20.1", "fabric", None),
-        ("1.21.1", "neoforge", None),
+        ("1.21.1", "fabric", None),
+        ("1.21.4", "neoforge", None),
+        ("1.20.1", "neoforge", None),
         ("1.12.2", "forge", None),
     ]
     for i, (version, loader, esperado) in enumerate(casos):
@@ -144,7 +147,7 @@ def test_instalar_con_errores_claros(tmp_path: Path) -> None:
 
 
 def test_cli_instalar_runtime_sin_soporte(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    juego = fabrica.prism(tmp_path, "1.21.1", "neoforge")
+    juego = fabrica.prism(tmp_path, "1.21.4", "neoforge")
     assert main(["instalar-runtime", str(juego.parent)]) != 0
     assert "Todavía no hay mod de apoyo" in capsys.readouterr().out  # los errores van por la salida normal
     assert main(["instalar-runtime", str(juego.parent), "--quitar"]) == 0
@@ -183,7 +186,7 @@ def test_plantillas_con_datos_variables_y_orden(tmp_path: Path, memoria: Memoria
 
 
 def test_estado_del_mod_de_apoyo(tmp_path: Path) -> None:
-    sin_soporte = fabrica.prism(tmp_path / "a", "1.21.1", "neoforge")
+    sin_soporte = fabrica.prism(tmp_path / "a", "1.21.4", "neoforge")
     with Instancia(sin_soporte) as inst:
         assert "No hay mod de apoyo" in mod_apoyo.estado(inst)[0]
     juego = fabrica.prism(tmp_path / "b", "1.20.1", "forge")

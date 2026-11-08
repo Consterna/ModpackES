@@ -95,10 +95,10 @@ originales). `uv run python scripts/descargar_corpus.py` baja partes de modpacks
 
 ## El mod de apoyo (Java)
 
-`mod-runtime/forge-1.20.1/` es un mod de Forge solo de cliente que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Se compila con Gradle y ForgeGradle 6 y necesita un JDK 17:
+`mod-runtime/forge-1.20.1/` y `mod-runtime/neoforge-1.21.1/` son mods solo de cliente (con la misma lógica de tabla y plantillas) que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Forge 1.20.1 se compila con ForgeGradle 6 y Java 17; NeoForge 1.21.1, con ModDevGradle, Gradle 9 y Java 21:
 
 ```
-uv run python scripts/construir_mod.py
+uv run python scripts/construir_mod.py [forge-1.20.1 | neoforge-1.21.1]
 ```
 
 Corre las pruebas de Java (JUnit) y deja el jar en `src/traductor_es/recursos/mods/` (Git lo ignora; el CI lo construye y `construir_exe.py` lo incluye). Un loader o versión nuevo es un proyecto nuevo en `mod-runtime/` y una entrada en `SOPORTADOS` de `salida/mod_apoyo.py`.
