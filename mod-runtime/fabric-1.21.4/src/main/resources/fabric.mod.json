@@ -1,0 +1,22 @@
+{
+	"schemaVersion": 1,
+	"id": "${mod_id}",
+	"version": "${version}",
+	"name": "${mod_name}",
+	"description": "${mod_description}",
+	"authors": ["${mod_authors}"],
+	"contact": {
+		"sources": "https://github.com/Consterna/ModpackES"
+	},
+	"license": "${mod_license}",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["io.github.consterna.modpackes.ModpackESRuntime"]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.9",
+		"minecraft": "${minecraft_version}",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

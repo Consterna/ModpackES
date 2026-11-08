@@ -9,7 +9,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 ### Agregado
 
 - **Texto escrito en el código de los mods** (opcional, apagado por defecto): la app traduce las frases que encuentra en el código Java de los
-  mods y las guarda en una tabla del resource pack; el nuevo mod de apoyo **ModpackES Runtime** (solo cliente, para Forge 1.20.1, NeoForge 1.21.1 y Fabric 1.20.1) las muestra en
+  mods y las guarda en una tabla del resource pack; el nuevo mod de apoyo **ModpackES Runtime** (solo cliente, para Forge 1.19.2 y 1.20.1, NeoForge 1.21.1 y Fabric 1.19.4, 1.20.1, 1.21.1 y 1.21.4) las muestra en
   español en el chat, la barra de acción, los tooltips y el texto de los botones de una pantalla al abrirla (en Forge y NeoForge también los tooltips que no son de objetos). No cambia el texto que una pantalla dibuja directamente. Solo cambia textos idénticos a los de la tabla. «Más ▸ Instalar el mod de apoyo» y
   «Quitar el mod de apoyo», `modpackes instalar-runtime` y `--java` en `analizar` y `traducir`. El CI compila el mod con sus pruebas.
 

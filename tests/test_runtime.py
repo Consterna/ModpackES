@@ -109,13 +109,18 @@ def _jars(tmp_path: Path, *nombres: str) -> Path:
 
 def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
     casos = [
+        ("1.19.2", "forge", "forge-1.19.2"),
         ("1.20.1", "forge", "forge-1.20.1"),
         ("1.21.1", "neoforge", "neoforge-1.21.1"),
+        ("1.19.4", "fabric", "fabric-1.19.4"),
         ("1.20.1", "fabric", "fabric-1.20.1"),
-        ("1.21.1", "fabric", None),
+        ("1.21.1", "fabric", "fabric-1.21.1"),
+        ("1.21.4", "fabric", "fabric-1.21.4"),
+        ("1.19.2", "fabric", None),  # Fabric API no tiene evento de chat en esa versión
         ("1.21.4", "neoforge", None),
         ("1.20.1", "neoforge", None),
         ("1.12.2", "forge", None),
+        ("1.19.4", "forge", None),
     ]
     for i, (version, loader, esperado) in enumerate(casos):
         juego = fabrica.prism(tmp_path / str(i), version, loader)
@@ -138,8 +143,11 @@ def test_instalar_reemplaza_versiones_y_respeta_otros_mods(tmp_path: Path) -> No
 
 
 def test_instalar_con_errores_claros(tmp_path: Path) -> None:
-    juego = fabrica.prism(tmp_path / "a", "1.21.1", "fabric")
+    juego = fabrica.prism(tmp_path / "a", "1.18.2", "forge")
     with Instancia(juego) as inst, pytest.raises(ValueError, match="Todavía no hay mod de apoyo"):
+        mod_apoyo.instalar(inst, tmp_path)
+    imposible = fabrica.prism(tmp_path / "c", "1.19.2", "fabric")  # se dice por qué no, no solo «todavía»
+    with Instancia(imposible) as inst, pytest.raises(ValueError, match="no tiene un evento"):
         mod_apoyo.instalar(inst, tmp_path)
     juego2 = fabrica.prism(tmp_path / "b", "1.20.1", "forge")
     with Instancia(juego2) as inst, pytest.raises(ValueError, match="no trae el mod de apoyo"):
@@ -188,7 +196,7 @@ def test_plantillas_con_datos_variables_y_orden(tmp_path: Path, memoria: Memoria
 def test_estado_del_mod_de_apoyo(tmp_path: Path) -> None:
     sin_soporte = fabrica.prism(tmp_path / "a", "1.21.4", "neoforge")
     with Instancia(sin_soporte) as inst:
-        assert "No hay mod de apoyo" in mod_apoyo.estado(inst)[0]
+        assert "no hay mod de apoyo" in mod_apoyo.estado(inst)[0].lower()
     juego = fabrica.prism(tmp_path / "b", "1.20.1", "forge")
     carpeta = _jars(tmp_path, "modpackes_runtime-forge-1.20.1-0.1.0.jar")
     with Instancia(juego) as inst:

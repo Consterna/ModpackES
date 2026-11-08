@@ -95,13 +95,13 @@ originales). `uv run python scripts/descargar_corpus.py` baja partes de modpacks
 
 ## El mod de apoyo (Java)
 
-`mod-runtime/forge-1.20.1/`, `mod-runtime/neoforge-1.21.1/` y `mod-runtime/fabric-1.20.1/` son mods solo de cliente (con la misma lógica de tabla y plantillas) que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Forge 1.20.1 se compila con ForgeGradle 6 y Java 17; NeoForge 1.21.1, con ModDevGradle, Gradle 9 y Java 21; Fabric 1.20.1, con Loom 1.17, Gradle 9 y Java 21 (el mod queda compilado para Java 17):
+Cada carpeta de `mod-runtime/` (`forge-1.19.2`, `forge-1.20.1`, `neoforge-1.21.1`, `fabric-1.19.4`, `fabric-1.20.1`, `fabric-1.21.1`, `fabric-1.21.4`) es un mod solo de cliente. Todos comparten la lógica de tabla y plantillas, que vive en `mod-runtime/comun/` (la tabla es de todos; el reescritor tiene una variante por forma de guardar el texto: `reescritor-literal`, `reescritor-plano` para 1.20.3 en adelante y `reescritor-sin-reserva` para 1.19.2), y cada proyecto solo trae su gancho con el loader que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Forge 1.19.2 y 1.20.1 se compilan con ForgeGradle 6 y Java 17; NeoForge 1.21.1, con ModDevGradle, Gradle 9 y Java 21; Fabric, con Loom 1.17, Gradle 9 y Java 21 (los de 1.19.4 y 1.20.1 quedan compilados para Java 17, los de 1.21 para Java 21):
 
 ```
-uv run python scripts/construir_mod.py [forge-1.20.1 | neoforge-1.21.1 | fabric-1.20.1]
+uv run python scripts/construir_mod.py [forge-1.19.2 | forge-1.20.1 | neoforge-1.21.1 | fabric-1.19.4 | fabric-1.20.1 | fabric-1.21.1 | fabric-1.21.4]
 ```
 
-Corre las pruebas de Java (JUnit) y deja el jar en `src/traductor_es/recursos/mods/` (Git lo ignora; el CI lo construye y `construir_exe.py` lo incluye). Un loader o versión nuevo es un proyecto nuevo en `mod-runtime/` y una entrada en `SOPORTADOS` de `salida/mod_apoyo.py`.
+Corre las pruebas de Java (JUnit) y deja el jar en `src/traductor_es/recursos/mods/` (Git lo ignora; el CI lo construye y `construir_exe.py` lo incluye). Un loader o versión nuevo es un proyecto nuevo en `mod-runtime/` (copia el más cercano y lee el código real de esa versión: los nombres de las clases y los eventos cambian), una entrada en `PROYECTOS` de `scripts/construir_mod.py` y otra en `SOPORTADOS` de `salida/mod_apoyo.py`. Si una versión no puede tener mod, se anota en `IMPOSIBLES` con el motivo (Fabric 1.19.2 no tiene evento de chat del cliente).
 
 ## Licencia de las contribuciones
 

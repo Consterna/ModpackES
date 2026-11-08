@@ -31,7 +31,7 @@ import java.util.List;
  * <p>También cambia el texto de los botones de una pantalla al abrirla. Fabric API no tiene evento para los
  * tooltips que no son de objetos ni para el texto que una pantalla dibuja directamente: esos no se tocan.
  *
- * <p>El chat de otros jugadores no se toca: Fabric API 1.20.1 no permite modificarlo, y no hace falta.
+ * <p>El chat de otros jugadores no se toca: Fabric API no permite modificarlo, y no hace falta.
  */
 public final class ModpackESRuntime implements ClientModInitializer {
     public static final String ID = "modpackes_runtime";

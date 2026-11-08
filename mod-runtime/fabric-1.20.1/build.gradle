@@ -49,6 +49,14 @@ java {
 	targetCompatibility = JavaVersion.VERSION_17
 }
 
+// La lógica común vive en ../comun: la tabla es de todos y el reescritor depende de cómo guarda el texto esa versión
+sourceSets {
+	main.java.srcDir '../comun/tabla/src/main/java'
+	main.java.srcDir '../comun/reescritor-literal/src/main/java'
+	test.java.srcDir '../comun/tabla/src/test/java'
+	test.java.srcDir '../comun/reescritor-literal/src/test/java'
+}
+
 tasks.named('test', Test).configure {
 	useJUnitPlatform()
 }

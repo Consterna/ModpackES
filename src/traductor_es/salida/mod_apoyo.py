@@ -16,9 +16,20 @@ from ..fuentes.instancia import Instancia
 PREFIJO = "modpackes_runtime-"
 #: (loader, versión de Minecraft) para los que hay mod de apoyo. Cada entrada es un proyecto en `mod-runtime/`.
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
+    ("forge", (1, 19, 2)): "forge-1.19.2",
     ("forge", (1, 20, 1)): "forge-1.20.1",
     ("neoforge", (1, 21, 1)): "neoforge-1.21.1",
+    ("fabric", (1, 19, 4)): "fabric-1.19.4",
     ("fabric", (1, 20, 1)): "fabric-1.20.1",
+    ("fabric", (1, 21, 1)): "fabric-1.21.1",
+    ("fabric", (1, 21, 4)): "fabric-1.21.4",
+}
+#: Combinaciones que no tendrán mod de apoyo y por qué (para decírselo al jugador en vez de «todavía no»).
+IMPOSIBLES: dict[tuple[str, tuple[int, ...]], str] = {
+    ("fabric", (1, 19, 2)): (
+        "Fabric API 1.19.2 no tiene un evento para los mensajes que recibe el cliente, "
+        "y sin él el mod de apoyo no podría cambiar el chat. Con Fabric 1.19.4 en adelante sí."
+    ),
 }
 _NOMBRE = re.compile(rf"{re.escape(PREFIJO)}(?P<destino>[a-z]+-[\d.]+)-(?P<version>[\w.+-]+)\.jar")
 
@@ -30,6 +41,15 @@ def _carpeta_de_jars() -> Path:
 def destino_de(instancia: Instancia) -> str | None:
     """«forge-1.20.1» si hay mod de apoyo para esta instancia; None si no."""
     return SOPORTADOS.get((instancia.loader or "", instancia.version.partes))
+
+
+def _sin_mod(instancia: Instancia) -> str:
+    """Por qué no hay mod de apoyo para esta instancia, en una frase."""
+    razon = IMPOSIBLES.get((instancia.loader or "", instancia.version.partes))
+    if razon is not None:
+        return f"No hay mod de apoyo para Minecraft {instancia.version} con {instancia.loader}: {razon}"
+    loader = instancia.loader or "sin loader"
+    return f"Todavía no hay mod de apoyo para Minecraft {instancia.version} con {loader}."
 
 
 def jar_empaquetado(instancia: Instancia, carpeta: Path | None = None) -> Path | None:
@@ -52,11 +72,7 @@ def estado(instancia: Instancia, carpeta_jars: Path | None = None) -> list[str]:
     """Lo que hay que saber del mod de apoyo en esta instancia, en frases (no abre el juego)."""
     destino = destino_de(instancia)
     if destino is None:
-        loader = instancia.loader or "sin loader"
-        return [
-            f"No hay mod de apoyo para Minecraft {instancia.version} con {loader}: "
-            "el texto del código Java seguirá en inglés."
-        ]
+        return [f"{_sin_mod(instancia)} El texto del código Java seguirá en inglés."]
     lineas = [f"Hay mod de apoyo para esta instancia ({destino})."]
     lineas.append(
         "Esta copia de la aplicación lo trae."
@@ -82,11 +98,7 @@ def instalar(instancia: Instancia, carpeta_jars: Path | None = None) -> Path:
     """Copia el mod de apoyo a `mods/` y quita sus versiones anteriores. ValueError si no hay uno."""
     destino = destino_de(instancia)
     if destino is None:
-        loader = instancia.loader or "sin loader"
-        raise ValueError(
-            f"Todavía no hay mod de apoyo para Minecraft {instancia.version} con {loader}. "
-            "El texto escrito en el código de los mods seguirá en inglés."
-        )
+        raise ValueError(f"{_sin_mod(instancia)} El texto escrito en el código de los mods seguirá en inglés.")
     origen = jar_empaquetado(instancia, carpeta_jars)
     if origen is None:
         raise ValueError(

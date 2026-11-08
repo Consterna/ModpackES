@@ -1,8 +1,8 @@
 """Compila el mod de apoyo (ModpackES Runtime) y deja el jar donde la aplicación lo busca.
 
-Uso:  uv run python scripts/construir_mod.py [forge-1.20.1 | neoforge-1.21.1 | fabric-1.20.1 | todos] [--sin-pruebas]
+Uso:  uv run python scripts/construir_mod.py [<proyecto de mod-runtime/> | todos] [--sin-pruebas]
 
-Sin nombre compila todos. Cada uno necesita su JDK (Forge 1.20.1: 17; NeoForge 1.21.1 y Fabric 1.20.1: 21) y su
+Sin nombre compila todos. Cada uno necesita su JDK (Forge: 17; NeoForge y Fabric: 21) y su
 Gradle, que se toman de JAVA_HOME (o JAVA_HOME_<versión>_X64) y de `.herramientas/` si existen, y acceso a
 internet la primera vez, para bajar el loader y Minecraft. El resultado queda en
 `src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo construye el mismo comando
@@ -21,7 +21,15 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "src" / "traductor_es" / "recursos" / "mods"
 #: proyecto → (versión de Java, versión de Gradle) que pide su compilación
-PROYECTOS = {"forge-1.20.1": (17, "8.8"), "neoforge-1.21.1": (21, "9.2.1"), "fabric-1.20.1": (21, "9.8.2")}
+PROYECTOS = {
+    "forge-1.19.2": (17, "8.8"),
+    "forge-1.20.1": (17, "8.8"),
+    "neoforge-1.21.1": (21, "9.2.1"),
+    "fabric-1.19.4": (21, "9.8.2"),
+    "fabric-1.20.1": (21, "9.8.2"),
+    "fabric-1.21.1": (21, "9.8.2"),
+    "fabric-1.21.4": (21, "9.8.2"),
+}
 
 
 def _herramientas() -> Path:
