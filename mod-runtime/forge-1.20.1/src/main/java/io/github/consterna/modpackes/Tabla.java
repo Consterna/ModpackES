@@ -7,20 +7,58 @@ import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Tabla de textos «inglés exacto → español» que genera ModpackES. Solo hay coincidencia si el texto es idéntico
- * (salvo los espacios de los bordes, que se conservan): no hay traducción aproximada ni en vivo.
+ * Tabla de textos «inglés → español» que genera ModpackES. Hay dos clases de entrada:
+ * <ul>
+ *   <li><b>Exactas</b>: solo coinciden si el texto es idéntico (salvo los espacios de los bordes, que se conservan).</li>
+ *   <li><b>Plantillas</b>: la clave lleva {@code %s} o {@code %d} (como el {@code String.format} del mod original) y coinciden
+ *       con cualquier texto que sea ese mismo molde con otros datos: «Hello %s!» coincide con «Hello Steve!». El español
+ *       reutiliza lo capturado; puede llevar {@code %1$s}, {@code %2$s} para cambiar el orden.</li>
+ * </ul>
+ * No hay traducción aproximada ni en vivo.
  */
 public final class Tabla {
     public static final Tabla VACIA = new Tabla(Map.of());
 
-    private final Map<String, String> textos;
+    private static final Pattern MARCADOR = Pattern.compile("%(?:(\\d+)\\$)?([sd%])");
+    private static final int MINIMO_FIJO = 4; // una plantilla con casi nada de texto fijo coincidiría con cualquier cosa
+    private static final int TAMANO_CACHE = 512;
+    private static final String SIN_COINCIDENCIA = "\u0000";
+
+    private final Map<String, String> exactos;
+    private final List<Plantilla> plantillas;
+    private final Map<String, String> cache = new LinkedHashMap<>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > TAMANO_CACHE;
+        }
+    };
 
     public Tabla(Map<String, String> textos) {
-        this.textos = Map.copyOf(textos);
+        Map<String, String> exactos = new HashMap<>();
+        List<Plantilla> plantillas = new ArrayList<>();
+        for (Map.Entry<String, String> e : textos.entrySet()) {
+            if (esPlantilla(e.getKey())) {
+                Plantilla p = Plantilla.crear(e.getKey(), e.getValue());
+                if (p != null) {
+                    plantillas.add(p);
+                }
+            } else {
+                exactos.put(e.getKey(), e.getValue());
+            }
+        }
+        plantillas.sort(Comparator.comparingInt((Plantilla p) -> p.fijo.length()).reversed()); // la más específica primero
+        this.exactos = Map.copyOf(exactos);
+        this.plantillas = List.copyOf(plantillas);
     }
 
     /** Lee un objeto JSON {"inglés": "español"}. Lo que no sea texto se ignora. */
@@ -47,28 +85,40 @@ public final class Tabla {
 
     /** Une dos tablas; si un texto está en las dos, manda la de {@code otra}. */
     public Tabla combinar(Tabla otra) {
-        if (otra.textos.isEmpty()) {
+        if (otra.vacia()) {
             return this;
         }
-        Map<String, String> mapa = new HashMap<>(textos);
-        mapa.putAll(otra.textos);
+        Map<String, String> mapa = new HashMap<>(this.comoMapa());
+        mapa.putAll(otra.comoMapa());
         return new Tabla(mapa);
     }
 
+    private Map<String, String> comoMapa() {
+        Map<String, String> mapa = new HashMap<>(exactos);
+        for (Plantilla p : plantillas) {
+            mapa.put(p.clave, p.valor);
+        }
+        return mapa;
+    }
+
     public boolean vacia() {
-        return textos.isEmpty();
+        return exactos.isEmpty() && plantillas.isEmpty();
     }
 
     public int tamano() {
-        return textos.size();
+        return exactos.size() + plantillas.size();
+    }
+
+    public int plantillas() {
+        return plantillas.size();
     }
 
     /** La traducción de {@code texto}, o {@code null} si no está en la tabla o no cambia nada. */
     public String traducir(String texto) {
-        if (texto == null || texto.isEmpty() || textos.isEmpty()) {
+        if (texto == null || texto.isEmpty() || vacia()) {
             return null;
         }
-        String directo = textos.get(texto);
+        String directo = buscar(texto);
         if (directo != null) {
             return directo.equals(texto) ? null : directo;
         }
@@ -76,12 +126,161 @@ public final class Tabla {
         if (nucleo.isEmpty() || nucleo.length() == texto.length()) {
             return null;
         }
-        String traduccion = textos.get(nucleo);
+        String traduccion = buscar(nucleo);
         if (traduccion == null || traduccion.equals(nucleo)) {
             return null;
         }
         int inicio = texto.length() - texto.stripLeading().length();
         int fin = texto.length() - texto.stripTrailing().length();
         return texto.substring(0, inicio) + traduccion + texto.substring(texto.length() - fin);
+    }
+
+    private String buscar(String texto) {
+        String exacto = exactos.get(texto);
+        if (exacto != null) {
+            return exacto;
+        }
+        if (plantillas.isEmpty()) {
+            return null;
+        }
+        synchronized (cache) { // los tooltips piden el mismo texto cada cuadro: se recuerda el resultado
+            String guardado = cache.get(texto);
+            if (guardado != null) {
+                return guardado.equals(SIN_COINCIDENCIA) ? null : guardado;
+            }
+            String resultado = null;
+            for (Plantilla p : plantillas) {
+                resultado = p.aplicar(texto);
+                if (resultado != null) {
+                    break;
+                }
+            }
+            cache.put(texto, resultado == null ? SIN_COINCIDENCIA : resultado);
+            return resultado;
+        }
+    }
+
+    private static boolean esPlantilla(String clave) {
+        Matcher m = MARCADOR.matcher(clave);
+        while (m.find()) {
+            if (!m.group(2).equals("%")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Un molde con datos variables: «Hello %s!» → «¡Hola %s!». */
+    private static final class Plantilla {
+        final String clave;
+        final String valor;
+        final String fijo; // el texto de la clave sin los marcadores
+        final String prefijo; // lo que va antes del primer marcador: descarta rápido lo que no coincide
+        final Pattern patron;
+        final List<Object> destino; // trozos de texto y números de grupo (Integer, desde 1)
+
+        private Plantilla(String clave, String valor, String fijo, String prefijo, Pattern patron, List<Object> destino) {
+            this.clave = clave;
+            this.valor = valor;
+            this.fijo = fijo;
+            this.prefijo = prefijo;
+            this.patron = patron;
+            this.destino = destino;
+        }
+
+        /** {@code null} si la plantilla no es segura (poco texto fijo o marcadores que no cuadran). */
+        static Plantilla crear(String clave, String valor) {
+            StringBuilder regex = new StringBuilder("^");
+            StringBuilder fijo = new StringBuilder();
+            String prefijo = null;
+            int grupos = 0;
+            int ultimo = 0;
+            Matcher m = MARCADOR.matcher(clave);
+            while (m.find()) {
+                String tramo = clave.substring(ultimo, m.start());
+                fijo.append(tramo);
+                if (!tramo.isEmpty()) {
+                    regex.append(Pattern.quote(tramo));
+                }
+                if (m.group(2).equals("%")) {
+                    fijo.append('%');
+                    regex.append(Pattern.quote("%"));
+                } else {
+                    if (prefijo == null) {
+                        prefijo = clave.substring(0, m.start());
+                    }
+                    grupos++;
+                    regex.append(m.group(2).equals("d") ? "(-?\\d+)" : "(.+?)");
+                }
+                ultimo = m.end();
+            }
+            String cola = clave.substring(ultimo);
+            fijo.append(cola);
+            if (!cola.isEmpty()) {
+                regex.append(Pattern.quote(cola));
+            }
+            regex.append('$');
+            if (grupos == 0 || fijo.toString().strip().length() < MINIMO_FIJO) {
+                return null;
+            }
+            List<Object> destino = destino(valor, grupos);
+            if (destino == null) {
+                return null;
+            }
+            return new Plantilla(clave, valor, fijo.toString(), prefijo == null ? "" : prefijo,
+                    Pattern.compile(regex.toString(), Pattern.DOTALL), destino);
+        }
+
+        private static List<Object> destino(String valor, int grupos) {
+            List<Object> partes = new ArrayList<>();
+            Matcher m = MARCADOR.matcher(valor);
+            int ultimo = 0;
+            int siguiente = 1;
+            boolean[] usado = new boolean[grupos + 1];
+            while (m.find()) {
+                if (m.start() > ultimo) {
+                    partes.add(valor.substring(ultimo, m.start()));
+                }
+                if (m.group(2).equals("%")) {
+                    partes.add("%");
+                } else {
+                    int indice = m.group(1) != null ? Integer.parseInt(m.group(1)) : siguiente++;
+                    if (indice < 1 || indice > grupos) {
+                        return null;
+                    }
+                    usado[indice] = true;
+                    partes.add(indice);
+                }
+                ultimo = m.end();
+            }
+            if (ultimo < valor.length()) {
+                partes.add(valor.substring(ultimo));
+            }
+            for (int i = 1; i <= grupos; i++) {
+                if (!usado[i]) {
+                    return null; // la traducción perdió un dato: mejor no usarla
+                }
+            }
+            return partes;
+        }
+
+        String aplicar(String texto) {
+            if (!prefijo.isEmpty() && !texto.startsWith(prefijo)) {
+                return null;
+            }
+            Matcher m = patron.matcher(texto);
+            if (!m.matches()) {
+                return null;
+            }
+            StringBuilder salida = new StringBuilder();
+            for (Object parte : destino) {
+                if (parte instanceof Integer indice) {
+                    salida.append(m.group(indice));
+                } else {
+                    salida.append((String) parte);
+                }
+            }
+            return salida.toString();
+        }
     }
 }

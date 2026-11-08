@@ -11,6 +11,7 @@ from typing import Any, cast
 from . import NOMBRE, __version__, configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.lanzadores import buscar
+from .modulos.cobertura import informe_en_json
 from .motores import fabrica
 from .motores.base import Cancelado, ErrorFatal, Motor
 from .motores.gemini import MODELO_POR_DEFECTO
@@ -100,6 +101,7 @@ def _argumentos() -> argparse.ArgumentParser:
     cob = sub.add_parser("cobertura", help="dice qué texto queda en inglés y por qué (solo lee, no escribe nada)")
     cob.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
     cob.add_argument("--java", action="store_true", help="también el texto escrito en el código de los mods (tarda)")
+    cob.add_argument("--json", action="store_true", help="escribe solo el informe, como JSON (UTF-8)")
     rt = sub.add_parser(
         "instalar-runtime", help="pone o quita el mod de apoyo que muestra el texto del código de los mods"
     )
@@ -147,9 +149,13 @@ def _instalar_runtime(args: argparse.Namespace) -> None:
 
 
 def _cobertura(args: argparse.Namespace) -> None:
-    with Proceso(args.carpeta, Simulador(), registro=_escribir) as p:
-        _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
+    with Proceso(args.carpeta, Simulador(), registro=(lambda _m: None) if args.json else _escribir) as p:
+        if not args.json:
+            _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
         hallazgos = p.que_queda(java=args.java)
+    if args.json:
+        _escribir(informe_en_json(hallazgos))
+        return
     for h in hallazgos:
         _escribir(f"[{h.categoria}] {h}")
     _escribir(f"{len(hallazgos)} hallazgos." if hallazgos else "No encontré texto que quede en inglés.")

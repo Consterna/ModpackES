@@ -540,3 +540,23 @@ def test_opcion_de_texto_java_y_mod_de_apoyo_en_la_ventana(
     assert not list((juego / "mods").glob("modpackes_runtime-*.jar"))
     v.a_quitar_apoyo.trigger()
     assert "No había mod de apoyo" in v.aviso.e_texto.text()
+
+
+def test_informe_en_cuadro_y_guardado_en_archivo(qtbot: QtBot, tmp_path: Path) -> None:
+    juego = _modpack(tmp_path)
+    ruta = juego / "kubejs" / "server_scripts" / "s.js"
+    ruta.write_text(
+        ruta.read_text("utf-8") + "\nlet nota = 'This sentence looks like a message but is not used'\n",
+        encoding="utf-8",
+    )
+    v = _ventana(qtbot, juego)
+    v._guardar_informe(str(tmp_path / "antes.txt"))  # pyright: ignore[reportPrivateUsage]
+    assert not (tmp_path / "antes.txt").exists()  # todavía no hay informe: no escribe nada
+    v.a_cobertura.trigger()
+    qtbot.waitUntil(lambda: v._hilo is None and v._dialogo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert "This sentence looks like a message" in v._dialogo_informe.texto.toPlainText()  # pyright: ignore[reportPrivateUsage, reportOptionalMemberAccess]
+    destino = tmp_path / "informe.txt"
+    v._guardar_informe(str(destino))  # pyright: ignore[reportPrivateUsage]
+    assert "This sentence looks like a message" in destino.read_text("utf-8")
+    v.a_comprobar_apoyo.trigger()
+    assert "mod de apoyo" in v.aviso.e_texto.text().lower() or "mod de apoyo" in v.log.toPlainText().lower()

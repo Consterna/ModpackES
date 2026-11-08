@@ -73,4 +73,70 @@ class TablaTest {
         assertFalse(total.vacia());
         assertEquals(total, total.combinar(Tabla.VACIA));
     }
+
+    @Test
+    void plantillaConUnDatoVariable() {
+        Tabla t = tabla("Hello %s, welcome back!", "¡Hola %s, bienvenido de nuevo!");
+        assertEquals("¡Hola Steve, bienvenido de nuevo!", t.traducir("Hello Steve, welcome back!"));
+        assertEquals("¡Hola Ñandú 😀, bienvenido de nuevo!", t.traducir("Hello Ñandú 😀, welcome back!"));
+        assertNull(t.traducir("Goodbye Steve, welcome back!"));
+        assertNull(t.traducir("Hello Steve"));
+    }
+
+    @Test
+    void plantillaConNumeroSoloCoincideConNumeros() {
+        Tabla t = tabla("You have %d items left", "Te quedan %d objetos");
+        assertEquals("Te quedan 5 objetos", t.traducir("You have 5 items left"));
+        assertEquals("Te quedan -3 objetos", t.traducir("You have -3 items left"));
+        assertNull(t.traducir("You have many items left"));
+    }
+
+    @Test
+    void plantillaPuedeCambiarElOrden() {
+        Tabla t = tabla("%s gave %d coins", "%2$d monedas de %1$s");
+        assertEquals("7 monedas de Laly", t.traducir("Laly gave 7 coins"));
+    }
+
+    @Test
+    void plantillaConBordesYPorcentajeLiteral() {
+        Tabla t = tabla("Progress: %d%% of %s", "Progreso: %d%% de %s");
+        assertEquals("  Progreso: 50% de la misión ", t.traducir("  Progress: 50% of la misión "));
+    }
+
+    @Test
+    void plantillasInseguras() {
+        // sin texto fijo: coincidiría con todo
+        assertNull(tabla("%s", "%s").traducir("cualquier cosa"));
+        assertNull(tabla("%s %s", "%s %s").traducir("uno dos"));
+        // la traducción pierde un dato o inventa uno
+        assertNull(tabla("Hello %s and %s here", "Hola %s aquí").traducir("Hello A and B here"));
+        assertNull(tabla("Hello %s there friend", "Hola %s y %s").traducir("Hello A there friend"));
+        assertNull(tabla("Hello %s there friend", "Hola %3$s").traducir("Hello A there friend"));
+    }
+
+    @Test
+    void laPlantillaMasEspecificaGana() {
+        Tabla t = tabla(
+                "Welcome %s", "Bienvenido %s",
+                "Welcome %s to the farm", "Bienvenido %s a la granja");
+        assertEquals("Bienvenido Steve a la granja", t.traducir("Welcome Steve to the farm"));
+        assertEquals("Bienvenido Steve", t.traducir("Welcome Steve"));
+    }
+
+    @Test
+    void caracteresDeRegexEnElTextoFijoNoSonEspeciales() {
+        Tabla t = tabla("Cost (%d) [gold]. Really?", "Costo (%d) [oro]. ¿En serio?");
+        assertEquals("Costo (9) [oro]. ¿En serio?", t.traducir("Cost (9) [gold]. Really?"));
+        assertNull(t.traducir("Cost 9 gold. Really?"));
+    }
+
+    @Test
+    void lasPlantillasSobrevivenAlCombinarYSeCuentan() {
+        Tabla a = tabla("Hello %s, welcome back!", "¡Hola %s, bienvenido de nuevo!", "Exact text here", "Texto exacto");
+        Tabla total = a.combinar(tabla("Another %d things here", "Otras %d cosas aquí"));
+        assertEquals(3, total.tamano());
+        assertEquals(2, total.plantillas());
+        assertEquals("Otras 3 cosas aquí", total.traducir("Another 3 things here"));
+        assertEquals("Texto exacto", total.traducir("Exact text here"));
+    }
 }

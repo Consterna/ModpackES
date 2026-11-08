@@ -7,6 +7,7 @@ la tabla `assets/modpackes_runtime/textos/<variante>.json` que se genera aquí (
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -17,6 +18,12 @@ from .cobertura import frases_por_mod
 
 AMBITO = "ui"
 RUTA_TABLA = "assets/modpackes_runtime/textos/{variante}.json"
+#: Datos variables de un `String.format`: el mod los trata como una plantilla («Hello %s!» coincide con «Hello Steve!»).
+_MARCADORES = re.compile(r"%(?:\d+\$)?[sd%]")
+
+
+def _marcadores(texto: str) -> list[str]:
+    return _MARCADORES.findall(texto)
 
 
 class TextoDeJava:
@@ -40,7 +47,12 @@ class TextoDeJava:
 
     def recolectar(self) -> list[Pieza]:
         self._frases = frases_por_mod(self.ctx.instancia)
-        return [Pieza(f, f"texto del código de {jar.name}") for jar, frases in self._frases for f in frases]
+        return [Pieza(f, self._pista(jar.name, f)) for jar, frases in self._frases for f in frases]
+
+    @staticmethod
+    def _pista(mod: str, frase: str) -> str:
+        base = f"texto del código de {mod}"
+        return f"{base}; los marcadores %s y %d son datos: déjalos en el mismo orden" if _marcadores(frase) else base
 
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
         resumen = Resumen()
@@ -48,10 +60,15 @@ class TextoDeJava:
         for _, frases in self._frases:
             for frase in frases:
                 traducida = traducciones.get(frase)
-                if traducida is not None and traducida != frase and es_traducible(frase):
-                    tabla[frase] = traducida
-                else:
+                if traducida is None or traducida == frase or not es_traducible(frase):
                     resumen.pendientes += 1
+                elif _marcadores(traducida) != _marcadores(frase):
+                    # El mod rellena los datos en orden: si la traducción los cambia de sitio, mostraría un dato
+                    # en el lugar de otro. Mejor dejar el inglés.
+                    self.ctx.registro(f"No uso «{traducida[:50]}»: cambió el orden de los datos de «{frase[:50]}»")
+                    resumen.pendientes += 1
+                else:
+                    tabla[frase] = traducida
         resumen.traducidos = len(tabla)
         if not tabla:
             return resumen

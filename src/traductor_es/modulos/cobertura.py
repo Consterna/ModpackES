@@ -7,6 +7,7 @@ Solo lee; no escribe nada en la instancia.
 
 from __future__ import annotations
 
+import json
 import re
 import struct
 import zipfile
@@ -25,8 +26,8 @@ MAX_EJEMPLOS = 3
 #: `method_43470` (Fabric) y los `TextComponent`, `StringTextComponent` y `TextComponentString` anteriores.
 _MARCAS_TEXTO = ("literal", "m_237113_", "method_43470")
 _CLASES_TEXTO = ("TextComponent", "StringTextComponent", "TextComponentString")
-#: Una frase en inglés: puede empezar con códigos de color (§c) y llevar %s, números y puntuación.
-_FRASE = re.compile(r"(?:§[0-9a-fk-or])*[A-Z][A-Za-z']+(?: [§A-Za-z0-9,.'!?:%\-]+){2,}[.!?:]?")
+#: Una frase en inglés: puede empezar con códigos de color (§c) o con un dato (%s) y llevar números y puntuación.
+_FRASE = re.compile(r"(?:§[0-9a-fk-or])*(?:[A-Z][A-Za-z']+|%[sd])(?: [§A-Za-z0-9,.'!?:%\-]+){2,}[.!?:]?")
 _ESPANOL = re.compile(r"\b(de|la|el|los|las|con|sin|para|por|una|un|del)\b")
 #: Frases de registros y errores internos: casi nunca llegan al jugador.
 _INTERNO = re.compile(
@@ -66,6 +67,46 @@ class Hallazgo:
     def __str__(self) -> str:
         ej = f" Por ejemplo: {' | '.join(f'«{e}»' for e in self.ejemplos)}." if self.ejemplos else ""
         return f"{self.donde}: {self.cantidad} {'texto' if self.cantidad == 1 else 'textos'}. {self.motivo}.{ej}"
+
+
+_TITULOS = {
+    "java": "Escrito en el código de los mods (un resource pack no lo alcanza; el mod de apoyo cubre Forge 1.20.1)",
+    "script": "Frases de scripts que parecen texto y no se tocaron (pueden ser lógica o un mensaje armado distinto)",
+    "formato": "Carpetas con frases en inglés cuyo formato la app no conoce (no se tocó ningún archivo)",
+}
+
+
+def texto_del_informe(hallazgos: list[Hallazgo]) -> str:
+    """El informe como texto para leer o guardar, agrupado por categoría."""
+    if not hallazgos:
+        return "No encontré texto que se quede en inglés.\n"
+    lineas = [f"Texto que se queda en inglés aunque se traduzca todo: {len(hallazgos)} lugares.", ""]
+    for categoria in ("script", "formato", "java"):
+        grupo = [h for h in hallazgos if h.categoria == categoria]
+        if not grupo:
+            continue
+        lineas += [f"== {_TITULOS[categoria]} ==", ""]
+        lineas += [f"- {h}" for h in grupo]
+        lineas.append("")
+    return "\n".join(lineas)
+
+
+def informe_en_json(hallazgos: list[Hallazgo]) -> str:
+    """El informe como JSON (UTF-8), para que lo lean otros programas."""
+    return json.dumps(
+        [
+            {
+                "categoria": h.categoria,
+                "donde": h.donde,
+                "textos": h.cantidad,
+                "motivo": h.motivo,
+                "ejemplos": list(h.ejemplos),
+            }
+            for h in hallazgos
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
 
 
 def hallazgos_de_scripts(juego: Path, sin_elegir: list[tuple[Path, list[str]]]) -> list[Hallazgo]:

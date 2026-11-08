@@ -44,6 +44,36 @@ def instalados(instancia: Instancia) -> list[Path]:
     return sorted(p for p in carpeta.glob(f"{PREFIJO}*.jar") if _NOMBRE.fullmatch(p.name)) if carpeta.is_dir() else []
 
 
+def estado(instancia: Instancia, carpeta_jars: Path | None = None) -> list[str]:
+    """Lo que hay que saber del mod de apoyo en esta instancia, en frases (no abre el juego)."""
+    destino = destino_de(instancia)
+    if destino is None:
+        loader = instancia.loader or "sin loader"
+        return [
+            f"No hay mod de apoyo para Minecraft {instancia.version} con {loader}: "
+            "el texto del código Java seguirá en inglés."
+        ]
+    lineas = [f"Hay mod de apoyo para esta instancia ({destino})."]
+    lineas.append(
+        "Esta copia de la aplicación lo trae."
+        if jar_empaquetado(instancia, carpeta_jars)
+        else "Esta copia de la aplicación NO lo trae."
+    )
+    puestos = instalados(instancia)
+    lineas.append(f"En mods/: {', '.join(p.name for p in puestos)}." if puestos else "No está instalado en mods/.")
+    tablas = sorted(
+        (instancia.juego / "resourcepacks" / "Traduccion_ES" / "assets" / "modpackes_runtime" / "textos").glob("*.json")
+    )
+    lineas.append(
+        f"Tabla de textos en el resource pack: {len(tablas)} variantes."
+        if tablas
+        else "Todavía no hay tabla de textos: traduce con la opción activada."
+    )
+    if puestos and tablas:
+        lineas.append("Todo listo: abre el juego en español.")
+    return lineas
+
+
 def instalar(instancia: Instancia, carpeta_jars: Path | None = None) -> Path:
     """Copia el mod de apoyo a `mods/` y quita sus versiones anteriores. ValueError si no hay uno."""
     destino = destino_de(instancia)

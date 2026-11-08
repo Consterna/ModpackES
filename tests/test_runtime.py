@@ -149,3 +149,59 @@ def test_cli_instalar_runtime_sin_soporte(tmp_path: Path, capsys: pytest.Capture
     assert "Todavía no hay mod de apoyo" in capsys.readouterr().out  # los errores van por la salida normal
     assert main(["instalar-runtime", str(juego.parent), "--quitar"]) == 0
     assert "No había mod de apoyo" in capsys.readouterr().out
+
+
+def test_plantillas_con_datos_variables_y_orden(tmp_path: Path, memoria: Memoria) -> None:
+    from traductor_es.motores.base import Lote
+
+    class Reordena(Simulador):
+        """Traduce bien, salvo una frase donde cambia el orden de los datos."""
+
+        def traducir_lote(self, lote: Lote) -> dict[str, str]:
+            salida = super().traducir_lote(lote)
+            for e in lote.entradas:
+                if "gave" in e.texto:  # «⟦0⟧ gave ⟦1⟧ coins» → los marcadores al revés
+                    salida[e.id] = "⟦1⟧ monedas de ⟦0⟧"
+            return salida
+
+    juego = fabrica.prism(tmp_path, "1.20.1", "forge")
+    fabrica.jar(
+        juego / "mods" / "m.jar",
+        {"com/m/Chat.class": _clase("literal", "Hello %s, welcome back to the farm!", "%s gave %d coins to the shop")},
+    )
+    avisos: list[str] = []
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego), pack=PackSalida(inst), registro=avisos.append)
+        modulo = TextoDeJava(ctx)
+        piezas = modulo.recolectar()
+        assert all("marcadores" in p.pista for p in piezas)  # el motor sabe que debe respetar el orden
+        resumen = traducir_modulo(modulo, Traductor(Reordena(), memoria, Glosario()))
+        pack = ctx.pack_listo().raiz
+    tabla = json.loads((pack / RUTA_TABLA.format(variante="es_mx")).read_text("utf-8"))
+    assert tabla == {"Hello %s, welcome back to the farm!": "«ES» Hello %s, welcome back to the farm!"}
+    assert resumen.traducidos == 1 and resumen.pendientes == 1 and any("cambió el orden" in a for a in avisos)
+
+
+def test_estado_del_mod_de_apoyo(tmp_path: Path) -> None:
+    sin_soporte = fabrica.prism(tmp_path / "a", "1.21.1", "neoforge")
+    with Instancia(sin_soporte) as inst:
+        assert "No hay mod de apoyo" in mod_apoyo.estado(inst)[0]
+    juego = fabrica.prism(tmp_path / "b", "1.20.1", "forge")
+    carpeta = _jars(tmp_path, "modpackes_runtime-forge-1.20.1-0.1.0.jar")
+    with Instancia(juego) as inst:
+        texto = " ".join(mod_apoyo.estado(inst, tmp_path / "vacia"))
+        assert "NO lo trae" in texto and "No está instalado" in texto and "Todavía no hay tabla" in texto
+        mod_apoyo.instalar(inst, carpeta)
+        tabla = juego / "resourcepacks" / "Traduccion_ES" / "assets" / "modpackes_runtime" / "textos" / "es_mx.json"
+        tabla.parent.mkdir(parents=True)
+        tabla.write_text("{}", encoding="utf-8")
+        texto = " ".join(mod_apoyo.estado(inst, carpeta))
+        assert "lo trae" in texto and "modpackes_runtime-forge-1.20.1-0.1.0.jar" in texto and "Todo listo" in texto
+
+
+def test_cli_cobertura_en_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    juego = _instancia_con_mod(tmp_path)
+    assert main(["cobertura", str(juego.parent), "--java", "--json"]) == 0
+    salida = capsys.readouterr().out
+    datos = json.loads(salida)  # solo JSON: sin cabecera ni líneas de texto
+    assert any(h["categoria"] == "java" and "You can't use chat" in " ".join(h["ejemplos"]) for h in datos)

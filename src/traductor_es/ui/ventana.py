@@ -49,7 +49,7 @@ from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, actualizaciones, configu
 from ..actualizaciones import Novedad
 from ..fuentes.instancia import Instancia, resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
-from ..modulos.cobertura import Hallazgo
+from ..modulos.cobertura import Hallazgo, texto_del_informe
 from ..motores import fabrica
 from ..motores.base import Cancelado, ErrorFatal, Motor
 from ..motores.compatible import Compatible
@@ -71,6 +71,7 @@ from .componentes import (
     icono_en_boton,
     seguir_tema,
 )
+from .informe import DialogoInforme
 from .instancias import Lector, ListaInstancias, traducida
 from .motor import DialogoMotor
 
@@ -221,6 +222,8 @@ class Ventana(QMainWindow):
         self._fase = ""
         self._clave_lista = False
         self.ultimo_informe: Informe | None = None
+        self.ultima_cobertura: list[Hallazgo] = []
+        self._dialogo_informe: DialogoInforme | None = None
         self._preferencias: dict[str, Any] = configuracion.leer_preferencias()
         self._motor_anterior: str | None = None
         self._construir()
@@ -526,6 +529,8 @@ class Ventana(QMainWindow):
         self.a_correcciones.setToolTip("Buscar y corregir a mano traducciones de la memoria")
         self.a_cobertura = agregar("Qué queda en inglés", "circle-alert", lambda: self.lanzar("cobertura"))
         self.a_cobertura.setToolTip("Lista el texto que no se puede traducir y por qué (solo lee, no cambia nada)")
+        self.a_guardar_informe = agregar("Guardar el informe de lo que queda…", "file-text", self._guardar_informe)
+        self.a_comprobar_apoyo = agregar("Comprobar el mod de apoyo", "circle-check", self._comprobar_apoyo)
         self.a_apoyo = agregar("Instalar el mod de apoyo", "package", self._instalar_apoyo)
         self.a_apoyo.setToolTip(
             "Pone ModpackES Runtime en la carpeta mods: muestra en español el texto del código de los mods"
@@ -1037,10 +1042,33 @@ class Ventana(QMainWindow):
 
         self._con_instancia(quitar)
 
+    def _comprobar_apoyo(self) -> None:
+        self._con_instancia(lambda inst: "\n".join(mod_apoyo.estado(inst)))
+
+    def _guardar_informe(self, destino: str | None = None) -> None:
+        if not self.ultima_cobertura:
+            self.avisar("Primero usa «Más ▸ Qué queda en inglés».")
+            return
+        if destino is None:
+            destino, _ = QFileDialog.getSaveFileName(
+                self, "Guardar el informe", str(Path.home() / "Que_queda_en_ingles.txt"), "Texto (*.txt)"
+            )
+        if not destino:
+            return
+        try:
+            Path(destino).write_text(texto_del_informe(self.ultima_cobertura), encoding="utf-8")
+        except OSError as e:
+            self.avisar(f"No pude guardar el informe: {e}", "error")
+            return
+        self.aviso.mostrar(f"Informe guardado: {destino}", "exito")
+
     def _mostrar_cobertura(self, hallazgos: list[Hallazgo]) -> None:
+        self.ultima_cobertura = hallazgos
         if not hallazgos:
             self.estado.setText("No encontré texto que se quede en inglés.")
             return
+        self._dialogo_informe = DialogoInforme(texto_del_informe(hallazgos), self._guardar_informe, self)
+        self._dialogo_informe.show()
         self.estado.setText(f"Quedan {len(hallazgos)} lugares con texto en inglés: el detalle está en Detalles.")
         self.escribir("Texto que se queda en inglés aunque traduzcas todo:")
         for h in hallazgos:

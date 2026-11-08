@@ -92,3 +92,22 @@ def test_formatos_desconocidos_se_informan_sin_tocar(tmp_path: Path) -> None:
     hallazgos = formatos_desconocidos(juego)
     assert [(h.categoria, h.donde, h.cantidad) for h in hallazgos] == [("formato", "kubejs/data/a/quizzes", 1)]
     assert hallazgos[0].ejemplos == ("What do cows eat for breakfast?",) and quiz.read_bytes() == antes
+
+
+def test_texto_y_json_del_informe() -> None:
+    import json
+
+    from traductor_es.modulos.cobertura import Hallazgo, informe_en_json, texto_del_informe
+
+    hallazgos = [
+        Hallazgo("java", "m.jar", 2, "Escrito en el código", ("You can't do that!", "Ñandú ¡hola!")),
+        Hallazgo("script", "kubejs/a.js", 1, "Parece una frase", ("The market is closed",)),
+    ]
+    texto = texto_del_informe(hallazgos)
+    assert texto.index("Frases de scripts") < texto.index("Escrito en el código de los mods")  # script antes que java
+    assert "m.jar: 2 textos" in texto and "Ñandú ¡hola!" in texto
+    assert texto_del_informe([]) == "No encontré texto que se quede en inglés.\n"
+    datos = json.loads(informe_en_json(hallazgos))
+    assert datos[0] == {"categoria": "java", "donde": "m.jar", "textos": 2, "motivo": "Escrito en el código",
+                        "ejemplos": ["You can't do that!", "Ñandú ¡hola!"]}  # fmt: skip
+    assert "Ñandú" in informe_en_json(hallazgos)  # UTF-8 sin escapar
