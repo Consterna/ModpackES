@@ -50,8 +50,9 @@ class ReescritorTest {
         raiz.append(Component.literal(" Steve"));
         Component nuevo = Reescritor.reescribir(raiz, TABLA);
         assertEquals("<Laly> Hola Steve", nuevo.getString());
-        assertEquals(ChatFormatting.AQUA.getColor(), nuevo.getStyle().getColor().getValue());
-        assertEquals(ChatFormatting.WHITE.getColor(), nuevo.getSiblings().get(0).getStyle().getColor().getValue());
+        // los colores se comparan con los del original: ChatFormatting.getColor() desaparece en Minecraft 26.2
+        assertEquals(raiz.getStyle().getColor(), nuevo.getStyle().getColor());
+        assertEquals(raiz.getSiblings().get(0).getStyle().getColor(), nuevo.getSiblings().get(0).getStyle().getColor());
         assertSame(raiz.getSiblings().get(1), nuevo.getSiblings().get(1)); // lo que no cambia, no se copia
     }
 

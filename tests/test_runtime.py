@@ -125,6 +125,11 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("1.21.8", "fabric", "fabric-1.21.5"),
         ("1.21.10", "fabric", "fabric-1.21.5"),
         ("1.21.11", "fabric", "fabric-1.21.11"),
+        ("26.1", "fabric", "fabric-26.1"),
+        ("26.1.2", "fabric", "fabric-26.1"),
+        ("26.2", "fabric", "fabric-26.1"),
+        ("26.3", "fabric", "fabric-26.1"),
+        ("26.4", "fabric", None),  # todavía solo tiene snapshots
         ("1.20.3", "fabric", None),  # sin jar probado para esa versión
         ("1.20.4", "fabric", None),
         ("1.21.12", "fabric", None),

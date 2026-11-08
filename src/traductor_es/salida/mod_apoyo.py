@@ -36,6 +36,11 @@ SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("fabric", (1, 21, 9)): "fabric-1.21.5",
     ("fabric", (1, 21, 10)): "fabric-1.21.5",
     ("fabric", (1, 21, 11)): "fabric-1.21.11",
+    ("fabric", (26, 1, 0)): "fabric-26.1",
+    ("fabric", (26, 1, 1)): "fabric-26.1",
+    ("fabric", (26, 1, 2)): "fabric-26.1",
+    ("fabric", (26, 2, 0)): "fabric-26.1",
+    ("fabric", (26, 3, 0)): "fabric-26.1",
 }
 #: Combinaciones que no tendrán mod de apoyo y por qué (para decírselo al jugador en vez de «todavía no»).
 IMPOSIBLES: dict[tuple[str, tuple[int, ...]], str] = {

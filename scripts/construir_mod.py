@@ -2,7 +2,7 @@
 
 Uso:  uv run python scripts/construir_mod.py [<proyecto de mod-runtime/> | todos] [--sin-pruebas]
 
-Sin nombre compila todos. Cada uno necesita su JDK (Forge: 17; NeoForge y Fabric: 21) y su
+Sin nombre compila todos. Cada uno necesita su JDK (Forge: 17; NeoForge y Fabric: 21, y Fabric 26.x: 25) y su
 Gradle, que se toman de JAVA_HOME (o JAVA_HOME_<versión>_X64) y de `.herramientas/` si existen, y acceso a
 internet la primera vez, para bajar el loader y Minecraft. El resultado queda en
 `src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo construye el mismo comando
@@ -31,6 +31,7 @@ PROYECTOS = {
     "fabric-1.21.4": (21, "9.8.2"),
     "fabric-1.21.5": (21, "9.8.2"),
     "fabric-1.21.11": (21, "9.8.2"),
+    "fabric-26.1": (25, "9.8.2"),
 }
 
 
