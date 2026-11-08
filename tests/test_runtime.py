@@ -130,8 +130,11 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("26.2", "fabric", "fabric-26.1"),
         ("26.3", "fabric", "fabric-26.1"),
         ("26.4", "fabric", None),  # todavía solo tiene snapshots
-        ("1.20.3", "fabric", None),  # sin jar probado para esa versión
-        ("1.20.4", "fabric", None),
+        ("1.20.3", "fabric", "fabric-1.20.4"),
+        ("1.20.4", "fabric", "fabric-1.20.4"),
+        ("1.20.5", "fabric", "fabric-1.20.6"),
+        ("1.20.6", "fabric", "fabric-1.20.6"),
+        ("1.19.3", "fabric", None),  # sin jar probado para esa versión
         ("1.21.12", "fabric", None),
         ("1.19.2", "fabric", None),  # Fabric API no tiene evento de chat en esa versión
         ("1.21.4", "neoforge", None),
