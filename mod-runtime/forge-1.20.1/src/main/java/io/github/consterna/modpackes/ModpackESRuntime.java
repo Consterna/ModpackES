@@ -2,6 +2,8 @@ package io.github.consterna.modpackes;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -10,6 +12,8 @@ import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
+import net.minecraftforge.client.event.RenderTooltipEvent;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -24,6 +28,9 @@ import java.util.List;
  * Muestra en español el texto que otros mods escriben en su código. Solo cambia mensajes de chat, de la barra de
  * acción y tooltips cuyo texto sea exactamente uno de la tabla {@code assets/modpackes_runtime/textos/<variante>.json}
  * que genera ModpackES. Si el juego no está en una variante de español, no hace nada.
+ *
+ * <p>También cambia el texto de los botones de una pantalla al abrirla y los tooltips que no son de objetos. El
+ * texto que una pantalla dibuja directamente no pasa por ningún evento y no se toca.
  */
 @Mod(ModpackESRuntime.ID)
 public final class ModpackESRuntime {
@@ -37,6 +44,8 @@ public final class ModpackESRuntime {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(ModpackESRuntime::alRegistrarRecargas);
         MinecraftForge.EVENT_BUS.addListener(ModpackESRuntime::alRecibirChat);
         MinecraftForge.EVENT_BUS.addListener(ModpackESRuntime::alCrearTooltip);
+        MinecraftForge.EVENT_BUS.addListener(ModpackESRuntime::alReunirTooltip);
+        MinecraftForge.EVENT_BUS.addListener(ModpackESRuntime::alIniciarPantalla);
     }
 
     private static void alRegistrarRecargas(RegisterClientReloadListenersEvent evento) {
@@ -65,6 +74,30 @@ public final class ModpackESRuntime {
                 Component nuevo = Reescritor.reescribir(lineas.get(i), actual);
                 if (nuevo != null) {
                     lineas.set(i, nuevo);
+                }
+            }
+        } catch (RuntimeException | LinkageError e) {
+            avisar(e);
+        }
+    }
+
+    private static void alReunirTooltip(RenderTooltipEvent.GatherComponents evento) {
+        try {
+            Reescritor.reescribirElementos(evento.getTooltipElements(), tabla);
+        } catch (RuntimeException | LinkageError e) {
+            avisar(e);
+        }
+    }
+
+    private static void alIniciarPantalla(ScreenEvent.Init.Post evento) {
+        try {
+            Tabla actual = tabla;
+            if (actual.vacia()) {
+                return;
+            }
+            for (GuiEventListener hijo : evento.getListenersList()) {
+                if (hijo instanceof AbstractWidget widget) {
+                    Reescritor.reescribirMensaje(widget, actual);
                 }
             }
         } catch (RuntimeException | LinkageError e) {

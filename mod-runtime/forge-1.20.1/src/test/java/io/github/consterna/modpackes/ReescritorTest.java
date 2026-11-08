@@ -1,13 +1,18 @@
 package io.github.consterna.modpackes;
 
+import com.mojang.datafixers.util.Either;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -72,5 +77,37 @@ class ReescritorTest {
         Tabla t = new Tabla(Map.of("Ñandú says hi", "Ñandú dice ¡hola! 😀"));
         Component nuevo = Reescritor.reescribir(Component.literal("  Ñandú says hi "), t);
         assertTrue(nuevo.getString().equals("  Ñandú dice ¡hola! 😀 "));
+    }
+
+    @Test
+    void cambiaLasLineasDeUnTooltipYDejaLoQueNoEsTexto() {
+        TooltipComponent imagen = new TooltipComponent() {
+        };
+        FormattedText plano = FormattedText.of("Hello");
+        Component otra = Component.literal("Other");
+        List<Either<FormattedText, TooltipComponent>> elementos = new ArrayList<>();
+        elementos.add(Either.left(Component.literal("Hello")));
+        elementos.add(Either.right(imagen));
+        elementos.add(Either.left(plano));
+        elementos.add(Either.left(otra));
+
+        Reescritor.reescribirElementos(elementos, TABLA);
+
+        assertEquals("Hola", ((Component) elementos.get(0).left().orElseThrow()).getString());
+        assertSame(imagen, elementos.get(1).right().orElseThrow());
+        assertSame(plano, elementos.get(2).left().orElseThrow());
+        assertSame(otra, elementos.get(3).left().orElseThrow());
+    }
+
+    @Test
+    void losTooltipsSinTablaOSinListaNoHacenNada() {
+        Component original = Component.literal("Hello");
+        List<Either<FormattedText, TooltipComponent>> elementos = new ArrayList<>();
+        elementos.add(Either.left(original));
+
+        Reescritor.reescribirElementos(elementos, Tabla.VACIA);
+        Reescritor.reescribirElementos(null, TABLA);
+
+        assertSame(original, elementos.get(0).left().orElseThrow());
     }
 }

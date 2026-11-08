@@ -2,6 +2,8 @@ package io.github.consterna.modpackes;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -13,6 +15,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
+import net.neoforged.neoforge.client.event.RenderTooltipEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import org.slf4j.Logger;
@@ -26,6 +30,9 @@ import java.util.List;
  * acción y tooltips cuyo texto sea exactamente uno de la tabla {@code assets/modpackes_runtime/textos/<variante>.json}
  * que genera ModpackES (o encaje en una de sus plantillas con {@code %s} o {@code %d}). Si el juego no está en una
  * variante de español, no hace nada.
+ *
+ * <p>También cambia el texto de los botones de una pantalla al abrirla y los tooltips que no son de objetos. El
+ * texto que una pantalla dibuja directamente no pasa por ningún evento y no se toca.
  */
 @Mod(value = ModpackESRuntime.ID, dist = Dist.CLIENT)
 public final class ModpackESRuntime {
@@ -39,6 +46,8 @@ public final class ModpackESRuntime {
         busDelMod.addListener(ModpackESRuntime::alRegistrarRecargas);
         NeoForge.EVENT_BUS.addListener(ModpackESRuntime::alRecibirChat);
         NeoForge.EVENT_BUS.addListener(ModpackESRuntime::alCrearTooltip);
+        NeoForge.EVENT_BUS.addListener(ModpackESRuntime::alReunirTooltip);
+        NeoForge.EVENT_BUS.addListener(ModpackESRuntime::alIniciarPantalla);
     }
 
     private static void alRegistrarRecargas(RegisterClientReloadListenersEvent evento) {
@@ -67,6 +76,30 @@ public final class ModpackESRuntime {
                 Component nuevo = Reescritor.reescribir(lineas.get(i), actual);
                 if (nuevo != null) {
                     lineas.set(i, nuevo);
+                }
+            }
+        } catch (RuntimeException | LinkageError e) {
+            avisar(e);
+        }
+    }
+
+    private static void alReunirTooltip(RenderTooltipEvent.GatherComponents evento) {
+        try {
+            Reescritor.reescribirElementos(evento.getTooltipElements(), tabla);
+        } catch (RuntimeException | LinkageError e) {
+            avisar(e);
+        }
+    }
+
+    private static void alIniciarPantalla(ScreenEvent.Init.Post evento) {
+        try {
+            Tabla actual = tabla;
+            if (actual.vacia()) {
+                return;
+            }
+            for (GuiEventListener hijo : evento.getListenersList()) {
+                if (hijo instanceof AbstractWidget widget) {
+                    Reescritor.reescribirMensaje(widget, actual);
                 }
             }
         } catch (RuntimeException | LinkageError e) {

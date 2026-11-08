@@ -4,9 +4,13 @@ import com.mojang.logging.LogUtils;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackType;
@@ -24,6 +28,9 @@ import java.util.List;
  * {@code assets/modpackes_runtime/textos/<variante>.json} que genera ModpackES (o encaje en una de sus plantillas con
  * {@code %s} o {@code %d}). Si el juego no está en una variante de español, no hace nada.
  *
+ * <p>También cambia el texto de los botones de una pantalla al abrirla. Fabric API no tiene evento para los
+ * tooltips que no son de objetos ni para el texto que una pantalla dibuja directamente: esos no se tocan.
+ *
  * <p>El chat de otros jugadores no se toca: Fabric API 1.20.1 no permite modificarlo, y no hace falta.
  */
 public final class ModpackESRuntime implements ClientModInitializer {
@@ -38,6 +45,7 @@ public final class ModpackESRuntime implements ClientModInitializer {
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(new Cargador());
         ClientReceiveMessageEvents.MODIFY_GAME.register(ModpackESRuntime::alRecibirMensaje);
         ItemTooltipCallback.EVENT.register((pila, contexto, lineas) -> alCrearTooltip(lineas));
+        ScreenEvents.AFTER_INIT.register((cliente, pantalla, ancho, alto) -> alIniciarPantalla(pantalla));
     }
 
     private static Component alRecibirMensaje(Component mensaje, boolean barraDeAccion) {
@@ -61,6 +69,20 @@ public final class ModpackESRuntime implements ClientModInitializer {
                 if (nuevo != null) {
                     lineas.set(i, nuevo);
                 }
+            }
+        } catch (RuntimeException | LinkageError e) {
+            avisar(e);
+        }
+    }
+
+    private static void alIniciarPantalla(Screen pantalla) {
+        try {
+            Tabla actual = tabla;
+            if (actual.vacia()) {
+                return;
+            }
+            for (AbstractWidget widget : Screens.getButtons(pantalla)) {
+                Reescritor.reescribirMensaje(widget, actual);
             }
         } catch (RuntimeException | LinkageError e) {
             avisar(e);

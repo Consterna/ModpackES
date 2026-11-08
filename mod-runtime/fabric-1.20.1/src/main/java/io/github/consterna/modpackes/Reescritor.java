@@ -1,10 +1,14 @@
 package io.github.consterna.modpackes;
 
+import com.mojang.datafixers.util.Either;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.LiteralContents;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,5 +79,35 @@ public final class Reescritor {
             resultado.append(hermano);
         }
         return resultado;
+    }
+
+    /**
+     * Cambia en su sitio las líneas de texto de un tooltip (las que son un {@link Component}); lo que no es texto
+     * o no está en la tabla se deja como está.
+     */
+    public static void reescribirElementos(List<Either<FormattedText, TooltipComponent>> elementos, Tabla tabla) {
+        if (elementos == null || tabla.vacia()) {
+            return;
+        }
+        for (int i = 0; i < elementos.size(); i++) {
+            Either<FormattedText, TooltipComponent> elemento = elementos.get(i);
+            if (elemento != null && elemento.left().orElse(null) instanceof Component linea) {
+                Component nuevo = reescribir(linea, tabla);
+                if (nuevo != null) {
+                    elementos.set(i, Either.left(nuevo));
+                }
+            }
+        }
+    }
+
+    /** Cambia el texto de un botón, casilla o etiqueta si está en la tabla. */
+    public static void reescribirMensaje(AbstractWidget widget, Tabla tabla) {
+        if (widget == null || tabla.vacia()) {
+            return;
+        }
+        Component nuevo = reescribir(widget.getMessage(), tabla);
+        if (nuevo != null) {
+            widget.setMessage(nuevo);
+        }
     }
 }
