@@ -90,7 +90,7 @@ infalibles: sirven para decidir qué rehacer, no como nota de calidad.
 
 **Modo exhaustivo de scripts** (opcional, en «Opciones avanzadas» o con `--exhaustivo`): traduce también las frases de los scripts de KubeJS cuyo uso no se entiende (por ejemplo textos que pasan por una función propia del pack). Puede tocar lógica del script, por eso viene apagado; todo queda con copia de seguridad y se restaura con «Restaurar el original».
 
-**Más ▸ Qué queda en inglés** (o `modpackes cobertura RUTA [--java]`) lista lo que no se traduce y por qué, sin cambiar nada: frases de scripts cuyo uso no se entiende y texto escrito en el código de los mods, que un resource pack no puede alcanzar. El análisis ya avisa de las frases de scripts.
+**Más ▸ Qué queda en inglés** (o `modpackes cobertura RUTA [--java]`) lista lo que no se traduce y por qué, sin cambiar nada: frases de scripts cuyo uso no se entiende, frases dentro de comandos de otros mods (p. ej. `emberstextapi queue`), cuyo formato la app no conoce y por eso no toca, y texto escrito en el código de los mods, que un resource pack no puede alcanzar. El análisis ya avisa de las frases de scripts.
 
 **Más ▸ Restaurar el original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar
 la traducción de los mods basta con desactivar el resource pack.

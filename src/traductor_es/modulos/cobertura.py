@@ -58,7 +58,7 @@ _TAMANO_CONSTANTE = {
 class Hallazgo:
     """Una cosa que queda en inglés: dónde, cuántos textos y unos ejemplos."""
 
-    categoria: str  #: «script», «formato» o «java»
+    categoria: str  #: «script», «comando», «formato» o «java»
     donde: str
     cantidad: int
     motivo: str
@@ -75,6 +75,7 @@ _TITULOS = {
         "(un resource pack no lo alcanza; el mod de apoyo cubre Forge, NeoForge y Fabric)"
     ),
     "script": "Frases de scripts que parecen texto y no se tocaron (pueden ser lógica o un mensaje armado distinto)",
+    "comando": "Comandos de otros mods con una frase en inglés (la app no conoce su formato y no los toca)",
     "formato": "Carpetas con frases en inglés cuyo formato la app no conoce (no se tocó ningún archivo)",
 }
 
@@ -84,7 +85,7 @@ def texto_del_informe(hallazgos: list[Hallazgo]) -> str:
     if not hallazgos:
         return "No encontré texto que se quede en inglés.\n"
     lineas = [f"Texto que se queda en inglés aunque se traduzca todo: {len(hallazgos)} lugares.", ""]
-    for categoria in ("script", "formato", "java"):
+    for categoria in ("script", "comando", "formato", "java"):
         grupo = [h for h in hallazgos if h.categoria == categoria]
         if not grupo:
             continue
@@ -209,6 +210,18 @@ _TEXTO_JSON = re.compile(r'"(?:text|title|description|message|tip|name|lore)"\s*
 _TAMANO_MAXIMO = 300_000
 
 
+def hallazgos_de_comandos(juego: Path, ajenos: list[tuple[Path, list[str]]]) -> list[Hallazgo]:
+    """Comandos de otros mods (p. ej. `emberstextapi queue`) con una frase en inglés: no se traducen."""
+    return [
+        Hallazgo(
+            "comando", ruta.relative_to(juego).as_posix(), len(textos),
+            "Se le pasa a un comando de otro mod cuyo formato la app no conoce: traducirlo podría romper sus etiquetas",
+            tuple(t[:100] for t in textos[:MAX_EJEMPLOS]),  # más largo: la frase va detrás del nombre del comando
+        )
+        for ruta, textos in ajenos
+    ]  # fmt: skip
+
+
 def formatos_desconocidos(juego: Path) -> list[Hallazgo]:
     """Carpetas de datos o recursos con frases en inglés cuyo formato la app no conoce (no se tocan)."""
     por_carpeta: dict[str, list[str]] = {}
@@ -246,7 +259,9 @@ def revisar_cobertura(
     ctx: Contexto, java: bool = False, progreso: Callable[[int, int], None] = lambda _a, _b: None
 ) -> list[Hallazgo]:
     """Lo que queda en inglés. El análisis del código Java tarda (lee todos los mods): solo si se pide."""
-    hallazgos = hallazgos_de_scripts(ctx.instancia.juego, ScriptsKubeJS(ctx).candidatas())
+    scripts = ScriptsKubeJS(ctx)
+    hallazgos = hallazgos_de_scripts(ctx.instancia.juego, scripts.candidatas())
+    hallazgos += hallazgos_de_comandos(ctx.instancia.juego, scripts.comandos_ajenos)
     hallazgos += formatos_desconocidos(ctx.instancia.juego)
     if java:
         hallazgos += textos_en_java(ctx.instancia, progreso)

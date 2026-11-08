@@ -14,7 +14,7 @@ from . import configuracion
 from .fuentes.instancia import Instancia
 from .modulos import datos, libros, misiones, mods, runtime, scripts
 from .modulos.base import Contexto, Modulo, Resumen
-from .modulos.cobertura import Hallazgo, hallazgos_de_scripts, revisar_cobertura
+from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
 from .motores import fabrica
 from .motores.base import ErrorFatal, Motor
@@ -221,11 +221,13 @@ class Proceso:
         """
         for s in scripts_leidos:
             informe.cobertura += hallazgos_de_scripts(self.instancia.juego, s.sin_elegir)
+            informe.cobertura += hallazgos_de_comandos(self.instancia.juego, s.comandos_ajenos)
         if not informe.cobertura:
             return []
         return [
-            f"{sum(h.cantidad for h in informe.cobertura)} frases de {len(informe.cobertura)} scripts parecen texto "
-            "pero no se traducen (puede ser lógica). Detalle con «modpackes cobertura»."
+            f"{sum(h.cantidad for h in informe.cobertura)} frases de {len(informe.cobertura)} lugares de los scripts "
+            "no se traducen (parecen texto pero puede ser lógica, o van dentro de un comando de otro mod). "
+            "Detalle con «modpackes cobertura»."
         ]
 
     def ejecutar(self, activar: bool = True, poner_idioma: bool = True) -> Informe:

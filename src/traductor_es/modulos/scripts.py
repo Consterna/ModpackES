@@ -48,6 +48,14 @@ def _llamadas_re(llamadas: frozenset[str]) -> str:
 
 
 _EXPRESION = re.compile(r"\$\{[^{}\n]*\}")
+#: Lo que va entre `<>` o `[]` en el texto de otro mod (etiquetas de formato) o entre `${}` (código del script).
+_ETIQUETA = re.compile(r"<[^<>\n]*>|\[[^\[\]\n]*\]|\$\{[^{}\n]*\}")
+_PALABRA = re.compile(r"[A-Za-z']+")
+#: Palabras de enlace del inglés que casi nunca aparecen en un comando: dos o más indican una frase.
+_ENLACES_INGLES = frozenset({
+    "the", "and", "of", "to", "is", "are", "you", "your", "it", "we", "that", "this", "be", "have", "will",
+    "can", "not", "with", "for", "from", "until", "when", "if", "my", "i",
+})  # fmt: skip
 
 
 def _parece_texto(texto: str) -> bool:
@@ -158,6 +166,17 @@ def comando_visible(c: javascript.CadenaJs) -> comandos.Comando | None:
     return cmd if cmd is not None and unidades_comando(cmd) else None
 
 
+def frase_en_comando_ajeno(c: javascript.CadenaJs) -> bool:
+    """`runCommand` recibe un comando que no es de chat y que lleva una frase en inglés (p. ej. `emberstextapi queue`).
+
+    La app no conoce el formato de los comandos de otros mods y no los toca: solo se avisa en el informe.
+    """
+    if c.comparada or c.funcion not in LLAMADAS_COMANDO or comandos.analizar(c.texto) is not None:
+        return False
+    palabras = _PALABRA.findall(_ETIQUETA.sub(" ", c.texto))
+    return len(palabras) >= 5 and sum(p.lower() in _ENLACES_INGLES for p in palabras) >= 2
+
+
 @dataclass(slots=True)
 class _Script:
     ruta: Path
@@ -196,6 +215,8 @@ class ScriptsKubeJS:
         self.exhaustivo = exhaustivo
         self._scripts: list[_Script] = []
         self.sin_elegir: list[tuple[Path, list[str]]] = []
+        #: Por script, los comandos de otros mods con una frase en inglés (no se tocan; van al informe)
+        self.comandos_ajenos: list[tuple[Path, list[str]]] = []
 
     def _archivos(self) -> list[Path]:
         juego = self.ctx.instancia.juego
@@ -228,6 +249,7 @@ class ScriptsKubeJS:
     def recolectar(self) -> list[Pieza]:
         self._scripts = []
         self.sin_elegir = []
+        self.comandos_ajenos = []
         leidos = self._leer()
         llamadas = llamadas_de_texto(self.ctx.instancia.version.partes)  # las de esta versión de KubeJS
         patron = _llamadas_re(llamadas)
@@ -260,6 +282,9 @@ class ScriptsKubeJS:
             frases = [c.texto for c in cadenas if c.inicio not in vistas and parece_frase_sin_elegir(c)]
             if frases:
                 self.sin_elegir.append((ruta, frases))
+            ajenos = [c.texto for c in cadenas if c.inicio not in vistas and frase_en_comando_ajeno(c)]
+            if ajenos:
+                self.comandos_ajenos.append((ruta, ajenos))
         return [
             Pieza(t, f"script: {c.funcion or 'mensaje'}")
             for s in self._scripts
