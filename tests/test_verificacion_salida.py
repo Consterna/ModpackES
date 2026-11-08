@@ -112,6 +112,36 @@ def test_exportar_kit_y_pack(tmp_path: Path) -> None:
         exportar.exportar_pack(tmp_path / "otro", tmp_path / "x.zip")
 
 
+def test_el_kit_incluye_datapacks_comprimidos_con_datos_del_servidor(tmp_path: Path) -> None:
+    import io
+
+    def comprimido(entradas: dict[str, str]) -> bytes:
+        salida = io.BytesIO()
+        with zipfile.ZipFile(salida, "w") as z:
+            for nombre, texto in entradas.items():
+                z.writestr(nombre, texto)
+        return salida.getvalue()
+
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    con_logros = juego / "global_packs" / "required_data" / "logros.zip"
+    solo_tips = juego / "global_packs" / "required_data" / "tips.zip"
+    for ruta in (con_logros, solo_tips):
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+    datos_logros = comprimido({"data/m/advancements/a.json": '{"display": {"title": {"text": "Hola"}}}'})
+    datos_tips = comprimido({"assets/m/tips/t.json": '{"tip": "Un consejo"}'})
+    con_logros.write_bytes(datos_logros)
+    solo_tips.write_bytes(datos_tips)
+    respaldo = Respaldo(juego)
+    respaldo.escribir(con_logros, datos_logros)
+    respaldo.escribir(solo_tips, datos_tips)
+    destino = tmp_path / "kit.zip"
+    exportar.exportar_kit_servidor(juego, destino)
+    with zipfile.ZipFile(destino) as z:
+        nombres = set(z.namelist())
+    assert "global_packs/required_data/logros.zip" in nombres  # lo lee el servidor
+    assert "global_packs/required_data/tips.zip" not in nombres  # los tips son de cliente
+
+
 # ------------------------------------------------------------------ línea de comandos real
 def _cli(*args: str, datos: Path) -> subprocess.CompletedProcess[str]:
     entorno = {**os.environ, "TRADUCTOR_ES_DATOS": str(datos), "PYTHONIOENCODING": "utf-8"}

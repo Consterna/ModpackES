@@ -6,7 +6,7 @@ import io
 import zipfile
 from pathlib import Path
 
-from ..modulos.datos import clasificar
+from ..modulos.datos import clasificar, entradas_del_zip
 from .copias import Respaldo
 from .resource_pack import NOMBRE
 
@@ -36,9 +36,16 @@ def _agregar_carpeta(zf: zipfile.ZipFile, carpeta: Path, prefijo: str = "") -> i
     return n
 
 
-def _es_dato_del_servidor(relativa: str) -> bool:
-    """Funciones y logros de un datapack los lee el servidor; los tips son de cliente."""
-    formato = clasificar(Path(relativa))
+def _es_dato_del_servidor(juego: Path, relativa: str) -> bool:
+    """Funciones y logros de un datapack los lee el servidor; los tips son de cliente.
+
+    Un `.zip` (datapack comprimido) cuenta por lo que lleva dentro, no por su propia ruta.
+    """
+    ruta = Path(relativa)
+    if ruta.suffix.lower() == ".zip":
+        comprimido = juego / ruta
+        return comprimido.is_file() and any(f.nombre != "tip" for _, f in entradas_del_zip(comprimido))
+    formato = clasificar(ruta)
     return formato is not None and formato.nombre != "tip"
 
 
@@ -55,7 +62,7 @@ def exportar_pack(juego: Path, destino: Path) -> int:
 def exportar_kit_servidor(juego: Path, destino: Path) -> int:
     """Kit para servidores: archivos traducidos que lee el servidor, el resource pack y unas instrucciones."""
     respaldo = Respaldo(juego)
-    archivos = [r for r in respaldo.registrados() if r.startswith(_DEL_SERVIDOR) or _es_dato_del_servidor(r)]
+    archivos = [r for r in respaldo.registrados() if r.startswith(_DEL_SERVIDOR) or _es_dato_del_servidor(juego, r)]
     pack = juego / "resourcepacks" / NOMBRE
     if not archivos and not (pack / "pack.mcmeta").is_file():
         raise ValueError("Todavía no hay nada traducido para el servidor: traduce primero.")

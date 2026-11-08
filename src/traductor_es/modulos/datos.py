@@ -186,7 +186,7 @@ def buscar_archivos(juego: Path) -> list[tuple[Path, Formato]]:
     return encontrados
 
 
-def _entradas_del_zip(ruta: Path) -> list[tuple[str, Formato]]:
+def entradas_del_zip(ruta: Path) -> list[tuple[str, Formato]]:
     """Las entradas de un .zip (datapack o pack de recursos) con texto conocido. Solo lee su índice."""
     if ruta.stat().st_size > LIMITE_ZIP:
         return []
@@ -201,7 +201,7 @@ def buscar_zips(juego: Path) -> list[tuple[Path, list[tuple[str, Formato]]]]:
     """Los .zip con texto conocido dentro (datapacks de `global_packs`, `datapacks`, mundos…)."""
     res: list[tuple[Path, list[tuple[str, Formato]]]] = []
     for ruta in recorrer(juego):
-        if ruta.suffix.lower() == ".zip" and (entradas := _entradas_del_zip(ruta)):
+        if ruta.suffix.lower() == ".zip" and (entradas := entradas_del_zip(ruta)):
             res.append((ruta, entradas))
     return res
 
