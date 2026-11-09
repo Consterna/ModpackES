@@ -135,6 +135,11 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("1.20.5", "fabric", "fabric-1.20.6"),
         ("1.20.6", "fabric", "fabric-1.20.6"),
         ("1.19.3", "fabric", None),  # sin jar probado para esa versión
+        ("1.20.1", "quilt", "fabric-1.20.1"),  # Quilt carga los mods de Fabric
+        ("1.21.1", "quilt", "fabric-1.21.1"),
+        ("1.19.4", "quilt", "fabric-1.19.4"),
+        ("1.20.3", "quilt", None),  # no hay Quilted Fabric API para esa versión
+        ("1.21.4", "quilt", None),
         ("1.21.12", "fabric", None),
         ("1.19.2", "fabric", None),  # Fabric API no tiene evento de chat en esa versión
         ("1.21.4", "neoforge", None),
@@ -236,3 +241,10 @@ def test_cli_cobertura_en_json(tmp_path: Path, capsys: pytest.CaptureFixture[str
     salida = capsys.readouterr().out
     datos = json.loads(salida)  # solo JSON: sin cabecera ni líneas de texto
     assert any(h["categoria"] == "java" and "You can't use chat" in " ".join(h["ejemplos"]) for h in datos)
+
+
+def test_estado_en_quilt_avisa_que_es_el_mod_de_fabric(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1", "quilt")
+    with Instancia(juego) as inst:
+        texto = " ".join(mod_apoyo.estado(inst, tmp_path / "vacia"))
+    assert "fabric-1.20.1" in texto and "Quilted Fabric API" in texto and "no se ha probado en Quilt" in texto

@@ -46,6 +46,11 @@ SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("fabric", (26, 2, 0)): "fabric-26.1",
     ("fabric", (26, 3, 0)): "fabric-26.1",
 }
+#: Quilt carga los mods de Fabric con Quilted Fabric API, que existe para estas versiones (no para 1.20.3 ni 1.20.5).
+_VERSIONES_DE_QUILT: tuple[tuple[int, ...], ...] = (
+    (1, 19, 4), (1, 20, 0), (1, 20, 1), (1, 20, 2), (1, 20, 4), (1, 20, 6), (1, 21, 0), (1, 21, 1),
+)  # fmt: skip
+SOPORTADOS.update({("quilt", v): SOPORTADOS[("fabric", v)] for v in _VERSIONES_DE_QUILT})
 #: Combinaciones que no tendrán mod de apoyo y por qué (para decírselo al jugador en vez de «todavía no»).
 IMPOSIBLES: dict[tuple[str, tuple[int, ...]], str] = {
     ("fabric", (1, 19, 2)): (
@@ -96,6 +101,11 @@ def estado(instancia: Instancia, carpeta_jars: Path | None = None) -> list[str]:
     if destino is None:
         return [f"{_sin_mod(instancia)} El texto del código Java seguirá en inglés."]
     lineas = [f"Hay mod de apoyo para esta instancia ({destino})."]
+    if instancia.loader == "quilt":
+        lineas.append(
+            "Es el mod de Fabric: Quilt lo carga con Quilted Fabric API (necesita que esté instalada) y no se ha "
+            "probado en Quilt."
+        )
     lineas.append(
         "Esta copia de la aplicación lo trae."
         if jar_empaquetado(instancia, carpeta_jars)

@@ -14,9 +14,12 @@
 		"client": ["io.github.consterna.modpackes.ModpackESRuntime"]
 	},
 	"depends": {
-		"fabricloader": ">=0.15.11",
+		"fabricloader": ">=0.14.0",
 		"minecraft": "${minecraft_range}",
 		"java": ">=21",
-		"fabric-api": "*"
+		"fabric-message-api-v1": "*",
+		"fabric-screen-api-v1": "*",
+		"fabric-item-api-v1": "*",
+		"fabric-resource-loader-v0": "*"
 	}
 }
