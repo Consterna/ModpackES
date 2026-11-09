@@ -24,6 +24,7 @@ DESTINO = RAIZ / "src" / "traductor_es" / "recursos" / "mods"
 #: proyecto → (versión de Java, versión de Gradle) que pide su compilación
 PROYECTOS = {
     "forge-1.16.5": (17, "8.8"),
+    "forge-1.17.1": (17, "8.8"),
     "forge-1.18.2": (17, "8.8"),
     "forge-1.19.2": (17, "8.8"),
     "forge-1.20.1": (17, "8.8"),
@@ -31,6 +32,7 @@ PROYECTOS = {
     "neoforge-1.21.4": (21, "9.2.1"),
     "neoforge-1.21.5": (21, "9.2.1"),
     "neoforge-1.21.11": (21, "9.2.1"),
+    "neoforge-26.1": (25, "9.8.2"),
     "fabric-1.19.4": (21, "9.8.2"),
     "fabric-1.20.1": (21, "9.8.2"),
     "fabric-1.20.4": (21, "9.8.2"),
@@ -54,8 +56,9 @@ def _herramientas() -> Path:
 HERRAMIENTAS = _herramientas()
 
 
-#: Proyectos cuyo código se compila con otro JDK que el que ejecuta Gradle (Forge 1.16.5 corre con Java 8).
-TOOLCHAINS = {"forge-1.16.5": 8}
+#: Proyectos que además de su JDK necesitan otros que Gradle no baja solo (versiones de Java):
+#: Forge 1.16.5 compila con Java 8, Forge 1.17.1 pide un JDK 16 y NeoForge 26.x baja los assets con Java 21.
+TOOLCHAINS = {"forge-1.16.5": (8,), "forge-1.17.1": (16,), "neoforge-26.1": (21,)}
 
 
 def _jdk(version: int) -> Path:
@@ -132,7 +135,8 @@ def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = No
     orden = [*_gradle(proyecto), "test" if propiedades else "build", "--no-daemon", "--console=plain"]
     orden += [f"-P{p}" for p in propiedades or []]
     if nombre in TOOLCHAINS:  # que Gradle encuentre el JDK de compilación sin bajarlo por su cuenta
-        orden.append(f"-Porg.gradle.java.installations.paths={_jdk(TOOLCHAINS[nombre])}")
+        rutas = ",".join(str(_jdk(v)) for v in TOOLCHAINS[nombre])
+        orden.append(f"-Porg.gradle.java.installations.paths={rutas}")
     if sin_pruebas:
         orden += ["-x", "test"]
     codigo = _ejecutar(orden, proyecto, entorno)
