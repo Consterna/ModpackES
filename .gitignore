@@ -18,6 +18,7 @@ validador/clases/
 .corpus/
 .descargas/
 .modelos/
+.herramientas/
 
 # Datos locales
 *.db

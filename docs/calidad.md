@@ -23,11 +23,34 @@ Los textos más lejanos de la referencia eran alternativas válidas, no errores:
 «Pay de arándanos» por «Pay de mora azul», «Piscina de maná» por «Estanque de maná». Es el límite conocido
 de chrF: compara con una sola referencia.
 
+## 9 de noviembre de 2026 · textos reales de mods
+
+Segundo banco, de 250 textos de interfaz (150 frases y 100 nombres) tomados de mods de licencia libre que ya
+traen su traducción al español, de 1.7.10 a 1.21. Cada mod lo tradujo una persona distinta, así que hay mucha
+más variedad que en el banco anterior. Las referencias y los textos no se publican (ver
+[datos-de-terceros.md](datos-de-terceros.md)): el banco se arma en tu PC con `scripts/armar_banco_local.py`.
+
+| | Gemini 3.8 Flash | Gemma 4 E2B local (Q4, 3,3 GB) |
+|---|---|---|
+| Textos que pasaron las reglas | 250 de 250 | 189 de 250 (76 %) |
+| chrF promedio | 71,6 | 66,5 |
+| Tiempo | 13 s | 712 s |
+| Costo estimado | US$ 0,024 | 0 |
+
+Con textos reales el chrF baja respecto al banco escrito a mano (85,1) porque cada mod usa sus propias
+palabras («Criaturas» o «Mobs», «Elegantes» o «Detallados»). El modelo local pequeño dejó sin traducir
+algunos nombres propios del mod y 61 textos no pasaron las reglas de calidad, que en la app se reintentan o
+quedan en inglés. Es útil para traducir sin conexión ni costo, pero con menos calidad y bastante más lento
+que Gemini. Se midió en una RTX 4050 con 6 GB, usando unos 2 GB de RAM; el modelo no se incluye en el
+instalador.
+
 ## Cómo repetirlo
 
 ```
 uv run python scripts/medir_calidad.py --revisar
 uv run python scripts/medir_calidad.py --motor ollama --modelo NOMBRE --revisar
+uv run python scripts/armar_banco_local.py
+uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.json
 ```
 
 El costo es una estimación con los precios de Google de noviembre de 2026, no lo que cobró la API.
