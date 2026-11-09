@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -15,6 +16,29 @@ from traductor_es.validacion.java import ValidadorJava, biblioteca_mas_nueva, bu
 
 RAIZ = Path(__file__).resolve().parent.parent
 CORPUS = RAIZ / ".corpus"
+
+
+def _descargas() -> Path:
+    """TRADUCTOR_ES_DESCARGAS o .descargas del checkout principal (los worktrees comparten la misma)."""
+    propia = os.environ.get("TRADUCTOR_ES_DESCARGAS")
+    if propia:
+        return Path(propia)
+    try:
+        comun = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=RAIZ,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        if (Path(comun).parent / ".descargas").is_dir():
+            return Path(comun).parent / ".descargas"
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    return RAIZ / ".descargas"
+
+
+DESCARGAS = _descargas()
 PRISM = Path(os.environ.get("APPDATA", Path.home())) / "PrismLauncher"
 
 

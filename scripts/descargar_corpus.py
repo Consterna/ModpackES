@@ -50,6 +50,11 @@ PACKS = {
     "technical-electrical": "https://cdn.modrinth.com/data/PmwWNPV6/versions/mkpGUYy6/Technical%20Electrical%20Temporal%20Totality-26.1.8.mrpack",
     "supernova-empires-2": "https://cdn.modrinth.com/data/Or9UFKR8/versions/ndm0obMO/Supernova%20Empires%202%207.0.3.mrpack",
     "prominence-2-fabric": "https://cdn.modrinth.com/data/EGs3lC8D/versions/ga7DDH29/Prominence%E2%84%A2%20II%20Hasturian%20Era%20v4.1.6.mrpack",
+    # Licencia libre (MIT o GPL), elegidos para cubrir 1.7.10, 1.12.2, Forge 1.19.2 y Forge 1.20.1.
+    "heroes-1-7-10": "https://cdn.modrinth.com/data/NX36rCuV/versions/kSbNmDiW/Heroes%201.0.0.mrpack",
+    "chaseters-spoopy-1-12-2": "https://cdn.modrinth.com/data/V5Po0cpt/versions/Ud6pjxUz/Chaseter%27s%20Spoopy%20Modpack%201.0.0.mrpack",
+    "fundino-forge-1-20-1": "https://cdn.modrinth.com/data/AlEkX559/versions/iVJ2tGVM/FunDinoModpack%20Forge%201.20.1%203.1.0.mrpack",
+    "horrors-in-the-fog-1-19-2": "https://cdn.modrinth.com/data/uPkIzDYf/versions/e5sVUHuu/the%20horrors%20in%20the%20fog%20%281.19.2%29%201.1.9.mrpack",
 }
 
 #: Qué se baja de cada pack (rutas dentro del .mrpack).
@@ -86,13 +91,13 @@ def _rango(url: str, inicio: int, fin: int) -> bytes:
         return r.read()
 
 
-def _tamano(url: str) -> int:
+def tamano(url: str) -> int:
     req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": AGENTE})
     with urllib.request.urlopen(req, timeout=60) as r:
         return int(r.headers["Content-Length"])
 
 
-def _directorio_central(url: str, tamano: int) -> list[Entrada]:
+def directorio_central(url: str, tamano: int) -> list[Entrada]:
     cola = _rango(url, max(0, tamano - 65_557), tamano - 1)
     pos = cola.rfind(b"PK\x05\x06")
     if pos < 0:
@@ -139,7 +144,7 @@ def _elegida(nombre: str) -> bool:
     return nombre.startswith("overrides/kubejs/assets/") and any(x in nombre for x in EXTENSIONES_KUBEJS_ASSETS)
 
 
-def _bajar(url: str, e: Entrada) -> bytes:
+def bajar(url: str, e: Entrada) -> bytes:
     cabecera = _rango(url, e.desplazamiento, e.desplazamiento + 29)
     ln, le = struct.unpack("<HH", cabecera[26:30])
     inicio = e.desplazamiento + 30 + ln + le
@@ -153,7 +158,7 @@ def _bajar(url: str, e: Entrada) -> bytes:
 
 def bajar_pack(slug: str, url: str) -> None:
     destino = RAIZ / slug
-    entradas = [e for e in _directorio_central(url, _tamano(url)) if _elegida(e.nombre)]
+    entradas = [e for e in directorio_central(url, tamano(url)) if _elegida(e.nombre)]
     total = sum(e.comprimido for e in entradas)
     print(f"{slug}: {len(entradas)} archivos, {total / 1e6:.1f} MB comprimidos")
     if total > LIMITE_POR_PACK:
@@ -164,7 +169,7 @@ def bajar_pack(slug: str, url: str) -> None:
             continue
         ruta = destino / relativa
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_bytes(_bajar(url, e))
+        ruta.write_bytes(bajar(url, e))
     indice: Any = json.loads((destino / "modrinth.index.json").read_text(encoding="utf-8"))
     deps = indice.get("dependencies", {})
     mods = [f["path"] for f in indice.get("files", []) if str(f.get("path", "")).startswith("mods/")]

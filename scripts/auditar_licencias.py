@@ -46,25 +46,38 @@ def _clase(licencia: dict[str, Any]) -> str:
     return "libre" if LIBRES.match(spdx) else "revisar"
 
 
+def mods_por_hash(hashes: list[str]) -> dict[str, dict[str, str]]:
+    """{sha1: {slug, licencia, clase}} de los mods que Modrinth reconoce."""
+    if not hashes:
+        return {}
+    versiones: dict[str, Any] = _api("/version_files", {"hashes": hashes, "algorithm": "sha1"})
+    ids = sorted({v["project_id"] for v in versiones.values()})
+    proyectos: dict[str, Any] = {}
+    for i in range(0, len(ids), 200):
+        lote = urllib.parse.quote(json.dumps(ids[i : i + 200], separators=(",", ":")))
+        proyectos.update({x["id"]: x for x in _api("/projects?ids=" + lote)})
+    salida: dict[str, dict[str, str]] = {}
+    for h, v in versiones.items():
+        x = proyectos[v["project_id"]]
+        lic = x.get("license") or {}
+        salida[h] = {"slug": x["slug"], "licencia": str(lic.get("id", "?")), "clase": _clase(lic)}
+    return salida
+
+
 def auditar(slug: str) -> dict[str, Any]:
     indice = json.loads((RAIZ / slug / "modrinth.index.json").read_text(encoding="utf-8"))
     p = _api(f"/project/{_id_proyecto(PACKS[slug])}")
     hashes = [f["hashes"]["sha1"] for f in indice.get("files", []) if "sha1" in f.get("hashes", {})]
-    versiones: dict[str, Any] = _api("/version_files", {"hashes": hashes, "algorithm": "sha1"}) if hashes else {}
-    ids = sorted({v["project_id"] for v in versiones.values()})
-    proyectos: list[dict[str, Any]] = []
-    for i in range(0, len(ids), 200):
-        proyectos += _api("/projects?ids=" + urllib.parse.quote(json.dumps(ids[i : i + 200], separators=(",", ":"))))
-    por_clase: Counter[str] = Counter(_clase(x.get("license") or {}) for x in proyectos)
+    mods = mods_por_hash(hashes)
+    por_proyecto = {m["slug"]: m for m in mods.values()}
+    por_clase: Counter[str] = Counter(m["clase"] for m in por_proyecto.values())
     return {
         "pack": {"titulo": p["title"], "licencia": p.get("license"), "clase": _clase(p.get("license") or {})},
         "mods_en_indice": len(hashes),
-        "mods_identificados": len(ids),
+        "mods_identificados": len(por_proyecto),
         "mods_por_clase": dict(por_clase),
         "mods_licencia_a_revisar": sorted(
-            f"{x['slug']} ({(x.get('license') or {}).get('id', '?')})"
-            for x in proyectos
-            if _clase(x.get("license") or {}) == "revisar"
+            f"{m['slug']} ({m['licencia']})" for m in por_proyecto.values() if m["clase"] == "revisar"
         ),
     }
 
