@@ -17,6 +17,7 @@ validador/clases/
 # Bancos de pruebas con copias de modpacks reales (pesados y de terceros)
 .corpus/
 .descargas/
+.modelos/
 
 # Datos locales
 *.db

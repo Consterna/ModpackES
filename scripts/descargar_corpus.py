@@ -9,7 +9,9 @@ Uso:  uv run python scripts/descargar_corpus.py
 from __future__ import annotations
 
 import json
+import os
 import struct
+import subprocess
 import sys
 import urllib.request
 import zlib
@@ -17,7 +19,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-RAIZ = Path(__file__).resolve().parent.parent / ".descargas"
+
+def _raiz_descargas() -> Path:
+    """TRADUCTOR_ES_DESCARGAS, o .descargas del checkout principal (los worktrees comparten la misma)."""
+    propia = os.environ.get("TRADUCTOR_ES_DESCARGAS")
+    if propia:
+        return Path(propia)
+    aqui = Path(__file__).resolve().parent.parent
+    try:
+        comun = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=aqui,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        principal = Path(comun).parent
+        if (principal / ".descargas").is_dir():
+            return principal / ".descargas"
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    return aqui / ".descargas"
+
+
+RAIZ = _raiz_descargas()
 AGENTE = "ModpackES/2.0 (corpus de pruebas local)"
 
 PACKS = {
