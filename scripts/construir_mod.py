@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -80,6 +81,37 @@ def _gradle(proyecto: Path) -> list[str]:
     return [str(local)] if local.is_file() else [str(envoltorio)]  # el de .herramientas si está; si no, el del proyecto
 
 
+#: Lo que dice Gradle cuando falla la red al bajar su distribución, el loader o Minecraft (y no el código del mod).
+_FALLOS_DE_RED = (
+    "Read timed out", "Connect timed out", "Connection reset", "Premature end of Content-Length",
+    "Server returned HTTP response code: 5", "Could not GET", "UnknownHostException", "Host desconocido",
+)  # fmt: skip
+INTENTOS = 3
+
+
+def _ejecutar(orden: list[str], proyecto: Path, entorno: dict[str, str], espera: float = 20.0) -> int:
+    """Corre Gradle y repite hasta 3 veces solo si el fallo es de red; un error del código se devuelve a la primera."""
+    codigo = 1
+    for intento in range(1, INTENTOS + 1):
+        salida: list[str] = []
+        with subprocess.Popen(
+            orden, cwd=proyecto, env=entorno, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+        ) as proceso:  # fmt: skip
+            assert proceso.stdout is not None
+            for linea in proceso.stdout:
+                sys.stdout.buffer.write(linea.encode("utf-8", "replace"))
+                sys.stdout.buffer.flush()
+                salida.append(linea)
+        codigo = proceso.returncode
+        texto = "".join(salida)
+        if codigo == 0 or intento == INTENTOS or not any(f in texto for f in _FALLOS_DE_RED):
+            return codigo
+        print(f"{proyecto.name}: falló la red; reintento {intento + 1} de {INTENTOS} en {espera:.0f} s.", flush=True)
+        time.sleep(espera)
+    return codigo
+
+
 def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = None) -> int:
     proyecto = RAIZ / "mod-runtime" / nombre
     jdk = _jdk(PROYECTOS[nombre][0])
@@ -99,7 +131,7 @@ def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = No
         orden.append(f"-Porg.gradle.java.installations.paths={_jdk(TOOLCHAINS[nombre])}")
     if sin_pruebas:
         orden += ["-x", "test"]
-    codigo = subprocess.run(orden, cwd=proyecto, env=entorno, check=False).returncode
+    codigo = _ejecutar(orden, proyecto, entorno)
     if codigo or propiedades:
         return codigo
     jars = sorted(

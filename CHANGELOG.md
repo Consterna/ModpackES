@@ -38,7 +38,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
-- El kit para servidores incluye las funciones y los logros traducidos dondequiera que estén.
+- El kit para servidores incluye las funciones y los logros traducidos dondequiera que estén, también los de un datapack comprimido (`.zip`); los `.zip` que solo traen tips siguen fuera porque son de cliente.
+- «Instalar el mod de apoyo» copia el mod nuevo antes de borrar los viejos, para no dejarte sin mod si la copia falla, y «Estado del mod de apoyo» avisa cuando el jar instalado es de otra versión de Minecraft en lugar de decir que todo está listo.
 
 ## [2.2.0] - 2026-11-04
 

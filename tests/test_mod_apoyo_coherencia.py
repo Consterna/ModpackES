@@ -120,3 +120,39 @@ def test_lo_imposible_no_esta_tambien_soportado() -> None:
 )
 def test_el_lector_de_rangos(rango: str, version: str, esperado: bool) -> None:
     assert _acepta(rango, Version.de(version)) is esperado
+
+
+# ------------------------------------------------------------------ reintentos de red al compilar
+def _comando(tmp_path: Path, mensaje: str, falla_la_primera_vez: bool) -> list[str]:
+    """Un «Gradle» de mentira: escribe `mensaje` y falla (siempre, o solo la primera vez)."""
+    import sys
+
+    guion = tmp_path / "falso.py"
+    guion.write_text(
+        "import pathlib, sys\n"
+        f"marca = pathlib.Path({str(tmp_path / 'marca')!r})\n"
+        f"print({mensaje!r})\n"
+        f"if {falla_la_primera_vez!r} and marca.exists():\n    sys.exit(0)\n"
+        "marca.write_text('x')\nsys.exit(1)\n",
+        encoding="utf-8",
+    )
+    return [sys.executable, str(guion)]
+
+
+def test_un_fallo_de_red_se_reintenta(tmp_path: Path) -> None:
+    construir = _construir_mod()
+    orden = _comando(tmp_path, "java.net.SocketTimeoutException: Read timed out", falla_la_primera_vez=True)
+    assert construir._ejecutar(orden, tmp_path, dict(__import__("os").environ), espera=0) == 0
+
+
+def test_un_error_del_codigo_no_se_reintenta(tmp_path: Path) -> None:
+    construir = _construir_mod()
+    orden = _comando(tmp_path, "error: cannot find symbol", falla_la_primera_vez=True)
+    assert construir._ejecutar(orden, tmp_path, dict(__import__("os").environ), espera=0) == 1
+    assert (tmp_path / "marca").exists()  # corrió una sola vez: no hubo segundo intento que lo hiciera pasar
+
+
+def test_un_fallo_de_red_que_no_se_arregla_termina_tras_tres_intentos(tmp_path: Path) -> None:
+    construir = _construir_mod()
+    orden = _comando(tmp_path, "Server returned HTTP response code: 504", falla_la_primera_vez=False)
+    assert construir._ejecutar(orden, tmp_path, dict(__import__("os").environ), espera=0) == 1
