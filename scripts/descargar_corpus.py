@@ -83,6 +83,10 @@ PREFIJOS = (
     "overrides/config/paxi/",
 )
 EXTENSIONES_KUBEJS_ASSETS = ("/lang/",)  # de kubejs/assets solo los idiomas
+#: Otros sitios donde viven datapacks: la carpeta `resources/` de algunos packs (Legacies) y los de cada mundo.
+#: Se baja solo la parte de datos de texto, no texturas ni el mundo entero.
+DATOS_EN = {"overrides/resources/": ("/data/",), "overrides/saves/": ("/datapacks/",)}
+EXTENSIONES_DE_DATOS = (".json", ".mcfunction", ".snbt", ".zip")
 LIMITE_POR_PACK = 40 * 1024 * 1024
 
 
@@ -154,6 +158,9 @@ def _elegida(nombre: str) -> bool:
         return True
     if nombre.startswith(("overrides/kubejs/assets/", "overrides/resourcepacks/")) and nombre.endswith(".json"):
         return any(x in nombre for x in (*EXTENSIONES_KUBEJS_ASSETS, "/tips/"))
+    for inicio, marcas in DATOS_EN.items():
+        if nombre.startswith(inicio) and nombre.endswith(EXTENSIONES_DE_DATOS):
+            return any(m in nombre for m in marcas)
     return False
 
 

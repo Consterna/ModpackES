@@ -39,7 +39,16 @@ FC4 = (
     Path(os.environ.get("APPDATA", Path.home())) / "PrismLauncher" / "instances" / "Farming Crossing 4(1)" / "minecraft"
 )
 #: Lo que se copia de cada modpack: donde viven los datos de texto y los scripts.
-CARPETAS = ("kubejs", "global_packs", "datapacks", "config/openloader", "config/paxi", "resourcepacks")
+CARPETAS = (
+    "kubejs",
+    "global_packs",
+    "datapacks",
+    "config/openloader",
+    "config/paxi",
+    "resourcepacks",
+    "resources",
+    "saves",
+)
 LOADERS = {"forge": "forge", "neoforge": "neoforge", "fabric-loader": "fabric", "quilt-loader": "quilt"}
 
 

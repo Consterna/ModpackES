@@ -92,6 +92,11 @@ cómo saca los textos y cómo los reescribe), cita su documentación en un comen
 traduzca un caso real recortado, otra con algo que **no** debe tocarse y la de ida y vuelta (restaurar devuelve los bytes
 originales). `uv run python scripts/descargar_corpus.py` baja partes de modpacks públicos de Modrinth a `.descargas/`
 (Git lo ignora); `uv run pytest -m corpus` los usa para comprobar que lo traducido sigue siendo válido.
+Solo se baja lo que lleva texto (misiones, scripts, `kubejs/data`, `global_packs`, `datapacks`, `config/openloader`, `config/paxi`,
+la parte `data/` de `resources/` y los datapacks de cada mundo en `saves/`): si añades una carpeta nueva a `descargar_corpus.py`,
+añádela también a `CARPETAS` en `tests/test_corpus_datos.py` y vuelve a bajar los modpacks que ya tenías, que no la traen.
+Las 3 pruebas del corpus que se saltan son modpacks sin texto para el jugador (`technical-electrical`, `supernova-empires-2` y
+los datapacks de `better-mc-neoforge-bmc5`).
 
 ## El mod de apoyo (Java)
 
