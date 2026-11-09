@@ -142,8 +142,16 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("1.21.4", "quilt", None),
         ("1.21.12", "fabric", None),
         ("1.19.2", "fabric", None),  # Fabric API no tiene evento de chat en esa versión
-        ("1.21.4", "neoforge", None),
-        ("1.20.1", "neoforge", None),
+        ("1.21.4", "neoforge", "neoforge-1.21.4"),
+        ("1.21", "neoforge", "neoforge-1.21.1"),
+        ("1.21.3", "neoforge", "neoforge-1.21.1"),
+        ("1.21.5", "neoforge", "neoforge-1.21.5"),
+        ("1.21.8", "neoforge", "neoforge-1.21.5"),
+        ("1.21.10", "neoforge", "neoforge-1.21.5"),
+        ("1.21.11", "neoforge", "neoforge-1.21.11"),
+        ("1.20.4", "neoforge", None),
+        ("26.1", "neoforge", None),
+        ("1.20.1", "neoforge", "forge-1.20.1"),  # NeoForge 1.20.1 carga los mods de Forge
         ("1.12.2", "forge", None),
         ("1.19.4", "forge", None),
     ]
@@ -180,7 +188,7 @@ def test_instalar_con_errores_claros(tmp_path: Path) -> None:
 
 
 def test_cli_instalar_runtime_sin_soporte(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    juego = fabrica.prism(tmp_path, "1.21.4", "neoforge")
+    juego = fabrica.prism(tmp_path, "1.20.4", "neoforge")
     assert main(["instalar-runtime", str(juego.parent)]) != 0
     assert "Todavía no hay mod de apoyo" in capsys.readouterr().out  # los errores van por la salida normal
     assert main(["instalar-runtime", str(juego.parent), "--quitar"]) == 0
@@ -219,7 +227,7 @@ def test_plantillas_con_datos_variables_y_orden(tmp_path: Path, memoria: Memoria
 
 
 def test_estado_del_mod_de_apoyo(tmp_path: Path) -> None:
-    sin_soporte = fabrica.prism(tmp_path / "a", "1.21.4", "neoforge")
+    sin_soporte = fabrica.prism(tmp_path / "a", "1.20.4", "neoforge")
     with Instancia(sin_soporte) as inst:
         assert "no hay mod de apoyo" in mod_apoyo.estado(inst)[0].lower()
     juego = fabrica.prism(tmp_path / "b", "1.20.1", "forge")
@@ -248,3 +256,10 @@ def test_estado_en_quilt_avisa_que_es_el_mod_de_fabric(tmp_path: Path) -> None:
     with Instancia(juego) as inst:
         texto = " ".join(mod_apoyo.estado(inst, tmp_path / "vacia"))
     assert "fabric-1.20.1" in texto and "Quilted Fabric API" in texto and "no se ha probado en Quilt" in texto
+
+
+def test_estado_en_neoforge_1_20_1_avisa_que_es_el_mod_de_forge(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1", "neoforge")
+    with Instancia(juego) as inst:
+        texto = " ".join(mod_apoyo.estado(inst, tmp_path / "vacia"))
+    assert "forge-1.20.1" in texto and "fork de Forge" in texto and "no se ha probado" in texto

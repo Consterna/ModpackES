@@ -18,7 +18,16 @@ PREFIJO = "modpackes_runtime-"
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("forge", (1, 19, 2)): "forge-1.19.2",
     ("forge", (1, 20, 1)): "forge-1.20.1",
+    ("neoforge", (1, 20, 1)): "forge-1.20.1",  # NeoForge 1.20.1 es un fork de Forge y carga sus mods
+    # NeoForge solo publicó 1.21, 1.21.1, 1.21.3, 1.21.4, 1.21.5, 1.21.8, 1.21.10 y 1.21.11 en esa serie
+    ("neoforge", (1, 21, 0)): "neoforge-1.21.1",
     ("neoforge", (1, 21, 1)): "neoforge-1.21.1",
+    ("neoforge", (1, 21, 3)): "neoforge-1.21.1",
+    ("neoforge", (1, 21, 4)): "neoforge-1.21.4",
+    ("neoforge", (1, 21, 5)): "neoforge-1.21.5",
+    ("neoforge", (1, 21, 8)): "neoforge-1.21.5",
+    ("neoforge", (1, 21, 10)): "neoforge-1.21.5",
+    ("neoforge", (1, 21, 11)): "neoforge-1.21.11",
     ("fabric", (1, 19, 4)): "fabric-1.19.4",
     # Un jar sirve para varias versiones cuando el mismo código compila y pasa las pruebas contra cada una de ellas
     ("fabric", (1, 20, 0)): "fabric-1.20.1",
@@ -79,6 +88,18 @@ def _sin_mod(instancia: Instancia) -> str:
     return f"Todavía no hay mod de apoyo para Minecraft {instancia.version} con {loader}."
 
 
+def _nota_de_compatibilidad(instancia: Instancia) -> str | None:
+    """Cuando el jar es de otro loader que el de la instancia (y no se ha probado en él), se dice."""
+    if instancia.loader == "quilt":
+        return (
+            "Es el mod de Fabric: Quilt lo carga con Quilted Fabric API (necesita que esté instalada) y no se ha "
+            "probado en Quilt."
+        )
+    if instancia.loader == "neoforge" and instancia.version.partes == (1, 20, 1):
+        return "Es el mod de Forge 1.20.1: NeoForge 1.20.1 es un fork de Forge y debería cargarlo; no se ha probado."
+    return None
+
+
 def jar_empaquetado(instancia: Instancia, carpeta: Path | None = None) -> Path | None:
     """El jar más nuevo del mod de apoyo para esta instancia, si viene con la aplicación."""
     destino = destino_de(instancia)
@@ -101,11 +122,9 @@ def estado(instancia: Instancia, carpeta_jars: Path | None = None) -> list[str]:
     if destino is None:
         return [f"{_sin_mod(instancia)} El texto del código Java seguirá en inglés."]
     lineas = [f"Hay mod de apoyo para esta instancia ({destino})."]
-    if instancia.loader == "quilt":
-        lineas.append(
-            "Es el mod de Fabric: Quilt lo carga con Quilted Fabric API (necesita que esté instalada) y no se ha "
-            "probado en Quilt."
-        )
+    nota = _nota_de_compatibilidad(instancia)
+    if nota:
+        lineas.append(nota)
     lineas.append(
         "Esta copia de la aplicación lo trae."
         if jar_empaquetado(instancia, carpeta_jars)

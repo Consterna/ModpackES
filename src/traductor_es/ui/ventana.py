@@ -469,7 +469,7 @@ class Ventana(QMainWindow):
         self.c_java.setToolTip(
             "Algunos mods tienen mensajes escritos en su código y un resource pack no los alcanza. Esto los "
             "traduce a una tabla que lee el mod de apoyo «ModpackES Runtime» (Más ▸ Instalar el mod de apoyo). "
-            "Por ahora existe para Forge 1.19.2 y 1.20.1, NeoForge 1.21.1 y Fabric 1.19.4, "
+            "Por ahora existe para Forge 1.19.2 y 1.20.1, NeoForge 1.20.1 y de 1.21 a 1.21.11, y Fabric 1.19.4, "
             "de 1.20 a 1.20.6, de 1.21 a 1.21.11 y de 26.1 a 26.3. En Quilt usa los mods de Fabric."
         )
         self.c_java.setChecked(bool(self._preferencias.get("texto_java", False)))
