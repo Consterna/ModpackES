@@ -55,6 +55,41 @@ PACKS = {
     "chaseters-spoopy-1-12-2": "https://cdn.modrinth.com/data/V5Po0cpt/versions/Ud6pjxUz/Chaseter%27s%20Spoopy%20Modpack%201.0.0.mrpack",
     "fundino-forge-1-20-1": "https://cdn.modrinth.com/data/AlEkX559/versions/iVJ2tGVM/FunDinoModpack%20Forge%201.20.1%203.1.0.mrpack",
     "horrors-in-the-fog-1-19-2": "https://cdn.modrinth.com/data/uPkIzDYf/versions/e5sVUHuu/the%20horrors%20in%20the%20fog%20%281.19.2%29%201.1.9.mrpack",
+    # Packs con datapacks, funciones, logros y scripts propios (para probar los datos de texto). Elegidos
+    # mirando el índice del .mrpack: el contenido de cada uno está en el comentario.
+    # 1.20.1 fabric · funciones, logros, datapacks .zip
+    "animatecraft-lankeren": "https://cdn.modrinth.com/data/rqoNUSYX/versions/iRG9ktbA/Lankeren%201.1.5-fixed.mrpack",
+    # 1.20.1 neoforge · kubejs y kubejs/data
+    "slimecrew": "https://cdn.modrinth.com/data/u3eBhKdv/versions/VHuCfVgS/SlimeCrew%20Frontier%201.3.0.mrpack",
+    # 1.20.1 forge · kubejs/data
+    "omnicraft-modpack": "https://cdn.modrinth.com/data/hcyfOf6Q/versions/Zh2npQSZ/Omnicraft%202.0.mrpack",
+    # 1.20.1 forge · kubejs y kubejs/data
+    "stormforge": "https://cdn.modrinth.com/data/Mclf6Juw/versions/Q1Znj0cU/Stormforge%202.1.7.mrpack",
+    # 1.21.1 neoforge · kubejs
+    "create-cobblemon-season-1": "https://cdn.modrinth.com/data/Mo3YEbmr/versions/KFjm9wO7/Create%20Cobblemon%20Season%201%201.0.2.mrpack",
+    # 1.20.1 fabric · logros, datapacks .zip
+    "prominence-2-chinese": "https://cdn.modrinth.com/data/2Vp3Sdd5/versions/ttpetMlI/Prominence%20II%20Hasturian%20Era%20CN%203.9.2.mrpack",
+    # 1.20.1 forge · funciones
+    "battlearmorytacz": "https://cdn.modrinth.com/data/rQiXwLhB/versions/TX0XBjIG/BattleArmory%20TACZ%2026.0.5.mrpack",
+    # 1.20.1 forge · datapacks .zip
+    "better-mc-forge-bmc4": "https://cdn.modrinth.com/data/4BV47HRn/versions/bdRIjRgs/Better%20MC%20%5BFORGE%5D%201.20.1%201.20.1%20v59.mrpack",
+    # 1.20.1 fabric · kubejs, datapacks .zip
+    "landscapes-reimagined-genesis": "https://cdn.modrinth.com/data/MdznSbKA/versions/pBrfi38A/Landscapes%20Reimagined%20Genesis%203.2.mrpack",
+    # Más versiones y loaders (1.16.5, 1.18.2, 1.19.2 Quilt, 1.20.1, 1.21.11 y 26.x): SNBT y formatos viejos
+    # 1.19.2 quilt · kubejs 171 / data 1297 / funciones 9 / logros 130 / zips 0
+    "taidumcraft": "https://cdn.modrinth.com/data/qH6Phyax/versions/dmDeTjMb/TaidumCraft.mrpack",
+    # 26.1.2 fabric · kubejs 0 / data 0 / funciones 5 / logros 176 / zips 0
+    "legacies": "https://cdn.modrinth.com/data/nWCaRO9f/versions/x4WpILDH/Legacies%2026-v4.1.mrpack",
+    # 1.16.5 forge · kubejs 125 / data 5 / funciones 0 / logros 0 / zips 0
+    "techblock-skytech-3": "https://cdn.modrinth.com/data/jRXzxVGA/versions/IHN5lWsY/TechBlock%20-%20SkyTech%203%201.2.1.mrpack",
+    # 1.18.2 forge · kubejs 7 / data 0 / funciones 0 / logros 0 / zips 0
+    "adventures-of-berk": "https://cdn.modrinth.com/data/zTK0MLqP/versions/yIog8kuK/Adventures%20of%20Berk%200.0.1.mrpack",
+    # 1.20.1 fabric · kubejs 3 / data 258 / funciones 0 / logros 123 / zips 0
+    "spectral-creation": "https://cdn.modrinth.com/data/eqbP6Ycz/versions/iJhfeFZL/Spectral%20Creation%201.20.1-7.1.1.mrpack",
+    # 1.18.2 forge · kubejs 0 / data 0 / funciones 0 / logros 0 / zips 16
+    "kings-dragons-of-berk": "https://cdn.modrinth.com/data/UmIII5vC/versions/b82038X3/Kings_dragon%201.0.0.mrpack",
+    # 1.21.11 fabric · kubejs 0 / data 0 / funciones 0 / logros 0 / zips 6
+    "better-adventures-plus-plus": "https://cdn.modrinth.com/data/23niDfW7/versions/e18PwvTU/Better%20Adventures%2B%2B%201.3.mrpack",
 }
 
 #: Qué se baja de cada pack (rutas dentro del .mrpack).
@@ -70,8 +105,18 @@ PREFIJOS = (
     "overrides/kubejs/server_scripts/",
     "overrides/kubejs/startup_scripts/",
     "overrides/patchouli_books/",
+    # Datos de texto que ve el jugador: funciones, logros y datapacks, vengan de donde vengan
+    "overrides/kubejs/data/",
+    "overrides/global_packs/",
+    "overrides/datapacks/",
+    "overrides/config/openloader/",
+    "overrides/config/paxi/",
 )
 EXTENSIONES_KUBEJS_ASSETS = ("/lang/",)  # de kubejs/assets solo los idiomas
+#: Otros sitios donde viven datapacks: la carpeta `resources/` de algunos packs (Legacies) y los de cada mundo.
+#: Se baja solo la parte de datos de texto, no texturas ni el mundo entero.
+DATOS_EN = {"overrides/resources/": ("/data/",), "overrides/saves/": ("/datapacks/",)}
+EXTENSIONES_DE_DATOS = (".json", ".mcfunction", ".snbt", ".zip")
 LIMITE_POR_PACK = 40 * 1024 * 1024
 
 
@@ -141,7 +186,12 @@ def _elegida(nombre: str) -> bool:
         return False
     if nombre in EXACTOS or nombre.startswith(PREFIJOS):
         return True
-    return nombre.startswith("overrides/kubejs/assets/") and any(x in nombre for x in EXTENSIONES_KUBEJS_ASSETS)
+    if nombre.startswith(("overrides/kubejs/assets/", "overrides/resourcepacks/")) and nombre.endswith(".json"):
+        return any(x in nombre for x in (*EXTENSIONES_KUBEJS_ASSETS, "/tips/"))
+    for inicio, marcas in DATOS_EN.items():
+        if nombre.startswith(inicio) and nombre.endswith(EXTENSIONES_DE_DATOS):
+            return any(m in nombre for m in marcas)
+    return False
 
 
 def bajar(url: str, e: Entrada) -> bytes:
@@ -181,9 +231,14 @@ def bajar_pack(slug: str, url: str) -> None:
 
 def main() -> int:
     elegidos = sys.argv[1:] or list(PACKS)
+    fallos = 0
     for slug in elegidos:
-        bajar_pack(slug, PACKS[slug])
-    return 0
+        try:
+            bajar_pack(slug, PACKS[slug])
+        except (RuntimeError, OSError) as e:  # un pack que no se puede bajar no detiene a los demás
+            print(f"{slug}: no se bajó ({e})")
+            fallos += 1
+    return 1 if fallos == len(elegidos) else 0
 
 
 if __name__ == "__main__":

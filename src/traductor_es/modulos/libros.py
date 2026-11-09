@@ -255,29 +255,35 @@ class Libros:
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
         resumen = Resumen()
         for a in self._archivos:
-            generado: bytes | None = None
-            for variante in self.ctx.variantes:
-                destino = a.destino(variante)
-                if variante in a.existentes:
-                    # Ya hay traducción del autor: si el pack tiene una copia vieja en esa ruta, que sea la oficial
-                    if not a.externo and self._en_pack(destino) not in (None, a.existentes[variante]):
-                        resumen.archivos.append(self.ctx.pack_listo().escribir(destino, a.existentes[variante]))
-                    continue
-                copia = next((a.existentes[v] for v in (*_PREFERIDAS, *a.existentes) if v in a.existentes), None)
-                if copia is not None:
-                    contenido = copia
-                else:
-                    if a.generar is None:
-                        continue
-                    if generado is None:
-                        generado, hechos, faltan = a.generar(traducciones)
-                        resumen.traducidos += hechos
-                        resumen.pendientes += faltan
-                        if hechos == 0:
-                            break  # nada traducido: el juego ya usa el inglés por su cuenta
-                    contenido = generado
-                resumen.archivos.append(self._escribir(a, destino, contenido))
+            try:
+                self._escribir_libro(a, traducciones, resumen)
+            except ValueError as e:  # una ruta imposible de guardar en el pack: ese libro se deja en inglés
+                self.ctx.registro(f"No pude guardar un libro: {e}")
         return resumen
+
+    def _escribir_libro(self, a: _Archivo, traducciones: Mapping[str, str], resumen: Resumen) -> None:
+        generado: bytes | None = None
+        for variante in self.ctx.variantes:
+            destino = a.destino(variante)
+            if variante in a.existentes:
+                # Ya hay traducción del autor: si el pack tiene una copia vieja en esa ruta, que sea la oficial
+                if not a.externo and self._en_pack(destino) not in (None, a.existentes[variante]):
+                    resumen.archivos.append(self.ctx.pack_listo().escribir(destino, a.existentes[variante]))
+                continue
+            copia = next((a.existentes[v] for v in (*_PREFERIDAS, *a.existentes) if v in a.existentes), None)
+            if copia is not None:
+                contenido = copia
+            else:
+                if a.generar is None:
+                    continue
+                if generado is None:
+                    generado, hechos, faltan = a.generar(traducciones)
+                    resumen.traducidos += hechos
+                    resumen.pendientes += faltan
+                    if hechos == 0:
+                        break  # nada traducido: el juego ya usa el inglés por su cuenta
+                contenido = generado
+            resumen.archivos.append(self._escribir(a, destino, contenido))
 
     def _en_pack(self, relativa: str) -> bytes | None:
         pack = self.ctx.pack

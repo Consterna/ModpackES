@@ -6,6 +6,41 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Texto escrito en el código de los mods** (opcional, apagado por defecto): la app traduce las frases que encuentra en el código Java de los
+  mods y las guarda en una tabla del resource pack; el nuevo mod de apoyo **ModpackES Runtime** (solo cliente, para Forge 1.16.5, 1.18.2, 1.19.2 y 1.20.1, NeoForge 1.20.1 y de 1.21 a 1.21.11, y Fabric 1.19.4, de 1.20 a 1.20.6, de 1.21 a 1.21.11 y de 26.1 a 26.3, y Quilt con los mods de Fabric hasta 1.21.1) las muestra en
+  español en el chat, la barra de acción, los tooltips y el texto de los botones de una pantalla al abrirla (en Forge y NeoForge también los tooltips que no son de objetos). No cambia el texto que una pantalla dibuja directamente. Solo cambia textos idénticos a los de la tabla. «Más ▸ Instalar el mod de apoyo» y
+  «Quitar el mod de apoyo», `modpackes instalar-runtime` y `--java` en `analizar` y `traducir`. El CI compila el mod con sus pruebas.
+
+- **Mensajes de chat y datos de texto**, que antes quedaban en inglés:
+  - El texto de `tellraw`, `title`, `say`, `msg`, `tell` y `w` en las funciones (`.mcfunction`) y en lo que un script de
+    KubeJS manda con `runCommand` o `runCommandSilent`.
+  - Títulos y descripciones de logros, y los consejos de las pantallas de carga (mod Tips, en sus dos formatos).
+  - Mensajes que un script arma por partes (`mensaje += efecto.name; player.tell(mensaje)`), con sus tablas de nombres.
+  - `notify`, `kick`, `openChestGUI` y `openInventoryGUI` de KubeJS (métodos tomados del código de KubeJS 1.20 y 1.21).
+- **Plantillas en el mod de apoyo:** una frase con datos variables escrita con `%s` o `%d` (p. ej. «Hello %s, welcome back!») se traduce y el mod la reconoce con cualquier dato («Hello Steve, welcome back!»). Se descartan las traducciones que cambian el orden de los datos o pierden alguno, y las plantillas con casi nada de texto fijo.
+- **Informe «Qué queda en inglés»:** ahora se ve en un cuadro con las categorías separadas y se puede guardar (`Más ▸ Guardar el informe…`); `modpackes cobertura --json` lo escribe como JSON para otros programas. `Más ▸ Comprobar el mod de apoyo` dice si el mod está en `mods/`, si esta copia lo trae y si ya hay tabla de textos.
+- **Modo exhaustivo** para los scripts de KubeJS (opcional, apagado por defecto; `--exhaustivo` y una casilla en «Opciones avanzadas»): traduce también toda frase que parezca texto aunque no se sepa dónde se muestra. Puede tocar lógica; todo queda con copia de seguridad. Nunca toca `console.log` ni comparaciones.
+- **Funciones propias de un script que solo muestran texto** (`CreateStringTooltip(evento, objeto, texto)`, `crear(id, nombre)`…): se traduce lo que se les pasa en la posición de ese parámetro. Es conservador: si el parámetro se compara, se busca, se guarda, se devuelve, va en un id o en un comando, o la función se usa como valor o está repetida, no se toca nada. Un `id` junto a un `nombre` queda intacto. En un modpack real (TaidumCraft) pasó de 101 a 35 frases sin elegir.
+- Los métodos de texto de KubeJS ahora dependen de la versión (`notify`, `openChestGUI`… solo donde existen), comprobados en el código de KubeJS de 1.12 a 26.x (`formatos/kubejs_api.py`).
+- Mercado de Farming for Blockheads (`farmingforblockheads_compat`): se traducen los nombres de las pestañas.
+- El informe «Qué queda en inglés» también avisa de carpetas de datos con frases en inglés cuyo formato la app no conoce.
+- El informe también avisa de los comandos de otros mods (como `emberstextapi queue` o `/eta queue`) que llevan una frase en inglés dentro de un script: la app no conoce su formato y no los toca, pero ya no pasan en silencio.
+- Estos datos se buscan por su estructura y no por la carpeta de un modpack: `kubejs/data`, `global_packs`, `datapacks`,
+  `config/openloader`, los datapacks de un mundo y cualquier otra con `data/<espacio>/functions/…`, sueltos o dentro de un `.zip`
+  (se reescribe el zip y se guarda el original). Los componentes de texto valen en JSON y en SNBT (1.21.5 y posteriores).
+- **Más ▸ Qué queda en inglés** y `modpackes cobertura`: lista lo que no se puede traducir y por qué (frases de scripts cuyo uso
+  no se entiende y texto escrito en el código de los mods, leído de la tabla de constantes de cada clase). Solo lee.
+  El análisis avisa de las frases de scripts que parecen texto.
+- Pruebas con modpacks públicos de Modrinth (16 más en `scripts/descargar_corpus.py`, de 1.16.5 a 26.x con Forge, NeoForge, Fabric y Quilt) y con la instancia propia: lo traducido
+  sigue siendo válido, repetir no cambia nada y restaurar devuelve los bytes originales.
+
+### Cambiado
+
+- El kit para servidores incluye las funciones y los logros traducidos dondequiera que estén, también los de un datapack comprimido (`.zip`); los `.zip` que solo traen tips siguen fuera porque son de cliente.
+- «Instalar el mod de apoyo» copia el mod nuevo antes de borrar los viejos, para no dejarte sin mod si la copia falla, y «Estado del mod de apoyo» avisa cuando el jar instalado es de otra versión de Minecraft en lugar de decir que todo está listo.
+
 ## [2.2.0] - 2026-11-04
 
 Interfaz nueva: una ventana guiada en pasos, con tarjetas y un solo botón principal, y un tema propio

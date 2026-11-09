@@ -9,7 +9,9 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 from . import NOMBRE, __version__, configuracion
+from .fuentes.instancia import Instancia
 from .fuentes.lanzadores import buscar
+from .modulos.cobertura import informe_en_json
 from .motores import fabrica
 from .motores.base import Cancelado, ErrorFatal, Motor
 from .motores.gemini import MODELO_POR_DEFECTO
@@ -17,6 +19,7 @@ from .motores.simulador import Simulador
 from .nucleo.dialectos import DIALECTOS
 from .proceso import GRUPOS, Informe, Proceso
 from .registro import LOGGER, configurar
+from .salida import mod_apoyo
 
 
 def _escribir(texto: str) -> None:
@@ -77,6 +80,16 @@ def _argumentos() -> argparse.ArgumentParser:
         p.add_argument("--lotes", action="store_true", help="usar la Batch API de Gemini (mitad de precio, tarda más)")
         p.add_argument("--contexto", default="", help="ambientación del modpack para el tono y los términos")
         p.add_argument("--revisar", action="store_true", help="revisión automática de misiones y libros (cuesta más)")
+        p.add_argument(
+            "--exhaustivo",
+            action="store_true",
+            help="en los scripts de KubeJS traduce toda frase, aunque no se sepa dónde se muestra (puede tocar lógica)",
+        )
+        p.add_argument(
+            "--java",
+            action="store_true",
+            help="también el texto escrito en el código de los mods (lo muestra el mod de apoyo; ver instalar-runtime)",
+        )
 
     comunes(sub.add_parser("analizar", help="cuenta lo que falta traducir y estima el costo (no escribe nada)"))
     traducir = sub.add_parser("traducir", help="traduce y escribe el resultado")
@@ -85,6 +98,15 @@ def _argumentos() -> argparse.ArgumentParser:
     traducir.add_argument("--simular", action="store_true", help="prueba sin API: antepone «ES» a todo")
     traducir.add_argument("--no-activar", action="store_true", help="no tocar options.txt")
     traducir.add_argument("--no-idioma", action="store_true", help="no cambiar el idioma del juego")
+    cob = sub.add_parser("cobertura", help="dice qué texto queda en inglés y por qué (solo lee, no escribe nada)")
+    cob.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
+    cob.add_argument("--java", action="store_true", help="también el texto escrito en el código de los mods (tarda)")
+    cob.add_argument("--json", action="store_true", help="escribe solo el informe, como JSON (UTF-8)")
+    rt = sub.add_parser(
+        "instalar-runtime", help="pone o quita el mod de apoyo que muestra el texto del código de los mods"
+    )
+    rt.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
+    rt.add_argument("--quitar", action="store_true", help="quita el mod de apoyo de mods/")
     restaurar = sub.add_parser("restaurar", help="devuelve misiones, scripts y libros propios a su original")
     restaurar.add_argument("carpeta")
     modelos = sub.add_parser("modelos", help="lista los modelos que ofrece el motor")
@@ -106,6 +128,8 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
     with Proceso(
         args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
         hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
+        texto_java=args.java,
+        scripts_exhaustivo=args.exhaustivo,
     ) as p:  # fmt: skip
         _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
         if args.orden == "analizar":
@@ -113,6 +137,28 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
         else:
             informe = p.ejecutar(activar=not args.no_activar, poner_idioma=not args.no_idioma)
     _mostrar(informe, args)
+
+
+def _instalar_runtime(args: argparse.Namespace) -> None:
+    with Instancia(args.carpeta) as inst:
+        if not args.quitar:
+            _escribir(f"Instalado: {mod_apoyo.instalar(inst)}")
+            return
+        quitados = mod_apoyo.quitar(inst)
+        _escribir("Quité: " + ", ".join(p.name for p in quitados) if quitados else "No había mod de apoyo instalado.")
+
+
+def _cobertura(args: argparse.Namespace) -> None:
+    with Proceso(args.carpeta, Simulador(), registro=(lambda _m: None) if args.json else _escribir) as p:
+        if not args.json:
+            _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
+        hallazgos = p.que_queda(java=args.java)
+    if args.json:
+        _escribir(informe_en_json(hallazgos))
+        return
+    for h in hallazgos:
+        _escribir(f"[{h.categoria}] {h}")
+    _escribir(f"{len(hallazgos)} hallazgos." if hallazgos else "No encontré texto que quede en inglés.")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -124,6 +170,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.orden == "instancias":
             for e in buscar():
                 _escribir(f"{e.lanzador}: {e.nombre}\n    {e.juego}")
+        elif args.orden == "instalar-runtime":
+            _instalar_runtime(args)
+        elif args.orden == "cobertura":
+            _cobertura(args)
         elif args.orden == "clave":
             nombre = fabrica.MOTORES[args.motor]
             if args.accion == "guardar":

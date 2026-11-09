@@ -33,3 +33,7 @@ build_exe.log
 # Prototipo antiguo que quedó en la carpeta del proyecto (no forma parte de la app)
 /traducir_mods.py
 /TraductorModpacks/
+
+# Herramientas de compilación del mod de apoyo (JDK, Gradle, caché de Forge) y su jar compilado
+.herramientas/
+src/traductor_es/recursos/mods/*.jar

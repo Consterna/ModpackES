@@ -21,7 +21,7 @@ jobs:
   verificar:
     name: Verificar y construir el .exe
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45  # con los reintentos de red al compilar los mods
     outputs:
       artefacto: ${{ steps.subir.outputs.artifact-id }}
     steps:
@@ -51,6 +51,47 @@ jobs:
 
       - name: Puerta de calidad (ruff, pyright y pytest con el validador Java)
         run: uv run python scripts/verificar.py
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "25"  # Minecraft 26.x (Fabric 26.1) pide Java 25
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "8"  # Minecraft 1.16.5 (Forge 1.16.5) se compila con Java 8
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"  # ForgeGradle 6 (Forge 1.18.2, 1.19.2 y 1.20.1) pide Java 17
+
+      # Con las cuatro versiones instaladas (25, 8 y 17 aquí, 21 más arriba; la última, 17, es la predeterminada), el script elige la que pide cada mod
+      # (Forge 1.18.2, 1.19.2 y 1.20.1: Java 17; NeoForge 1.21.1 y Fabric hasta 1.21.11: Java 21; Fabric 26.1: Java 25; Forge 1.16.5 compila su código con Java 8)
+      # por las variables JAVA_HOME_8_X64, JAVA_HOME_17_X64, JAVA_HOME_21_X64 y JAVA_HOME_25_X64.
+      # Cada proyecto de mod baja su propia distribución de Gradle (3 distintas) y los servidores de descarga fallan a
+      # veces con un 504. Lo ya bajado se guarda entre ejecuciones, también si esta falla, para no repetirlo.
+      - name: Restaurar las distribuciones de Gradle
+        continue-on-error: true  # la caché nunca debe romper la compilación
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-dists-${{ hashFiles('mod-runtime/*/gradle/wrapper/gradle-wrapper.properties') }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-dists-${{ hashFiles('mod-runtime/*/gradle/wrapper/gradle-wrapper.properties') }}-
+            gradle-dists-
+
+      - name: Compilar los mods de apoyo (ModpackES Runtime) con sus pruebas
+        run: uv run python scripts/construir_mod.py
+
+      - name: Guardar las distribuciones de Gradle
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-dists-${{ hashFiles('mod-runtime/*/gradle/wrapper/gradle-wrapper.properties') }}-${{ github.run_id }}
 
       - name: Construir ModpackES.exe
         run: uv run python scripts/construir_exe.py
