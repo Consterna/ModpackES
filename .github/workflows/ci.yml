@@ -65,11 +65,16 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
         with:
           distribution: temurin
+          java-version: "16"  # ForgeGradle pide un JDK 16 para Minecraft 1.17.1 (Forge 1.17.1)
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
           java-version: "17"  # ForgeGradle 6 (Forge 1.18.2, 1.19.2 y 1.20.1) pide Java 17
 
-      # Con las cuatro versiones instaladas (25, 8 y 17 aquí, 21 más arriba; la última, 17, es la predeterminada), el script elige la que pide cada mod
-      # (Forge 1.18.2, 1.19.2 y 1.20.1: Java 17; NeoForge 1.21.1 y Fabric hasta 1.21.11: Java 21; Fabric 26.1: Java 25; Forge 1.16.5 compila su código con Java 8)
-      # por las variables JAVA_HOME_8_X64, JAVA_HOME_17_X64, JAVA_HOME_21_X64 y JAVA_HOME_25_X64.
+      # Con las cinco versiones instaladas (25, 8, 16 y 17 aquí, 21 más arriba; la última, 17, es la predeterminada), el script elige la que pide cada mod
+      # (Forge 1.17.1, 1.18.2, 1.19.2 y 1.20.1: Java 17; NeoForge 1.21.1 y Fabric hasta 1.21.11: Java 21; Fabric y NeoForge 26.1: Java 25; Forge 1.16.5 compila su código con Java 8 y Forge 1.17.1 pide además un JDK 16; NeoForge 26.1 baja sus assets con Java 21)
+      # por las variables JAVA_HOME_8_X64, JAVA_HOME_16_X64, JAVA_HOME_17_X64, JAVA_HOME_21_X64 y JAVA_HOME_25_X64.
       # Cada proyecto de mod baja su propia distribución de Gradle (3 distintas) y los servidores de descarga fallan a
       # veces con un 504. Lo ya bajado se guarda entre ejecuciones, también si esta falla, para no repetirlo.
       - name: Restaurar las distribuciones de Gradle
