@@ -78,11 +78,37 @@ referencia también baja el puntaje, así que revisa los ejemplos que lista el s
 | `src/traductor_es/nucleo` | Marcadores de códigos, memoria y correcciones, glosario, variantes de español y el orquestador de traducción |
 | `src/traductor_es/formatos` | Lectura y escritura sin pérdidas: SNBT, JSON, NBT, `.lang`, JavaScript y markdown |
 | `src/traductor_es/fuentes` | Lanzadores, versión, loader, jars y prioridad de los resource packs |
-| `src/traductor_es/modulos` | Misiones, libros, scripts y mods: qué se traduce y dónde se escribe |
+| `src/traductor_es/modulos` | Misiones, libros, scripts, datos (funciones, logros, tips) y mods: qué se traduce y dónde se escribe; `cobertura.py` dice qué queda en inglés |
 | `src/traductor_es/motores` | Gemini, el motor compatible con OpenAI, las instrucciones comunes a todos, la fábrica de motores y el simulador para pruebas |
 | `src/traductor_es/salida` | Resource pack, `options.txt`, copias de seguridad y exportación |
 | `src/traductor_es/validacion` | Reglas de calidad, revisión automática, medición con el banco de referencia y el validador con los parsers del juego (Java) |
 | `src/traductor_es/ui` | La ventana y el editor de correcciones (PySide6) |
+
+## Agregar un formato de texto nuevo
+
+Los archivos de texto de datapacks y packs de recursos (funciones, logros, tips…) se reconocen por su ruta y su formato,
+no por el modpack. Para agregar uno, escribe un `Formato` en `src/traductor_es/modulos/datos.py` (qué ruta lo reconoce,
+cómo saca los textos y cómo los reescribe), cita su documentación en un comentario y agrega a `tests/` una prueba que
+traduzca un caso real recortado, otra con algo que **no** debe tocarse y la de ida y vuelta (restaurar devuelve los bytes
+originales). `uv run python scripts/descargar_corpus.py` baja partes de modpacks públicos de Modrinth a `.descargas/`
+(Git lo ignora); `uv run pytest -m corpus` los usa para comprobar que lo traducido sigue siendo válido.
+Solo se baja lo que lleva texto (misiones, scripts, `kubejs/data`, `global_packs`, `datapacks`, `config/openloader`, `config/paxi`,
+la parte `data/` de `resources/` y los datapacks de cada mundo en `saves/`): si añades una carpeta nueva a `descargar_corpus.py`,
+añádela también a `CARPETAS` en `tests/test_corpus_datos.py` y vuelve a bajar los modpacks que ya tenías, que no la traen.
+Las 3 pruebas del corpus que se saltan son modpacks sin texto para el jugador (`technical-electrical`, `supernova-empires-2` y
+los datapacks de `better-mc-neoforge-bmc5`).
+
+## El mod de apoyo (Java)
+
+Cada carpeta de `mod-runtime/` (`forge-1.16.5`, `forge-1.18.2`, `forge-1.19.2`, `forge-1.20.1`, `neoforge-1.21.1`, `neoforge-1.21.4`, `neoforge-1.21.5`, `neoforge-1.21.11`, `fabric-1.19.4`, `fabric-1.20.1`, `fabric-1.20.4`, `fabric-1.20.6`, `fabric-1.21.1`, `fabric-1.21.4`, `fabric-1.21.5`, `fabric-1.21.11`, `fabric-26.1`) es un mod solo de cliente que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Todos comparten la lógica de tabla y plantillas, que vive en `mod-runtime/comun/` (la tabla es de todos; el reescritor tiene una variante por forma de guardar el texto: `reescritor-literal`, `reescritor-plano` para 1.20.3 en adelante, con `reescritor-plano-1215` solo para sus pruebas desde 1.21.5, donde cambió `ClickEvent`, y `reescritor-sin-reserva` para 1.19.2 `reescritor-texto` para 1.18.2, donde el texto aún es `TextComponent`, y `reescritor-1165` para 1.16.5, con los nombres antiguos de las clases, sin tooltips por elementos y en Java 8; por eso `Tabla` evita todo lo posterior a Java 8), y cada proyecto solo trae su gancho con el loader. Forge 1.16.5, 1.18.2, 1.19.2 y 1.20.1 se compilan con ForgeGradle 6 y Java 17 (el de 1.16.5 compila su código con un JDK 8, que `construir_mod.py` le pasa a Gradle como toolchain); NeoForge 1.21.1, con ModDevGradle, Gradle 9 y Java 21; Fabric, con Loom 1.17, Gradle 9 y Java 21 (los de 1.19.4, 1.20.1 y 1.20.4 quedan compilados para Java 17; los de 1.20.6 en adelante, para Java 21); Fabric 26.1, con Loom 1.19 sin remapeo (Minecraft 26.x ya no está ofuscado) y Java 25:
+
+```
+uv run python scripts/construir_mod.py [forge-1.16.5 | forge-1.18.2 | forge-1.19.2 | forge-1.20.1 | neoforge-1.21.1 | neoforge-1.21.4 | neoforge-1.21.5 | neoforge-1.21.11 | fabric-1.19.4 | fabric-1.20.1 | fabric-1.20.4 | fabric-1.20.6 | fabric-1.21.1 | fabric-1.21.4 | fabric-1.21.5 | fabric-1.21.11 | fabric-26.1]
+```
+
+Si Gradle falla por la red (por ejemplo, un «Read timed out» o un HTTP 5xx al bajar su distribución o Minecraft), el script lo reintenta hasta 5 veces, esperando 30, 60, 90 y 120 s; un error del código o de una prueba no se reintenta. El wrapper de cada proyecto espera hasta 120 s en esas descargas (`networkTimeout`). El CI además guarda `~/.gradle/wrapper/dists` entre ejecuciones (`actions/cache`, también si la ejecución falla) para no volver a bajar las tres distribuciones de Gradle cada vez. `tests/test_mod_apoyo_coherencia.py` comprueba que la tabla `SOPORTADOS`, los proyectos de `mod-runtime/` y los rangos de versiones que declaran coincidan, sin compilar nada.
+
+Corre las pruebas de Java (JUnit) y deja el jar en `src/traductor_es/recursos/mods/` (Git lo ignora; el CI lo construye y `construir_exe.py` lo incluye). Un loader o versión nuevo es un proyecto nuevo en `mod-runtime/` (copia el más cercano y lee el código real de esa versión: los nombres de las clases y los eventos cambian), una entrada en `PROYECTOS` de `scripts/construir_mod.py` y otra en `SOPORTADOS` de `salida/mod_apoyo.py`. Un mismo jar puede servir para varias versiones vecinas si el mismo código compila y pasa las pruebas contra cada una: `uv run python scripts/construir_mod.py fabric-1.21.5 --propiedad minecraft_version=1.21.8 --propiedad fabric_api_version=0.136.1+1.21.8 --propiedad loader_version=0.16.13` lo comprueba sin generar jar, y el rango comprobado va en `minecraft_range` del proyecto y en `SOPORTADOS`. Quilt no tiene proyectos propios: carga los mods de Fabric con Quilted Fabric API, y `_VERSIONES_DE_QUILT` lista las versiones donde esa API existe. Si una versión no puede tener mod, se anota en `IMPOSIBLES` con el motivo (Fabric 1.16.5, 1.18.2 y 1.19.2 no tienen evento de chat del cliente).
 
 ## Licencia de las contribuciones
 

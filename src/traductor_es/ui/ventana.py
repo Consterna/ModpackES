@@ -47,8 +47,9 @@ from PySide6.QtWidgets import (
 
 from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, actualizaciones, configuracion, registro
 from ..actualizaciones import Novedad
-from ..fuentes.instancia import resolver_carpeta_juego
+from ..fuentes.instancia import Instancia, resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
+from ..modulos.cobertura import Hallazgo, texto_del_informe
 from ..motores import fabrica
 from ..motores.base import Cancelado, ErrorFatal, Motor
 from ..motores.compatible import Compatible
@@ -56,7 +57,7 @@ from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
 from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
-from ..salida import exportar
+from ..salida import exportar, mod_apoyo
 from . import correcciones, iconos, tema
 from .bienvenida import TarjetaBienvenida
 from .componentes import (
@@ -70,6 +71,7 @@ from .componentes import (
     icono_en_boton,
     seguir_tema,
 )
+from .informe import DialogoInforme
 from .instancias import Lector, ListaInstancias, traducida
 from .motor import DialogoMotor
 
@@ -159,12 +161,16 @@ class Trabajador(QObject):
                 usar_lotes=self.opciones["lotes"],
                 contexto=self.opciones["contexto"],
                 revisar=self.opciones["revisar"],
+                texto_java=self.opciones["texto_java"],
+                scripts_exhaustivo=self.opciones["exhaustivo"],
             ) as p:
                 self.registro.emit(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'}")
                 if self.accion == "analizar":
                     resultado: object = p.analizar()
                 elif self.accion == "traducir":
                     resultado = p.ejecutar(activar=self.opciones["activar"], poner_idioma=self.opciones["idioma"])
+                elif self.accion == "cobertura":
+                    resultado = p.que_queda(java=True, progreso=self.progreso.emit)
                 else:
                     resultado = p.restaurar()
             self.terminado.emit(resultado)
@@ -216,6 +222,8 @@ class Ventana(QMainWindow):
         self._fase = ""
         self._clave_lista = False
         self.ultimo_informe: Informe | None = None
+        self.ultima_cobertura: list[Hallazgo] = []
+        self._dialogo_informe: DialogoInforme | None = None
         self._preferencias: dict[str, Any] = configuracion.leer_preferencias()
         self._motor_anterior: str | None = None
         self._construir()
@@ -260,7 +268,13 @@ class Ventana(QMainWindow):
         self.c_motor.setCurrentIndex(max(0, self.c_motor.findData(self._preferencias.get("motor", fabrica.GEMINI))))
         self.c_motor.currentIndexChanged.connect(self._al_cambiar_motor)
         self._al_cambiar_motor()
-        for senal in (self.c_lotes.toggled, self.c_revisar.toggled, self.c_activar.toggled):
+        for senal in (
+            self.c_lotes.toggled,
+            self.c_revisar.toggled,
+            self.c_activar.toggled,
+            self.c_java.toggled,
+            self.c_exhaustivo.toggled,
+        ):
             senal.connect(self._al_cambiar_opciones)
         self.c_hilos.valueChanged.connect(self._al_cambiar_opciones)
         self.c_dialecto.currentIndexChanged.connect(self._al_cambiar_opciones)
@@ -451,6 +465,22 @@ class Ventana(QMainWindow):
         )
         self.c_revisar.setChecked(bool(self._preferencias.get("revisar", False)))
         formulario.addRow("", self.c_revisar)
+        self.c_java = QCheckBox("Incluir texto escrito en el código de los mods (necesita el mod de apoyo)")
+        self.c_java.setToolTip(
+            "Algunos mods tienen mensajes escritos en su código y un resource pack no los alcanza. Esto los "
+            "traduce a una tabla que lee el mod de apoyo «ModpackES Runtime» (Más ▸ Instalar el mod de apoyo). "
+            "Por ahora existe para Forge 1.16.5, 1.18.2, 1.19.2 y 1.20.1, NeoForge 1.20.1 y de 1.21 a 1.21.11, "
+            "y Fabric 1.19.4, de 1.20 a 1.20.6, de 1.21 a 1.21.11 y de 26.1 a 26.3. En Quilt usa los mods de Fabric."
+        )
+        self.c_java.setChecked(bool(self._preferencias.get("texto_java", False)))
+        formulario.addRow("", self.c_java)
+        self.c_exhaustivo = QCheckBox("Scripts: traducir toda frase, aunque no se sepa dónde se muestra")
+        self.c_exhaustivo.setToolTip(
+            "Puede tocar lógica de los scripts de KubeJS (una frase que se compara o se guarda). Todo queda con copia "
+            "de seguridad y se puede restaurar. Mira antes «Más ▸ Qué queda en inglés»."
+        )
+        self.c_exhaustivo.setChecked(bool(self._preferencias.get("exhaustivo", False)))
+        formulario.addRow("", self.c_exhaustivo)
         self.c_hilos = QSpinBox()
         self.c_hilos.setRange(1, 16)
         self.c_hilos.setSuffix(" pedidos a la vez")
@@ -498,6 +528,15 @@ class Ventana(QMainWindow):
 
         self.a_correcciones = agregar("Correcciones…", "pencil", self.abrir_correcciones)
         self.a_correcciones.setToolTip("Buscar y corregir a mano traducciones de la memoria")
+        self.a_cobertura = agregar("Qué queda en inglés", "circle-alert", lambda: self.lanzar("cobertura"))
+        self.a_cobertura.setToolTip("Lista el texto que no se puede traducir y por qué (solo lee, no cambia nada)")
+        self.a_guardar_informe = agregar("Guardar el informe de lo que queda…", "file-text", self._guardar_informe)
+        self.a_comprobar_apoyo = agregar("Comprobar el mod de apoyo", "circle-check", self._comprobar_apoyo)
+        self.a_apoyo = agregar("Instalar el mod de apoyo", "package", self._instalar_apoyo)
+        self.a_apoyo.setToolTip(
+            "Pone ModpackES Runtime en la carpeta mods: muestra en español el texto del código de los mods"
+        )
+        self.a_quitar_apoyo = agregar("Quitar el mod de apoyo", "undo-2", self._quitar_apoyo)
         self.a_restaurar = agregar("Restaurar el original…", "undo-2", self._confirmar_restaurar)
         self.a_exportar = agregar("Exportar pack…", "package", lambda: self._exportar(kit=False))
         self.a_kit = agregar("Kit de servidor…", "server", lambda: self._exportar(kit=True))
@@ -833,6 +872,8 @@ class Ventana(QMainWindow):
             "idioma": self.c_activar.isChecked(),
             "contexto": self.e_contexto.text().strip(),
             "revisar": self.c_revisar.isChecked(),
+            "texto_java": self.c_java.isChecked(),
+            "exhaustivo": self.c_exhaustivo.isChecked(),
         }
 
     def _confirmar_traducir(self) -> None:
@@ -889,7 +930,11 @@ class Ventana(QMainWindow):
         self.barra.setMaximum(0)  # sin total todavía: barra en movimiento
         self._inicio = None
         self._fase = ""
-        self.estado.setText({"analizar": "Analizando…", "traducir": "Preparando…"}.get(accion, "Restaurando…"))
+        self.estado.setText(
+            {"analizar": "Analizando…", "traducir": "Preparando…", "cobertura": "Buscando texto en inglés…"}.get(
+                accion, "Restaurando…"
+            )
+        )
         self._accion = accion
         self._antes = self._estado
         self._estado = "trabajando"
@@ -923,7 +968,10 @@ class Ventana(QMainWindow):
             self._inicio = (ahora, total)  # cada módulo cuenta desde cero
         self.barra.setMaximum(max(total, 1))
         self.barra.setValue(hechos)
-        texto = f"Traduciendo{f' {self._fase}' if self._fase else ''}… {_miles(hechos)} de {_miles(total)}"
+        if self._accion == "cobertura":
+            texto = f"Leyendo los mods… {_miles(hechos)} de {_miles(total)}"
+        else:
+            texto = f"Traduciendo{f' {self._fase}' if self._fase else ''}… {_miles(hechos)} de {_miles(total)}"
         pasado = ahora - self._inicio[0]
         if 0 < hechos < total and pasado > 3:
             texto += f" · quedan {_restante(pasado / hechos * (total - hechos))}"
@@ -956,6 +1004,9 @@ class Ventana(QMainWindow):
                 self.estado.setText("¡Listo! Abre el juego: ya está en español.")
                 self.aviso.mostrar("Traducción terminada. Abre Minecraft para verla.", "exito")
                 self._marcar_traducida()
+        elif accion == "cobertura":
+            self._estado = self._antes  # no cambia nada en la instancia: el botón principal sigue como estaba
+            self._mostrar_cobertura(cast("list[Hallazgo]", resultado))
         else:
             self._olvidar_analisis()  # el texto volvió al original: lo contado antes ya no vale
             n = len(resultado) if isinstance(resultado, list) else 0  # pyright: ignore[reportUnknownArgumentType]
@@ -963,6 +1014,71 @@ class Ventana(QMainWindow):
         self._ocupado(False)
         self._al_cambiar_opciones()
         self.escribir(self.estado.text())
+
+    def _con_instancia(self, accion: Callable[[Instancia], str]) -> None:
+        carpeta = self.carpeta()
+        if not carpeta:
+            self.avisar("Elige primero una instancia.")
+            return
+        try:
+            with Instancia(carpeta) as inst:
+                mensaje = accion(inst)
+        except (ValueError, OSError) as e:
+            self.avisar(str(e), "aviso", anotar=False)
+            return
+        self.escribir(mensaje)
+        self.aviso.mostrar(mensaje, "exito")
+
+    def _instalar_apoyo(self) -> None:
+        self._con_instancia(
+            lambda inst: (
+                f"Mod de apoyo instalado: {mod_apoyo.instalar(inst).name}. Abre el juego para que empiece a actuar."
+            )
+        )
+
+    def _quitar_apoyo(self) -> None:
+        def quitar(inst: Instancia) -> str:
+            quitados = mod_apoyo.quitar(inst)
+            return "Quité: " + ", ".join(p.name for p in quitados) if quitados else "No había mod de apoyo instalado."
+
+        self._con_instancia(quitar)
+
+    def _comprobar_apoyo(self) -> None:
+        self._con_instancia(lambda inst: "\n".join(mod_apoyo.estado(inst)))
+
+    def _guardar_informe(self, destino: str | None = None) -> None:
+        if not self.ultima_cobertura:
+            self.avisar("Primero usa «Más ▸ Qué queda en inglés».")
+            return
+        if destino is None:
+            destino, _ = QFileDialog.getSaveFileName(
+                self, "Guardar el informe", str(Path.home() / "Que_queda_en_ingles.txt"), "Texto (*.txt)"
+            )
+        if not destino:
+            return
+        try:
+            Path(destino).write_text(texto_del_informe(self.ultima_cobertura), encoding="utf-8")
+        except OSError as e:
+            self.avisar(f"No pude guardar el informe: {e}", "error")
+            return
+        self.aviso.mostrar(f"Informe guardado: {destino}", "exito")
+
+    def _mostrar_cobertura(self, hallazgos: list[Hallazgo]) -> None:
+        self.ultima_cobertura = hallazgos
+        if not hallazgos:
+            self.estado.setText("No encontré texto que se quede en inglés.")
+            return
+        self._dialogo_informe = DialogoInforme(texto_del_informe(hallazgos), self._guardar_informe, self)
+        self._dialogo_informe.show()
+        self.estado.setText(f"Quedan {len(hallazgos)} lugares con texto en inglés: el detalle está en Detalles.")
+        self.escribir("Texto que se queda en inglés aunque traduzcas todo:")
+        for h in hallazgos:
+            self.escribir(f"· [{h.categoria}] {h}")
+        self.escribir(
+            "Lo de «java» está escrito en el código del mod: un resource pack no lo alcanza. "
+            "Lo de «script» puede ser lógica y no un mensaje."
+        )
+        self.detalles.fijar_abierta(True)
 
     def _marcar_traducida(self) -> None:
         carpeta = self.carpeta()
@@ -1085,7 +1201,8 @@ class Ventana(QMainWindow):
             "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "motor": o["motor"],
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
-            "revisar": o["revisar"], "avisar_version": self.c_avisar.isChecked(),
+            "revisar": o["revisar"], "texto_java": o["texto_java"], "exhaustivo": o["exhaustivo"],
+            "avisar_version": self.c_avisar.isChecked(),
             "tema": self._preferencias.get("tema", "sistema"),
             "bienvenida_vista": bool(self._preferencias.get("bienvenida_vista", False)),
         }  # fmt: skip

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -11,11 +12,12 @@ from typing import Self
 
 from . import configuracion
 from .fuentes.instancia import Instancia
-from .modulos import libros, misiones, mods, scripts
+from .modulos import datos, libros, misiones, mods, runtime, scripts
 from .modulos.base import Contexto, Modulo, Resumen
+from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
 from .motores import fabrica
-from .motores.base import Motor
+from .motores.base import ErrorFatal, Motor
 from .motores.compatible import Compatible
 from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
@@ -56,6 +58,8 @@ class Informe:
     revision_automatica: revision.ResumenRevision | None = None
     pack_activado: list[str] = field(default_factory=list[str])
     fallidos: list[str] = field(default_factory=list[str])  #: grupos que el análisis no pudo leer
+    #: Lo que queda en inglés aunque se traduzca todo, y por qué (ver `modulos/cobertura.py`)
+    cobertura: list[Hallazgo] = field(default_factory=list[Hallazgo])
 
     @property
     def a_traducir(self) -> int:
@@ -110,13 +114,17 @@ class Proceso:
         usar_lotes: bool = False,
         contexto: str = "",
         revisar: bool = False,
+        texto_java: bool = False,
+        scripts_exhaustivo: bool = False,
     ) -> None:
         self.instancia = Instancia(carpeta)
         self.revisar = revisar
+        self.texto_java = texto_java
+        self.scripts_exhaustivo = scripts_exhaustivo
         self.registro = registro
         self.grupos = [g for g in GRUPOS if g in grupos]
         self._memoria_propia = memoria is None
-        self.memoria = memoria or Memoria(configuracion.ruta_memoria())
+        self.memoria = memoria or self._abrir_memoria()
         self.glosario = Glosario()
         self.ctx = Contexto(
             self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
@@ -154,19 +162,40 @@ class Proceso:
         lista: list[tuple[str, Modulo]] = []
         if "mods" in self.grupos:
             lista.append(("mods", mods.Mods(self.ctx)))
+            if self.texto_java:  # texto escrito en el código de los mods: lo muestra el mod de apoyo
+                lista.append(("mods", runtime.TextoDeJava(self.ctx)))
         if "libros" in self.grupos:
             lista.append(("libros", libros.Libros(self.ctx)))
         if "misiones" in self.grupos:
             lista += [("misiones", m) for m in misiones.todos(self.ctx)]
         if "scripts" in self.grupos:
-            lista.append(("scripts", scripts.ScriptsKubeJS(self.ctx)))
+            lista += [
+                ("scripts", scripts.ScriptsKubeJS(self.ctx, self.scripts_exhaustivo)),
+                ("scripts", datos.Datos(self.ctx)),
+            ]
         return [(g, m) for g, m in lista if m.detectar()]
 
     # ------------------------------------------------------------------ acciones
+    def _abrir_memoria(self) -> Memoria:
+        """La memoria de traducciones del usuario. Si el archivo está dañado, dice cuál es y no falla a medias."""
+        ruta = configuracion.ruta_memoria()
+        try:
+            return Memoria(ruta)
+        except sqlite3.Error as e:
+            self.instancia.cerrar()
+            raise ErrorFatal(
+                f"La memoria de traducciones está dañada ({e}). Muévela o bórrala y vuelve a intentarlo: {ruta}"
+            ) from e
+
+    def que_queda(self, java: bool = False, progreso: Callable[[int, int], None] | None = None) -> list[Hallazgo]:
+        """Lo que quedaría en inglés. Solo lee. `java`: también el texto escrito en el código de los mods (tarda)."""
+        return revisar_cobertura(self.ctx, java, progreso or (lambda _a, _b: None))
+
     def analizar(self) -> Informe:
         """Cuenta lo que hay que traducir. Solo lee: no escribe nada en la instancia."""
         self._preparar_glosario()
         informe = Informe()
+        scripts_leidos: list[scripts.ScriptsKubeJS] = []
         for grupo, modulo in self.modulos():
             try:
                 piezas = modulo.recolectar()
@@ -175,12 +204,31 @@ class Proceso:
                 if grupo not in informe.fallidos:
                     informe.fallidos.append(grupo)
                 continue
+            if isinstance(modulo, scripts.ScriptsKubeJS):
+                scripts_leidos.append(modulo)
             pendientes = self.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre, modulo.describir(), len({p.texto for p in piezas}),
                               len(pendientes), sum(len(t) for t in pendientes))
             )  # fmt: skip
+        informe.avisos.extend(self._avisos_de_cobertura(informe, scripts_leidos))
         return informe
+
+    def _avisos_de_cobertura(self, informe: Informe, scripts_leidos: list[scripts.ScriptsKubeJS]) -> list[str]:
+        """Lo barato de saber antes de traducir: frases de scripts que parecen texto y no se tocan.
+
+        Se apoya en lo que el análisis ya leyó y nunca lo detiene.
+        """
+        for s in scripts_leidos:
+            informe.cobertura += hallazgos_de_scripts(self.instancia.juego, s.sin_elegir)
+            informe.cobertura += hallazgos_de_comandos(self.instancia.juego, s.comandos_ajenos)
+        if not informe.cobertura:
+            return []
+        return [
+            f"{sum(h.cantidad for h in informe.cobertura)} frases de {len(informe.cobertura)} lugares de los scripts "
+            "no se traducen (parecen texto pero puede ser lógica, o van dentro de un comando de otro mod). "
+            "Detalle con «modpackes cobertura»."
+        ]
 
     def ejecutar(self, activar: bool = True, poner_idioma: bool = True) -> Informe:
         self._preparar_glosario()

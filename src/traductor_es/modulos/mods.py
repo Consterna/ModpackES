@@ -82,7 +82,13 @@ class Mods:
             return resumen  # nada que escribir y nada viejo que vaciar: no se crea un pack vacío
         pack = self.ctx.pack_listo()
         for (namespace, variante), textos in sorted(por_archivo.items()):
-            resumen.archivos.append(pack.escribir_lang(namespace, variante, textos))
+            try:
+                resumen.archivos.append(pack.escribir_lang(namespace, variante, textos))
+            except ValueError:  # un mod con un espacio de nombres imposible de guardar no detiene a los demás
+                self.ctx.registro(
+                    f"El espacio de nombres «{namespace}» no se puede guardar en el pack: se deja en inglés"
+                )
+                resumen.pendientes += len(textos)
         pack.vaciar_idiomas_viejos()
         return resumen
 

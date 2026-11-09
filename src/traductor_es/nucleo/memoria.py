@@ -45,6 +45,13 @@ class Memoria:
             self.ruta.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._db = sqlite3.connect(str(ruta), check_same_thread=False)
+        try:
+            self._crear_tablas()
+        except sqlite3.Error:  # archivo dañado o bloqueado: no se deja la conexión abierta
+            self._db.close()
+            raise
+
+    def _crear_tablas(self) -> None:
         self._db.execute(
             """CREATE TABLE IF NOT EXISTS traducciones (
                    origen TEXT NOT NULL, dialecto TEXT NOT NULL, ambito TEXT NOT NULL,

@@ -53,7 +53,7 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
         return []
     crudo = ruta.read_bytes()
     salto = "\r\n" if b"\r\n" in crudo else "\n"
-    lineas = crudo.decode("utf-8", errors="replace").splitlines()
+    lineas = crudo.decode("utf-8", errors="surrogateescape").splitlines()  # lo que no es UTF-8 se conserva igual
     cambios: list[str] = []
     vio_packs = vio_idioma = False
     for i, linea in enumerate(lineas):
@@ -78,6 +78,6 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
         cambios.append(f"idioma del juego: {idioma}")
     if cambios:
         temporal = ruta.with_name("options.txt.tmp")
-        temporal.write_bytes((salto.join(lineas) + salto).encode("utf-8"))
+        temporal.write_bytes((salto.join(lineas) + salto).encode("utf-8", errors="surrogateescape"))
         temporal.replace(ruta)
     return cambios

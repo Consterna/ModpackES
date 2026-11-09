@@ -137,7 +137,10 @@ class _Lector:
 
 def descomprimir(datos: bytes) -> tuple[bytes, Compresion]:
     if datos[:2] == b"\x1f\x8b":
-        return gzip.decompress(datos), "gzip"
+        try:
+            return gzip.decompress(datos), "gzip"
+        except (EOFError, OSError, zlib.error) as e:  # gzip truncado o dañado: un solo tipo de error para quien llama
+            raise ValueError(f"Archivo NBT comprimido dañado: {e}") from e
     if datos[:1] == b"\x78":
         try:
             return zlib.decompress(datos), "zlib"

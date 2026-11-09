@@ -18,6 +18,16 @@ from ..nucleo.dialectos import nombre_archivo_lang
 NOMBRE = "Traduccion_ES"
 #: Un segmento de ruta seguro: sin barras invertidas, dos puntos ni caracteres que Windows no admite.
 _PARTE_VALIDA = re.compile(r"[^\\/:*?\"<>|\x00-\x1f]+")
+#: Nombres de dispositivo de Windows (CON, NUL, COM1…): no se pueden usar como carpeta ni archivo.
+_RESERVADOS = frozenset(
+    {"CON", "PRN", "AUX", "NUL", *(f"COM{n}" for n in range(1, 10)), *(f"LPT{n}" for n in range(1, 10))}
+)
+
+
+def _parte_segura(parte: str) -> bool:
+    if not _PARTE_VALIDA.fullmatch(parte) or parte in (".", "..") or parte != parte.rstrip(". "):
+        return False  # Windows quita los puntos y espacios del final: «a.» y «a» serían la misma carpeta
+    return parte.split(".", maxsplit=1)[0].upper() not in _RESERVADOS
 
 
 class PackSalida:
@@ -30,7 +40,7 @@ class PackSalida:
     def _ruta(self, relativa: str) -> Path:
         """Ruta dentro del pack. Rechaza todo lo que pueda salir de él (también trucos de Windows)."""
         partes = relativa.split("/")
-        if not relativa or any(not _PARTE_VALIDA.fullmatch(p) or p in (".", "..") for p in partes):
+        if not relativa or any(not _parte_segura(p) for p in partes):
             raise ValueError(f"Ruta fuera del pack: {relativa!r}")
         ruta = self.raiz.joinpath(*partes)
         if not ruta.resolve().is_relative_to(self.raiz.resolve()):
