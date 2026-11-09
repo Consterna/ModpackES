@@ -142,6 +142,8 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("1.21.4", "quilt", None),
         ("1.21.12", "fabric", None),
         ("1.19.2", "fabric", None),  # Fabric API no tiene evento de chat en esa versión
+        ("1.18.2", "fabric", None),
+        ("1.18.2", "forge", "forge-1.18.2"),
         ("1.21.4", "neoforge", "neoforge-1.21.4"),
         ("1.21", "neoforge", "neoforge-1.21.1"),
         ("1.21.3", "neoforge", "neoforge-1.21.1"),
@@ -153,6 +155,7 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("26.1", "neoforge", None),
         ("1.20.1", "neoforge", "forge-1.20.1"),  # NeoForge 1.20.1 carga los mods de Forge
         ("1.12.2", "forge", None),
+        ("1.16.5", "forge", None),
         ("1.19.4", "forge", None),
     ]
     for i, (version, loader, esperado) in enumerate(casos):
@@ -176,12 +179,13 @@ def test_instalar_reemplaza_versiones_y_respeta_otros_mods(tmp_path: Path) -> No
 
 
 def test_instalar_con_errores_claros(tmp_path: Path) -> None:
-    juego = fabrica.prism(tmp_path / "a", "1.18.2", "forge")
+    juego = fabrica.prism(tmp_path / "a", "1.16.5", "forge")
     with Instancia(juego) as inst, pytest.raises(ValueError, match="Todavía no hay mod de apoyo"):
         mod_apoyo.instalar(inst, tmp_path)
-    imposible = fabrica.prism(tmp_path / "c", "1.19.2", "fabric")  # se dice por qué no, no solo «todavía»
-    with Instancia(imposible) as inst, pytest.raises(ValueError, match="no tiene un evento"):
-        mod_apoyo.instalar(inst, tmp_path)
+    for i, version in enumerate(("1.18.2", "1.19.2")):  # se dice por qué no, no solo «todavía»
+        imposible = fabrica.prism(tmp_path / f"c{i}", version, "fabric")
+        with Instancia(imposible) as inst, pytest.raises(ValueError, match="no tiene en esa versión un evento"):
+            mod_apoyo.instalar(inst, tmp_path)
     juego2 = fabrica.prism(tmp_path / "b", "1.20.1", "forge")
     with Instancia(juego2) as inst, pytest.raises(ValueError, match="no trae el mod de apoyo"):
         mod_apoyo.instalar(inst, tmp_path / "no_hay")

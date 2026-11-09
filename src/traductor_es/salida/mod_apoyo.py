@@ -16,6 +16,7 @@ from ..fuentes.instancia import Instancia
 PREFIJO = "modpackes_runtime-"
 #: (loader, versión de Minecraft) para los que hay mod de apoyo. Cada entrada es un proyecto en `mod-runtime/`.
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
+    ("forge", (1, 18, 2)): "forge-1.18.2",
     ("forge", (1, 19, 2)): "forge-1.19.2",
     ("forge", (1, 20, 1)): "forge-1.20.1",
     ("neoforge", (1, 20, 1)): "forge-1.20.1",  # NeoForge 1.20.1 es un fork de Forge y carga sus mods
@@ -61,11 +62,13 @@ _VERSIONES_DE_QUILT: tuple[tuple[int, ...], ...] = (
 )  # fmt: skip
 SOPORTADOS.update({("quilt", v): SOPORTADOS[("fabric", v)] for v in _VERSIONES_DE_QUILT})
 #: Combinaciones que no tendrán mod de apoyo y por qué (para decírselo al jugador en vez de «todavía no»).
+_SIN_EVENTO_DE_CHAT = (
+    "Fabric API no tiene en esa versión un evento para los mensajes que recibe el cliente, "
+    "y sin él el mod de apoyo no podría cambiar el chat. Con Fabric 1.19.4 en adelante sí."
+)
 IMPOSIBLES: dict[tuple[str, tuple[int, ...]], str] = {
-    ("fabric", (1, 19, 2)): (
-        "Fabric API 1.19.2 no tiene un evento para los mensajes que recibe el cliente, "
-        "y sin él el mod de apoyo no podría cambiar el chat. Con Fabric 1.19.4 en adelante sí."
-    ),
+    ("fabric", (1, 18, 2)): _SIN_EVENTO_DE_CHAT,
+    ("fabric", (1, 19, 2)): _SIN_EVENTO_DE_CHAT,
 }
 _NOMBRE = re.compile(rf"{re.escape(PREFIJO)}(?P<destino>[a-z]+-[\d.]+)-(?P<version>[\w.+-]+)\.jar")
 

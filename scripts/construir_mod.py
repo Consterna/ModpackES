@@ -22,6 +22,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "src" / "traductor_es" / "recursos" / "mods"
 #: proyecto → (versión de Java, versión de Gradle) que pide su compilación
 PROYECTOS = {
+    "forge-1.18.2": (17, "8.8"),
     "forge-1.19.2": (17, "8.8"),
     "forge-1.20.1": (17, "8.8"),
     "neoforge-1.21.1": (21, "9.2.1"),
