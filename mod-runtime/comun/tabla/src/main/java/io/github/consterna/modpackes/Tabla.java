@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -27,7 +28,7 @@ import java.util.regex.Pattern;
  * No hay traducción aproximada ni en vivo.
  */
 public final class Tabla {
-    public static final Tabla VACIA = new Tabla(Map.of());
+    public static final Tabla VACIA = new Tabla(Collections.<String, String>emptyMap());
 
     private static final Pattern MARCADOR = Pattern.compile("%(?:(\\d+)\\$)?([sd%])");
     private static final int MINIMO_FIJO = 4; // una plantilla con casi nada de texto fijo coincidiría con cualquier cosa
@@ -36,7 +37,7 @@ public final class Tabla {
 
     private final Map<String, String> exactos;
     private final List<Plantilla> plantillas;
-    private final Map<String, String> cache = new LinkedHashMap<>(64, 0.75f, true) {
+    private final Map<String, String> cache = new LinkedHashMap<String, String>(64, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
             return size() > TAMANO_CACHE;
@@ -57,15 +58,15 @@ public final class Tabla {
             }
         }
         plantillas.sort(Comparator.comparingInt((Plantilla p) -> p.fijo.length()).reversed()); // la más específica primero
-        this.exactos = Map.copyOf(exactos);
-        this.plantillas = List.copyOf(plantillas);
+        this.exactos = Collections.unmodifiableMap(exactos);
+        this.plantillas = Collections.unmodifiableList(plantillas);
     }
 
     /** Lee un objeto JSON {"inglés": "español"}. Lo que no sea texto se ignora. */
     public static Tabla leer(Reader lector) throws IOException {
         JsonElement raiz;
         try {
-            raiz = JsonParser.parseReader(lector);
+            raiz = new JsonParser().parse(lector); // el único que existe también en el Gson de 1.16.5
         } catch (JsonParseException e) {
             throw new IOException("La tabla de textos no es JSON válido", e);
         }
@@ -122,7 +123,7 @@ public final class Tabla {
         if (directo != null) {
             return directo.equals(texto) ? null : directo;
         }
-        String nucleo = texto.strip();
+        String nucleo = sinBordes(texto);
         if (nucleo.isEmpty() || nucleo.length() == texto.length()) {
             return null;
         }
@@ -130,9 +131,31 @@ public final class Tabla {
         if (traduccion == null || traduccion.equals(nucleo)) {
             return null;
         }
-        int inicio = texto.length() - texto.stripLeading().length();
-        int fin = texto.length() - texto.stripTrailing().length();
+        int inicio = espaciosAlInicio(texto);
+        int fin = espaciosAlFinal(texto);
         return texto.substring(0, inicio) + traduccion + texto.substring(texto.length() - fin);
+    }
+
+    // Como String.strip(), String.stripLeading() y String.stripTrailing() de Java 11, que Java 8 no tiene
+    private static int espaciosAlInicio(String texto) {
+        int i = 0;
+        while (i < texto.length() && Character.isWhitespace(texto.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private static int espaciosAlFinal(String texto) {
+        int i = 0;
+        while (i < texto.length() && Character.isWhitespace(texto.charAt(texto.length() - 1 - i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private static String sinBordes(String texto) {
+        int inicio = espaciosAlInicio(texto);
+        return inicio == texto.length() ? "" : texto.substring(inicio, texto.length() - espaciosAlFinal(texto));
     }
 
     private String buscar(String texto) {
@@ -220,7 +243,7 @@ public final class Tabla {
                 regex.append(Pattern.quote(cola));
             }
             regex.append('$');
-            if (grupos == 0 || fijo.toString().strip().length() < MINIMO_FIJO) {
+            if (grupos == 0 || sinBordes(fijo.toString()).length() < MINIMO_FIJO) {
                 return null;
             }
             List<Object> destino = destino(valor, grupos);
@@ -274,8 +297,8 @@ public final class Tabla {
             }
             StringBuilder salida = new StringBuilder();
             for (Object parte : destino) {
-                if (parte instanceof Integer indice) {
-                    salida.append(m.group(indice));
+                if (parte instanceof Integer) {
+                    salida.append(m.group((Integer) parte));
                 } else {
                     salida.append((String) parte);
                 }

@@ -16,6 +16,7 @@ from ..fuentes.instancia import Instancia
 PREFIJO = "modpackes_runtime-"
 #: (loader, versión de Minecraft) para los que hay mod de apoyo. Cada entrada es un proyecto en `mod-runtime/`.
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
+    ("forge", (1, 16, 5)): "forge-1.16.5",
     ("forge", (1, 18, 2)): "forge-1.18.2",
     ("forge", (1, 19, 2)): "forge-1.19.2",
     ("forge", (1, 20, 1)): "forge-1.20.1",
@@ -67,6 +68,7 @@ _SIN_EVENTO_DE_CHAT = (
     "y sin él el mod de apoyo no podría cambiar el chat. Con Fabric 1.19.4 en adelante sí."
 )
 IMPOSIBLES: dict[tuple[str, tuple[int, ...]], str] = {
+    ("fabric", (1, 16, 5)): _SIN_EVENTO_DE_CHAT,
     ("fabric", (1, 18, 2)): _SIN_EVENTO_DE_CHAT,
     ("fabric", (1, 19, 2)): _SIN_EVENTO_DE_CHAT,
 }

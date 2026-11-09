@@ -2,9 +2,9 @@
 
 Uso:  uv run python scripts/construir_mod.py [<proyecto de mod-runtime/> | todos] [--sin-pruebas]
 
-Sin nombre compila todos. Cada uno necesita su JDK (Forge: 17; NeoForge y Fabric: 21, y Fabric 26.x: 25) y su
-Gradle, que se toman de JAVA_HOME (o JAVA_HOME_<versión>_X64) y de `.herramientas/` si existen, y acceso a
-internet la primera vez, para bajar el loader y Minecraft. El resultado queda en
+Sin nombre compila todos. Cada uno necesita su JDK (Forge: 17, y 8 para compilar 1.16.5; NeoForge y Fabric: 21,
+y Fabric 26.x: 25) y su Gradle, que se toman de JAVA_HOME (o JAVA_HOME_<versión>_X64) y de `.herramientas/` si
+existen, y acceso a internet la primera vez, para bajar el loader y Minecraft. El resultado queda en
 `src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo construye el mismo comando
 (`.github/workflows/ci.yml`).
 """
@@ -22,6 +22,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "src" / "traductor_es" / "recursos" / "mods"
 #: proyecto → (versión de Java, versión de Gradle) que pide su compilación
 PROYECTOS = {
+    "forge-1.16.5": (17, "8.8"),
     "forge-1.18.2": (17, "8.8"),
     "forge-1.19.2": (17, "8.8"),
     "forge-1.20.1": (17, "8.8"),
@@ -52,12 +53,17 @@ def _herramientas() -> Path:
 HERRAMIENTAS = _herramientas()
 
 
+#: Proyectos cuyo código se compila con otro JDK que el que ejecuta Gradle (Forge 1.16.5 corre con Java 8).
+TOOLCHAINS = {"forge-1.16.5": 8}
+
+
 def _jdk(version: int) -> Path:
     ejecutable = "java.exe" if os.name == "nt" else "java"
     candidatos = [Path(os.environ[v]) for v in ("JAVA_HOME", f"JAVA_HOME_{version}_X64") if os.environ.get(v)]
-    candidatos += sorted(HERRAMIENTAS.glob(f"jdk-{version}*"))
+    candidatos += sorted(HERRAMIENTAS.glob(f"jdk-{version}*")) + sorted(HERRAMIENTAS.glob(f"jdk{version}u*"))
+    marca = '"1.8.' if version == 8 else f'"{version}.'  # Java 8 se presenta como «1.8.0_x»
     for c in candidatos:
-        if (c / "bin" / ejecutable).is_file() and f'"{version}.' in _version_de_java(c / "bin" / ejecutable):
+        if (c / "bin" / ejecutable).is_file() and marca in _version_de_java(c / "bin" / ejecutable):
             return c
     raise SystemExit(f"No encuentro un JDK {version}: define JAVA_HOME o ponlo en .herramientas/jdk-{version}*.")
 
@@ -89,6 +95,8 @@ def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = No
     # de Minecraft: no se toca ningún jar.
     orden = [*_gradle(proyecto), "test" if propiedades else "build", "--no-daemon", "--console=plain"]
     orden += [f"-P{p}" for p in propiedades or []]
+    if nombre in TOOLCHAINS:  # que Gradle encuentre el JDK de compilación sin bajarlo por su cuenta
+        orden.append(f"-Porg.gradle.java.installations.paths={_jdk(TOOLCHAINS[nombre])}")
     if sin_pruebas:
         orden += ["-x", "test"]
     codigo = subprocess.run(orden, cwd=proyecto, env=entorno, check=False).returncode
