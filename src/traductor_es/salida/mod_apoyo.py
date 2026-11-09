@@ -137,6 +137,12 @@ def estado(instancia: Instancia, carpeta_jars: Path | None = None) -> list[str]:
     )
     puestos = instalados(instancia)
     lineas.append(f"En mods/: {', '.join(p.name for p in puestos)}." if puestos else "No está instalado en mods/.")
+    ajenos = [p.name for p in puestos if not p.name.startswith(f"{PREFIJO}{destino}-")]
+    if ajenos:
+        lineas.append(
+            f"Ojo: {', '.join(ajenos)} no es el de esta versión ({destino}). "
+            "Pulsa «Instalar el mod de apoyo» para cambiarlo."
+        )
     tablas = sorted(
         (instancia.juego / "resourcepacks" / "Traduccion_ES" / "assets" / "modpackes_runtime" / "textos").glob("*.json")
     )
@@ -145,7 +151,7 @@ def estado(instancia: Instancia, carpeta_jars: Path | None = None) -> list[str]:
         if tablas
         else "Todavía no hay tabla de textos: traduce con la opción activada."
     )
-    if puestos and tablas:
+    if puestos and not ajenos and tablas:
         lineas.append("Todo listo: abre el juego en español.")
     return lineas
 
@@ -162,10 +168,10 @@ def instalar(instancia: Instancia, carpeta_jars: Path | None = None) -> Path:
         )
     instancia.carpeta_mods.mkdir(parents=True, exist_ok=True)
     final = instancia.carpeta_mods / origen.name
+    shutil.copyfile(origen, final)  # primero el nuevo: si la copia falla, el mod que había sigue ahí
     for viejo in instalados(instancia):
         if viejo != final:
             viejo.unlink()
-    shutil.copyfile(origen, final)
     return final
 
 

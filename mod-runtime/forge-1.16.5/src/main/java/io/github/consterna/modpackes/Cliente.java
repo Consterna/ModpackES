@@ -13,9 +13,6 @@ import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -40,22 +37,19 @@ final class Cliente {
     private Cliente() {
     }
 
+    /**
+     * Se llama al construir el mod, antes de la primera recarga de recursos. En 1.16.5 no hay un evento para registrar
+     * recargas del cliente y {@code FMLClientSetupEvent} se dispara durante esa primera recarga: un listener
+     * registrado ahí queda fuera y la tabla no se cargaría hasta que el jugador recargara los recursos.
+     */
     static void iniciar() {
-        IEventBus busDelMod = FMLJavaModLoadingContext.get().getModEventBus();
-        busDelMod.addListener(Cliente::alIniciarCliente);
+        IResourceManager gestor = Minecraft.getInstance().getResourceManager();
+        if (gestor instanceof IReloadableResourceManager) {
+            ((IReloadableResourceManager) gestor).registerReloadListener(new Cargador());
+        }
         MinecraftForge.EVENT_BUS.addListener(Cliente::alRecibirChat);
         MinecraftForge.EVENT_BUS.addListener(Cliente::alCrearTooltip);
         MinecraftForge.EVENT_BUS.addListener(Cliente::alIniciarPantalla);
-    }
-
-    /** En 1.16.5 no hay un evento para registrar recargas del cliente: se hace con el gestor de recursos. */
-    private static void alIniciarCliente(FMLClientSetupEvent evento) {
-        evento.enqueueWork(() -> {
-            IResourceManager gestor = Minecraft.getInstance().getResourceManager();
-            if (gestor instanceof IReloadableResourceManager) {
-                ((IReloadableResourceManager) gestor).registerReloadListener(new Cargador());
-            }
-        });
     }
 
     private static void alRecibirChat(ClientChatReceivedEvent evento) {

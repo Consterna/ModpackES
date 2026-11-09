@@ -269,3 +269,29 @@ def test_estado_en_neoforge_1_20_1_avisa_que_es_el_mod_de_forge(tmp_path: Path) 
     with Instancia(juego) as inst:
         texto = " ".join(mod_apoyo.estado(inst, tmp_path / "vacia"))
     assert "forge-1.20.1" in texto and "fork de Forge" in texto and "no se ha probado" in texto
+
+
+def test_estado_avisa_si_el_jar_instalado_es_de_otra_version(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.21.1", "fabric")
+    (juego / "mods" / "modpackes_runtime-fabric-1.20.1-0.1.0.jar").write_bytes(b"viejo")
+    pack = juego / "resourcepacks" / "Traduccion_ES" / "assets" / "modpackes_runtime" / "textos"
+    pack.mkdir(parents=True)
+    (pack / "es_mx.json").write_text("{}", encoding="utf-8")
+    with Instancia(juego) as inst:
+        texto = " ".join(mod_apoyo.estado(inst, tmp_path / "vacia"))
+    assert "no es el de esta versión (fabric-1.21.1)" in texto and "Todo listo" not in texto
+
+
+def test_instalar_no_borra_el_mod_viejo_si_la_copia_falla(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1", "forge")
+    viejo = juego / "mods" / "modpackes_runtime-forge-1.20.1-0.0.9.jar"
+    viejo.write_bytes(b"viejo")
+    carpeta = _jars(tmp_path, "modpackes_runtime-forge-1.20.1-0.1.0.jar")
+
+    def copia_que_falla(*_a: object, **_k: object) -> None:
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(mod_apoyo.shutil, "copyfile", copia_que_falla)
+    with Instancia(juego) as inst, pytest.raises(OSError, match="disco lleno"):
+        mod_apoyo.instalar(inst, carpeta)
+    assert viejo.read_bytes() == b"viejo"  # el que ya funcionaba sigue ahí
