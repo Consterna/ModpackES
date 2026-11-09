@@ -123,36 +123,53 @@ def test_el_lector_de_rangos(rango: str, version: str, esperado: bool) -> None:
 
 
 # ------------------------------------------------------------------ reintentos de red al compilar
-def _comando(tmp_path: Path, mensaje: str, falla_la_primera_vez: bool) -> list[str]:
-    """Un «Gradle» de mentira: escribe `mensaje` y falla (siempre, o solo la primera vez)."""
+def _comando(tmp_path: Path, mensaje: str, falla_primeras: int) -> list[str]:
+    """Un «Gradle» de mentira: escribe `mensaje`, cuenta cuántas veces corre y falla las primeras `falla_primeras`."""
     import sys
 
     guion = tmp_path / "falso.py"
-    guion.write_text(
-        "import pathlib, sys\n"
-        f"marca = pathlib.Path({str(tmp_path / 'marca')!r})\n"
-        f"print({mensaje!r})\n"
-        f"if {falla_la_primera_vez!r} and marca.exists():\n    sys.exit(0)\n"
-        "marca.write_text('x')\nsys.exit(1)\n",
-        encoding="utf-8",
-    )
+    contador = tmp_path / "ejecuciones"
+    lineas = [
+        "import pathlib, sys",
+        f"contador = pathlib.Path({str(contador)!r})",
+        "veces = (int(contador.read_text()) if contador.exists() else 0) + 1",
+        "contador.write_text(str(veces))",
+        f"print({mensaje!r})",
+        f"sys.exit(1 if veces <= {falla_primeras} else 0)",
+    ]
+    guion.write_text("\n".join(lineas) + "\n", encoding="utf-8")
     return [sys.executable, str(guion)]
 
 
-def test_un_fallo_de_red_se_reintenta(tmp_path: Path) -> None:
+def _ejecuciones(tmp_path: Path) -> int:
+    return int((tmp_path / "ejecuciones").read_text())
+
+
+def _correr(tmp_path: Path, mensaje: str, falla_primeras: int) -> int:
+    import os
+
     construir = _construir_mod()
-    orden = _comando(tmp_path, "java.net.SocketTimeoutException: Read timed out", falla_la_primera_vez=True)
-    assert construir._ejecutar(orden, tmp_path, dict(__import__("os").environ), espera=0) == 0
+    orden = _comando(tmp_path, mensaje, falla_primeras)
+    return int(construir._ejecutar(orden, tmp_path, dict(os.environ), espera=0))
+
+
+def test_un_fallo_de_red_se_reintenta(tmp_path: Path) -> None:
+    assert _correr(tmp_path, "java.net.SocketTimeoutException: Read timed out", falla_primeras=1) == 0
+    assert _ejecuciones(tmp_path) == 2
+
+
+def test_aguanta_varios_fallos_de_red_seguidos(tmp_path: Path) -> None:
+    """Como el 504 de GitHub: falla varias veces seguidas y a la cuarta responde."""
+    assert _correr(tmp_path, "Server returned HTTP response code: 504", falla_primeras=3) == 0
+    assert _ejecuciones(tmp_path) == 4
 
 
 def test_un_error_del_codigo_no_se_reintenta(tmp_path: Path) -> None:
-    construir = _construir_mod()
-    orden = _comando(tmp_path, "error: cannot find symbol", falla_la_primera_vez=True)
-    assert construir._ejecutar(orden, tmp_path, dict(__import__("os").environ), espera=0) == 1
-    assert (tmp_path / "marca").exists()  # corrió una sola vez: no hubo segundo intento que lo hiciera pasar
+    assert _correr(tmp_path, "error: cannot find symbol", falla_primeras=1) == 1
+    assert _ejecuciones(tmp_path) == 1  # corrió una sola vez
 
 
-def test_un_fallo_de_red_que_no_se_arregla_termina_tras_tres_intentos(tmp_path: Path) -> None:
+def test_un_fallo_de_red_que_no_se_arregla_termina_tras_agotar_los_intentos(tmp_path: Path) -> None:
     construir = _construir_mod()
-    orden = _comando(tmp_path, "Server returned HTTP response code: 504", falla_la_primera_vez=False)
-    assert construir._ejecutar(orden, tmp_path, dict(__import__("os").environ), espera=0) == 1
+    assert _correr(tmp_path, "Server returned HTTP response code: 504", falla_primeras=99) == 1
+    assert _ejecuciones(tmp_path) == construir.INTENTOS == 5

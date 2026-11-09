@@ -86,11 +86,14 @@ _FALLOS_DE_RED = (
     "Read timed out", "Connect timed out", "Connection reset", "Premature end of Content-Length",
     "Server returned HTTP response code: 5", "Could not GET", "UnknownHostException", "Host desconocido",
 )  # fmt: skip
-INTENTOS = 3
+INTENTOS = 5
 
 
-def _ejecutar(orden: list[str], proyecto: Path, entorno: dict[str, str], espera: float = 20.0) -> int:
-    """Corre Gradle y repite hasta 3 veces solo si el fallo es de red; un error del código se devuelve a la primera."""
+def _ejecutar(orden: list[str], proyecto: Path, entorno: dict[str, str], espera: float = 30.0) -> int:
+    """Corre Gradle y repite hasta 5 veces solo si el fallo es de red, esperando más cada vez (30, 60, 90, 120 s).
+
+    Un error del código o de una prueba se devuelve a la primera. Un 504 de GitHub puede durar más de medio minuto.
+    """
     codigo = 1
     for intento in range(1, INTENTOS + 1):
         salida: list[str] = []
@@ -107,8 +110,9 @@ def _ejecutar(orden: list[str], proyecto: Path, entorno: dict[str, str], espera:
         texto = "".join(salida)
         if codigo == 0 or intento == INTENTOS or not any(f in texto for f in _FALLOS_DE_RED):
             return codigo
-        print(f"{proyecto.name}: falló la red; reintento {intento + 1} de {INTENTOS} en {espera:.0f} s.", flush=True)
-        time.sleep(espera)
+        pausa = espera * intento
+        print(f"{proyecto.name}: falló la red; reintento {intento + 1} de {INTENTOS} en {pausa:.0f} s.", flush=True)
+        time.sleep(pausa)
     return codigo
 
 
