@@ -17,6 +17,7 @@ PREFIJO = "modpackes_runtime-"
 #: (loader, versión de Minecraft) para los que hay mod de apoyo. Cada entrada es un proyecto en `mod-runtime/`.
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("forge", (1, 16, 5)): "forge-1.16.5",
+    ("forge", (1, 17, 1)): "forge-1.17.1",
     ("forge", (1, 18, 2)): "forge-1.18.2",
     ("forge", (1, 19, 2)): "forge-1.19.2",
     ("forge", (1, 20, 1)): "forge-1.20.1",
@@ -30,6 +31,11 @@ SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
     ("neoforge", (1, 21, 8)): "neoforge-1.21.5",
     ("neoforge", (1, 21, 10)): "neoforge-1.21.5",
     ("neoforge", (1, 21, 11)): "neoforge-1.21.11",
+    ("neoforge", (26, 1, 0)): "neoforge-26.1",
+    ("neoforge", (26, 1, 1)): "neoforge-26.1",
+    ("neoforge", (26, 1, 2)): "neoforge-26.1",
+    ("neoforge", (26, 2, 0)): "neoforge-26.1",
+    ("neoforge", (26, 3, 0)): "neoforge-26.1",
     ("fabric", (1, 19, 4)): "fabric-1.19.4",
     # Un jar sirve para varias versiones cuando el mismo código compila y pasa las pruebas contra cada una de ellas
     ("fabric", (1, 20, 0)): "fabric-1.20.1",

@@ -152,12 +152,13 @@ def test_mod_de_apoyo_solo_para_lo_soportado(tmp_path: Path) -> None:
         ("1.21.10", "neoforge", "neoforge-1.21.5"),
         ("1.21.11", "neoforge", "neoforge-1.21.11"),
         ("1.20.4", "neoforge", None),
-        ("26.1", "neoforge", None),
+        ("26.1", "neoforge", "neoforge-26.1"),
+        ("26.3", "neoforge", "neoforge-26.1"),
         ("1.20.1", "neoforge", "forge-1.20.1"),  # NeoForge 1.20.1 carga los mods de Forge
         ("1.12.2", "forge", None),
         ("1.16.5", "forge", "forge-1.16.5"),
         ("1.16.5", "fabric", None),
-        ("1.17.1", "forge", None),
+        ("1.17.1", "forge", "forge-1.17.1"),
         ("1.19.4", "forge", None),
     ]
     for i, (version, loader, esperado) in enumerate(casos):
@@ -181,7 +182,7 @@ def test_instalar_reemplaza_versiones_y_respeta_otros_mods(tmp_path: Path) -> No
 
 
 def test_instalar_con_errores_claros(tmp_path: Path) -> None:
-    juego = fabrica.prism(tmp_path / "a", "1.17.1", "forge")
+    juego = fabrica.prism(tmp_path / "a", "1.12.2", "forge")
     with Instancia(juego) as inst, pytest.raises(ValueError, match="Todavía no hay mod de apoyo"):
         mod_apoyo.instalar(inst, tmp_path)
     for i, version in enumerate(("1.16.5", "1.18.2", "1.19.2")):  # se dice por qué no, no solo «todavía»
