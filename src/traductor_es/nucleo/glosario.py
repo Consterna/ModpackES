@@ -30,6 +30,13 @@ class Glosario:
                 self._terminos.setdefault(en, es)
         self._orden = None
 
+    def descubrir(self, terminos: Mapping[str, str]) -> None:
+        """Términos hallados en esta ejecución (los que se repiten en el modpack): no pisan a los oficiales."""
+        for en, es in terminos.items():
+            if en.strip() and es.strip():
+                self._terminos.setdefault(en.strip(), es.strip())
+        self._orden = None
+
     def fijar(self, terminos: Mapping[str, str]) -> None:
         """Términos del usuario: mandan sobre todo lo demás."""
         self._fijos.update({k.strip(): v.strip() for k, v in terminos.items() if k.strip() and v.strip()})

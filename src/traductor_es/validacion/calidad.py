@@ -47,6 +47,14 @@ def validar(original: str, traduccion: str) -> str | None:
     return None
 
 
+def sin_traducir(original: str, traduccion: str) -> bool:
+    """El motor devolvió el texto igual y parece inglés: dos o más palabras y ninguna palabra común del español."""
+    if traduccion.strip() != original.strip():
+        return False
+    palabras = _palabras(original)
+    return len(palabras) >= 2 and not any(p in _ESPANOL for p in palabras)
+
+
 @dataclass(slots=True)
 class Revision:
     """Avisos sobre el conjunto (no rechazan nada): términos del glosario que no se respetaron."""

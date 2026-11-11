@@ -31,6 +31,7 @@ class Lote:
     glosario: dict[str, str] = field(default_factory=dict[str, str])
     contexto: str = ""  #: ambientación del modpack que escribe el usuario (tono, términos propios)
     tarea: str = "traducir"  #: «traducir» o «revisar» (juzgar traducciones ya hechas)
+    ejemplos: dict[str, str] = field(default_factory=dict[str, str])  #: {inglés: español} de textos parecidos ya hechos
 
 
 class Motor(Protocol):

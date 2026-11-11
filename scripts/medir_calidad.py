@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--modelo", default="")
     ap.add_argument("--direccion", default="")
     ap.add_argument("--revisar", action="store_true", help="medir también después de la revisión automática")
+    ap.add_argument(
+        "--sin-contexto", action="store_true", help="medir sin las pistas ni los ejemplos del banco (como antes)"
+    )
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
@@ -40,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
         motor = fabrica.crear(args.motor, configuracion.leer_clave(args.motor), modelo, args.direccion)
         nombre = f"{args.motor}:{modelo}"
     banco = medicion.Banco.leer(args.banco)
+    if args.sin_contexto:
+        banco.ejemplos = {}
+        banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia) for c in banco.casos]
     resultados = medicion.medir(motor, banco, nombre, modelo, args.motor, revisar=args.revisar)
     for m in resultados:
         print(m.tabla(), end="\n\n")

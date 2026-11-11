@@ -69,7 +69,12 @@ def _traducir(lote: Lote) -> str:
         "4. Usa la terminología oficial de Minecraft en español. Si hay glosario, respétalo.\n"
         "5. Conserva el estilo y un largo parecido; no añadas explicaciones ni comillas.\n"
         "6. Usa los signos de apertura ¿ y ¡ cuando corresponda.\n"
-        "7. Si un texto ya está en español o no se puede traducir, devuélvelo igual." + _contexto(lote)
+        "7. Si un texto ya está en español o no se puede traducir, devuélvelo igual. Pero un nombre en inglés "
+        "(objeto, bloque, criatura, efecto…) sí se traduce: «Moon Berries» es «Bayas lunares», no se deja igual.\n"
+        "8. Si un texto trae «contexto», es de dónde sale (la clave y el tipo, p. ej. «nombre de un objeto»): úsalo "
+        "para elegir el sentido correcto («playing» en un disco de música es «reproduciéndose»), no lo traduzcas.\n"
+        "9. Si hay «ejemplos», son traducciones ya hechas de textos parecidos de este mismo modpack: usa sus "
+        "términos y su estilo para ser consistente, sin copiarlos." + _contexto(lote)
     )
 
 
@@ -77,6 +82,8 @@ def usuario(lote: Lote) -> str:
     datos: dict[str, Any] = {}
     if lote.glosario:
         datos["glosario"] = lote.glosario
+    if lote.ejemplos and lote.tarea != "revisar":
+        datos["ejemplos"] = lote.ejemplos
     if lote.tarea == "revisar":
         datos["pares"] = {
             e.id: {"original": e.texto, "traduccion": e.traduccion, **({"contexto": e.pista} if e.pista else {})}

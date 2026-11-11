@@ -210,7 +210,8 @@ personalizado, `--direccion http://servidor/v1`. La clave también se puede pasa
 - Los archivos se reescriben sin pérdidas: solo cambian los textos traducidos y todo lo demás queda byte a byte
   igual.
 - Un glosario con los nombres oficiales de Minecraft y de los mods mantiene los mismos términos en misiones,
-  libros y scripts.
+  libros y scripts. Los términos que se repiten en los nombres de un modpack se traducen primero y se fijan, y
+  el motor recibe de cada texto de dónde sale y ejemplos de textos parecidos ya traducidos.
 - Con un banco de 148 textos de referencia, Gemini 3.8 Flash tradujo el 100 % con un chrF de 85 y respetó
   todos los términos del glosario: detalle y límites de la medición en [docs/calidad.md](docs/calidad.md).
 

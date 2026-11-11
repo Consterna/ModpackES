@@ -85,6 +85,17 @@ class Memoria:
             )
             self._db.commit()
 
+    def recientes(self, dialecto: str, limite: int = 50_000) -> dict[str, str]:
+        """{original: traducción} de lo último traducido en este dialecto; las correcciones mandan."""
+        with self._lock:
+            filas = self._db.execute(
+                "SELECT origen, traduccion FROM traducciones WHERE dialecto=? ORDER BY fecha DESC LIMIT ?",
+                (dialecto, limite),
+            ).fetchall()
+        salida = {str(o): str(t) for o, t in filas}
+        salida.update(self.correcciones(dialecto))
+        return salida
+
     def olvidar(self, origen: str, dialecto: str, ambito: str) -> None:
         with self._lock:
             self._db.execute(
