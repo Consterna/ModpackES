@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -94,6 +94,44 @@ class Modulo(Protocol):
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen: ...
 
     def restaurar(self) -> list[Path]: ...
+
+
+#: Cuántos caracteres de un texto vecino o de un título se mandan como contexto.
+LARGO_VECINO = 100
+MARCAS_VECINDAD = ("dentro de «", "viene después de «")
+
+
+def _recortar(texto: str) -> str:
+    plano = " ".join(texto.split())
+    return plano if len(plano) <= LARGO_VECINO else plano[: LARGO_VECINO - 1] + "…"
+
+
+def con_vecindad(piezas: Sequence[Pieza], es_titulo: Callable[[Pieza], bool]) -> list[Pieza]:
+    """Le agrega a cada pieza el título bajo el que está y el texto que viene justo antes (en el mismo archivo).
+
+    Una descripción de misión o un párrafo de un libro suelto no dicen de qué tratan; con el título y la línea
+    anterior el motor puede elegir el sentido, el tono y los términos. Los títulos no llevan contexto propio.
+    """
+    titulo = anterior = ""
+    salida: list[Pieza] = []
+    for p in piezas:
+        if es_titulo(p):
+            titulo, anterior = _recortar(p.texto), ""
+            salida.append(p)
+            continue
+        partes = [p.pista] if p.pista else []
+        if titulo:
+            partes.append(f"dentro de «{titulo}»")
+        if anterior:
+            partes.append(f"viene después de «{anterior}»")
+        salida.append(Pieza(p.texto, " · ".join(partes)))
+        anterior = _recortar(p.texto)
+    return salida
+
+
+def quitar_vecindad(pista: str) -> str:
+    """La pista sin lo que agrega `con_vecindad` (para medir cuánto aporta)."""
+    return " · ".join(parte for parte in pista.split(" · ") if not parte.startswith(MARCAS_VECINDAD))
 
 
 #: Cuántas pistas distintas se mandan por texto cuando el mismo texto sale en varios sitios.

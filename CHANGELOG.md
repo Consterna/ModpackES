@@ -38,6 +38,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **El glosario ya no deja que un mod imponga su traducción a todo el modpack.** Los nombres del propio juego (primero es_mx, después es_es) mandan sobre los de un mod, y si dos mods traducen distinto el mismo término no se usa ninguno. Antes un mod que llamaba «Acechador de medianoche» a la vaca hacía que todo el modpack la tradujera así.
+- **Motores en tu PC (LM Studio, Ollama o un servidor en localhost):** los pedidos son más chicos (12 textos o 1.800 caracteres en vez de 60 o 5.000), porque un modelo pequeño se equivoca más con pedidos largos. Para medir sin saturar la GPU hay una «carga segura» en las herramientas de desarrollo (`medir_calidad.py --carga-segura`: pausas entre pedidos y espera si la GPU pasa de 80 °C).
+- **Ya no se mandan ejemplos de otros mods al motor.** Con referencias limpias, los ejemplos parecidos bajaron el chrF de Gemini (−1,2, intervalo de −2,3 a −0,3) y la ganancia que se había medido antes con el contexto no se reprodujo; las pistas (clave y tipo de cada texto) se mantienen. Los ejemplos siguen en el código para probarlos con modelos locales; ver [docs/calidad.md](docs/calidad.md).
+- **Contexto de vecindad en misiones y libros.** Cada texto de una misión o de un libro se manda al motor con el título bajo el que está y el texto que viene justo antes, para elegir mejor el sentido y el tono. En una comparación con un juez ganó el 56 % de los casos decididos, sin llegar a ser concluyente; ver [docs/calidad.md](docs/calidad.md).
+
 - **El glosario ahora se exige.** Si un término del glosario sale en un texto y su traducción no lo usa (con tolerancia a plurales, tildes y mayúsculas), el texto se reintenta una vez con un aviso explícito; si sigue sin salir se acepta, para no dejar nada en inglés.
 
 - **Traducciones más precisas.** Cada texto de un mod va ahora con de dónde sale y qué es («nombre de un objeto», «tooltip», «disco de música»…), y si el mismo texto sale en varios sitios se mandan hasta tres pistas. El motor recibe además ejemplos de textos parecidos ya traducidos (el español que traen los mods del modpack, la memoria y lo que se va traduciendo en esa misma ejecución) para seguir los mismos términos y estilo. Los términos que se repiten en los nombres («Moon Berries» en «Moon Berries Pie», «Moon Berries Jam»…) se traducen primero y se fijan en el glosario, para que todos los nombres usen la misma palabra. Un nombre que el motor devuelve igual al original se reintenta con un aviso; si sigue igual, se acepta. Con 250 textos reales de mods y Gemini 3.8 Flash, el chrF subió de 68,9 a 70,6 (promedio de tres corridas); ver [docs/calidad.md](docs/calidad.md).
@@ -54,7 +59,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - Las varias pistas de un texto que sale con distintas claves (hasta tres) llegaban al motor solo en las pruebas: la app mandaba una sola.
 - En el mod de apoyo, una frase con índices explícitos fuera de orden (`"%2$s of %1$s"`) mostraba cada dato en el lugar del otro.
 - El texto de un `hoverEvent` de objeto o criatura (`show_item`, `show_entity`) ya no se manda a traducir: en 1.12 es el SNBT del objeto y traducirlo rompía el comando.
-- Cancelar con Gemini cortaba recién al agotar los reintentos (minutos); ahora corta enseguida, también durante la espera entre reintentos y con los demás motores.
+- Cancelar con Gemini cortaba recién al agotar los reintentos (minutos); ahora corta enseguida, también durante la espera entre reintentos con los demás motores y en las pausas de la carga segura de los modelos locales (también mientras espera a que se enfríe la GPU).
 - Cerrar la ventana mientras «Probar conexión» seguía esperando podía cerrar la app con un error de Qt.
 - Unas preferencias dañadas (por ejemplo `"hilos": "muchos"`) impedían abrir la ventana, y una carpeta de un lanzador sin permiso de lectura también.
 - «Restaurar el original» se cortaba a medias si faltaba alguna copia de seguridad: ahora restaura el resto, guarda lo hecho y dice cuáles faltan. Volver a traducir un archivo sin copia ya no falla.
