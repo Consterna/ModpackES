@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, cast
 
 from . import NOMBRE, __version__, configuracion
@@ -111,6 +113,9 @@ def _argumentos() -> argparse.ArgumentParser:
     restaurar.add_argument("carpeta")
     modelos = sub.add_parser("modelos", help="lista los modelos que ofrece el motor")
     _opciones_de_motor(modelos)
+    glosario = sub.add_parser("glosario", help="los términos que quieres que se traduzcan siempre igual")
+    glosario.add_argument("accion", choices=["listar", "agregar", "quitar", "importar"])
+    glosario.add_argument("valores", nargs="*", help="agregar INGLÉS ESPAÑOL · quitar INGLÉS · importar ARCHIVO.json")
     clave = sub.add_parser("clave", help="guarda u olvida la clave de un motor en el sistema")
     clave.add_argument("accion", choices=["guardar", "olvidar"])
     clave.add_argument("--motor", choices=list(fabrica.MOTORES), default=fabrica.GEMINI)
@@ -148,6 +153,37 @@ def _instalar_runtime(args: argparse.Namespace) -> None:
         _escribir("Quité: " + ", ".join(p.name for p in quitados) if quitados else "No había mod de apoyo instalado.")
 
 
+def _glosario(args: argparse.Namespace) -> None:
+    """Edita el glosario del usuario: lo que escribes aquí manda sobre todo lo demás y se exige en cada texto."""
+    terminos = configuracion.leer_glosario_usuario()
+    valores: list[str] = args.valores
+    if args.accion == "listar":
+        for ingles, espanol in sorted(terminos.items(), key=lambda par: par[0].lower()):
+            _escribir(f"{ingles} = {espanol}")
+        _escribir(f"{len(terminos)} términos en {configuracion.ruta_glosario_usuario()}")
+        return
+    if args.accion == "agregar":
+        if len(valores) != 2 or not valores[0].strip() or not valores[1].strip():
+            raise ValueError('Uso: glosario agregar "INGLÉS" "ESPAÑOL"')
+        terminos[valores[0].strip()] = valores[1].strip()
+    elif args.accion == "quitar":
+        if len(valores) != 1 or valores[0].strip() not in terminos:
+            raise ValueError("Uso: glosario quitar INGLÉS (con un término que esté en el glosario)")
+        del terminos[valores[0].strip()]
+    else:
+        if len(valores) != 1:
+            raise ValueError("Uso: glosario importar ARCHIVO.json")
+        try:
+            nuevos: Any = json.loads(Path(valores[0]).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            raise ValueError(f"No pude leer {valores[0]}: {e}") from e
+        if not isinstance(nuevos, dict):
+            raise ValueError('El archivo debe ser un objeto JSON: {"inglés": "español", …}')
+        terminos.update({str(k): str(v) for k, v in cast(dict[str, Any], nuevos).items() if isinstance(v, str)})
+    configuracion.guardar_glosario_usuario(terminos)
+    _escribir(f"Glosario guardado: {len(terminos)} términos.")
+
+
 def _cobertura(args: argparse.Namespace) -> None:
     with Proceso(args.carpeta, Simulador(), registro=(lambda _m: None) if args.json else _escribir) as p:
         if not args.json:
@@ -174,6 +210,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             _instalar_runtime(args)
         elif args.orden == "cobertura":
             _cobertura(args)
+        elif args.orden == "glosario":
+            _glosario(args)
         elif args.orden == "clave":
             nombre = fabrica.MOTORES[args.motor]
             if args.accion == "guardar":
