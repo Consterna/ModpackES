@@ -78,6 +78,9 @@ def main() -> int:
     ap.add_argument("--frases", type=int, default=150)
     ap.add_argument("--nombres", type=int, default=100)
     ap.add_argument("--familias", type=int, default=25, help="términos repetidos cuyos nombres se agregan completos")
+    ap.add_argument(
+        "--salida", type=Path, default=None, help="dónde guardar (por defecto .descargas/banco/referencia_real.json)"
+    )
     args = ap.parse_args()
     todos = sorted(set(pares()))
     jars = sorted({p.jar for p in todos})
@@ -126,7 +129,7 @@ def main() -> int:
         ],
         "ejemplos": ejemplos,
     }
-    destino = dc.RAIZ / "banco" / "referencia_real.json"
+    destino = args.salida or dc.RAIZ / "banco" / "referencia_real.json"
     destino.parent.mkdir(exist_ok=True)
     destino.write_text(json.dumps(banco, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"{len(elegidos)} textos y {len(ejemplos)} ejemplos de otros mods en {destino}")

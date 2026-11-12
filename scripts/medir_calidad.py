@@ -14,6 +14,7 @@ from pathlib import Path
 from traductor_es import configuracion
 from traductor_es.motores import fabrica
 from traductor_es.motores.base import Motor
+from traductor_es.motores.carga import Enfriador
 from traductor_es.motores.gemini import MODELO_POR_DEFECTO
 from traductor_es.motores.simulador import Simulador
 from traductor_es.validacion import medicion
@@ -34,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--glosario-laxo", action="store_true", help="no rechazar traducciones a las que les falta un término"
     )
+    ap.add_argument(
+        "--carga-segura",
+        action="store_true",
+        help="motor local: descansar entre pedidos (ciclo 70/30), vigilar la GPU (pausa sobre 80 °C) y usar 1 hilo",
+    )
+    ap.add_argument("--hilos", type=int, default=0, help="pedidos a la vez (0: 4, o 1 con --carga-segura)")
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
@@ -43,14 +50,22 @@ def main(argv: list[str] | None = None) -> int:
         motor: Motor = Simulador()
         nombre = "simulador"
     else:
-        motor = fabrica.crear(args.motor, configuracion.leer_clave(args.motor), modelo, args.direccion)
+        enfriador = Enfriador(aviso=print) if args.carga_segura else None
+        motor = fabrica.crear(args.motor, configuracion.leer_clave(args.motor), modelo, args.direccion, enfriador)
         nombre = f"{args.motor}:{modelo}"
     banco = medicion.Banco.leer(args.banco)
     if args.sin_contexto:
         banco.ejemplos = {}
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia) for c in banco.casos]
     resultados = medicion.medir(
-        motor, banco, nombre, modelo, args.motor, revisar=args.revisar, glosario_estricto=not args.glosario_laxo
+        motor,
+        banco,
+        nombre,
+        modelo,
+        args.motor,
+        revisar=args.revisar,
+        glosario_estricto=not args.glosario_laxo,
+        hilos=args.hilos or (1 if args.carga_segura else 4),
     )
     for m in resultados:
         print(m.tabla(), end="\n\n")

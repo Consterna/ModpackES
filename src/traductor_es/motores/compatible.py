@@ -16,6 +16,7 @@ from typing import Any, cast
 import httpx
 
 from .base import Cancelado, ErrorFatal, Lote
+from .carga import Enfriador
 from .instrucciones import interpretar, sistema, usuario
 
 _ESPERA_INICIAL, _ESPERA_MAXIMA = 2.0, 60.0
@@ -85,6 +86,7 @@ class Compatible:
         esperar: Callable[[float], None] = time.sleep,
         reintentos: int = 6,
         temperatura: float = 0.2,
+        enfriador: Enfriador | None = None,
     ) -> None:
         self.perfil = perfil
         self.modelo = modelo.strip()
@@ -101,12 +103,19 @@ class Compatible:
         self._reintentos = reintentos
         self._temperatura = temperatura
         self._modo_json = perfil.modo_json
+        #: Pausas y vigilancia de la GPU para motores que corren en el PC (ver `carga.py`)
+        self.enfriador = enfriador
         #: Si se activa, se deja de reintentar y se corta el trabajo.
         self.cancelar: threading.Event | None = None
 
     @property
     def nombre(self) -> str:
         return f"{self.perfil.id}:{self.modelo}"
+
+    @property
+    def es_local(self) -> bool:
+        """Corre en este PC: un perfil local o cualquier servidor en localhost o 127.0.0.1."""
+        return self.perfil.local or self.direccion.split("//", 1)[-1].startswith(("localhost", "127.0.0.1"))
 
     def _formato(self, lote: Lote) -> dict[str, Any]:
         if self._modo_json == "objeto":
@@ -137,12 +146,22 @@ class Compatible:
             )
         return None
 
+    def _antes_del_pedido(self) -> None:
+        if self.enfriador is not None:
+            self.enfriador.antes()
+
+    def _despues_del_pedido(self, inicio: float) -> None:
+        if self.enfriador is not None:
+            self.enfriador.despues(time.monotonic() - inicio)
+
     def traducir_lote(self, lote: Lote) -> dict[str, str]:
         espera = _ESPERA_INICIAL
         for intento in range(self._reintentos):
             if self.cancelar is not None and self.cancelar.is_set():
                 raise Cancelado()
             ultimo = intento == self._reintentos - 1
+            self._antes_del_pedido()
+            inicio = time.monotonic()
             try:
                 respuesta = self._cliente.post(f"{self.direccion}/chat/completions", json=self._cuerpo(lote))
             except httpx.ConnectError as e:
@@ -156,6 +175,7 @@ class Compatible:
                     return {}
             else:
                 if respuesta.is_success:
+                    self._despues_del_pedido(inicio)
                     return self._leer(respuesta)
                 fatal = self._fatal(respuesta)
                 if fatal:
