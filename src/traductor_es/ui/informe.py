@@ -25,7 +25,7 @@ class DialogoInforme(QDialog):
         capa.addWidget(self.texto, 1)
         botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         self.b_guardar = QPushButton("Guardar…")
-        self.b_guardar.clicked.connect(guardar)
+        self.b_guardar.clicked.connect(lambda: guardar())  # noqa: PLW0108  # sin el `checked` que manda `clicked`
         botones.addButton(self.b_guardar, QDialogButtonBox.ButtonRole.ActionRole)
         botones.rejected.connect(self.close)
         capa.addWidget(botones)

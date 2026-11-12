@@ -118,15 +118,22 @@ class Libros:
         return {k: v for k, v in grupos.items() if k[0] != "guideme" or (k[1], k[2]) in guias}
 
     def _externos(self) -> dict[tuple[str, ...], dict[str, bytes]]:
-        """Libros propios del modpack en <instancia>/patchouli_books/<libro>/<idioma>/."""
+        """Libros propios del modpack en <instancia>/patchouli_books/<libro>/<idioma>/.
+
+        El español que escribió la propia app no cuenta como traducción del autor: si no, una segunda pasada
+        (con correcciones o más memoria) lo dejaría como estaba.
+        """
         base = self.ctx.instancia.juego / "patchouli_books"
         grupos: dict[tuple[str, ...], dict[str, bytes]] = {}
         for nombre in Carpeta(base).nombres() if base.is_dir() else []:
             partes = nombre.split("/", 2)
             if len(partes) == 3 and _IDIOMA.fullmatch(partes[1]) and nombre.endswith(".json"):
-                if partes[2].startswith("templates/"):
+                if partes[2].startswith("templates/") or partes[1] not in self._idiomas:
                     continue
-                grupos.setdefault(("externo", partes[0], partes[2]), {})[partes[1]] = (base / nombre).read_bytes()
+                ruta = base / nombre
+                contenido = ruta.read_bytes() if partes[1] == "en_us" else self.ctx.respaldo.original(ruta)
+                if contenido is not None:
+                    grupos.setdefault(("externo", partes[0], partes[2]), {})[partes[1]] = contenido
         return grupos
 
     def detectar(self) -> bool:

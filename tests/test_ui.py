@@ -379,6 +379,67 @@ def test_bienvenida_la_primera_vez(qtbot: QtBot) -> None:
         configuracion.guardar_preferencias(antes)
 
 
+def test_preferencias_danadas_no_impiden_abrir(qtbot: QtBot) -> None:
+    from traductor_es import configuracion
+
+    configuracion.guardar_preferencias({"hilos": "muchos", "grupos": 7, "contextos": [1], "modelos": "x"})
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    assert v.c_hilos.value() == 4 and all(t.incluido for t in v.grupos.values())
+
+
+def test_cerrar_espera_a_probar_conexion(qtbot: QtBot) -> None:
+    import threading
+
+    soltar = threading.Event()
+
+    class Lento(Simulador):
+        def listar_modelos(self) -> list[str]:
+            soltar.wait(0.3)
+            return ["modelo"]
+
+    v = Ventana(buscar_instancias=list, fabrica_motor=siempre(Lento()))
+    qtbot.addWidget(v)
+    v.b_probar.click()
+    sondeo = v._sondeo  # pyright: ignore[reportPrivateUsage]
+    assert sondeo is not None and sondeo.isRunning()
+    v.close()
+    assert not sondeo.isRunning()
+
+
+def test_cerrar_con_conexion_bloqueada_espera_a_que_termine(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si la prueba no contesta a tiempo, la ventana se oculta y se cierra recién cuando el hilo termina."""
+    import threading
+
+    from PySide6.QtGui import QCloseEvent
+
+    soltar = threading.Event()
+
+    class Colgado(Simulador):
+        def listar_modelos(self) -> list[str]:
+            soltar.wait(10)
+            return ["modelo"]
+
+    class Registra(Ventana):
+        aceptado = False
+
+        def closeEvent(self, event: QCloseEvent) -> None:
+            super().closeEvent(event)
+            self.aceptado = event.isAccepted()
+
+    monkeypatch.setattr(Ventana, "ESPERA_AL_CERRAR_MS", 50)
+    v = Registra(buscar_instancias=list, fabrica_motor=siempre(Colgado()))
+    qtbot.addWidget(v)
+    v.show()
+    v.b_probar.click()
+    sondeo = v._sondeo  # pyright: ignore[reportPrivateUsage]
+    assert sondeo is not None
+    assert v.close() is False  # todavía no: el hilo sigue vivo
+    assert sondeo.isRunning() and v.isHidden() and not v.aceptado
+    soltar.set()  # desde aquí el QThread puede estar ya borrado (deleteLater): no se le pregunta nada
+    qtbot.waitUntil(lambda: v.aceptado and v._sondeo is None, timeout=10000)  # pyright: ignore[reportPrivateUsage]
+
+
 def test_soltar_la_carpeta_de_un_modpack(qtbot: QtBot, tmp_path: Path) -> None:
     from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl
     from PySide6.QtGui import QDropEvent
@@ -542,7 +603,7 @@ def test_opcion_de_texto_java_y_mod_de_apoyo_en_la_ventana(
     assert "No había mod de apoyo" in v.aviso.e_texto.text()
 
 
-def test_informe_en_cuadro_y_guardado_en_archivo(qtbot: QtBot, tmp_path: Path) -> None:
+def test_informe_en_cuadro_y_guardado_en_archivo(qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     juego = _modpack(tmp_path)
     ruta = juego / "kubejs" / "server_scripts" / "s.js"
     ruta.write_text(
@@ -550,13 +611,22 @@ def test_informe_en_cuadro_y_guardado_en_archivo(qtbot: QtBot, tmp_path: Path) -
         encoding="utf-8",
     )
     v = _ventana(qtbot, juego)
-    v._guardar_informe(str(tmp_path / "antes.txt"))  # pyright: ignore[reportPrivateUsage]
+    v.guardar_informe_en(str(tmp_path / "antes.txt"))
     assert not (tmp_path / "antes.txt").exists()  # todavía no hay informe: no escribe nada
     v.a_cobertura.trigger()
     qtbot.waitUntil(lambda: v._hilo is None and v._dialogo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
     assert "This sentence looks like a message" in v._dialogo_informe.texto.toPlainText()  # pyright: ignore[reportPrivateUsage, reportOptionalMemberAccess]
     destino = tmp_path / "informe.txt"
-    v._guardar_informe(str(destino))  # pyright: ignore[reportPrivateUsage]
+    from PySide6.QtWidgets import QFileDialog
+
+    def elegir(*_a: object, **_k: object) -> tuple[str, str]:
+        return str(destino), ""
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(elegir))
+    v._dialogo_informe.b_guardar.click()  # pyright: ignore[reportPrivateUsage, reportOptionalMemberAccess]
+    assert "This sentence looks like a message" in destino.read_text("utf-8")  # el botón del cuadro guarda
+    destino.unlink()
+    v.a_guardar_informe.trigger()  # y la entrada del menú «Más» también
     assert "This sentence looks like a message" in destino.read_text("utf-8")
     v.a_comprobar_apoyo.trigger()
     assert "mod de apoyo" in v.aviso.e_texto.text().lower() or "mod de apoyo" in v.log.toPlainText().lower()

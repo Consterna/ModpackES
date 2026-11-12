@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -266,6 +267,24 @@ def test_lanzadores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         ("Modrinth", "Tres"),
         ("Launcher oficial", ".minecraft"),
     }
+
+
+def test_lanzador_ilegible_no_impide_ver_los_demas(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Una carpeta sin permiso (o en una red caída) no puede tumbar la ventana al abrirla."""
+    appdata, home = tmp_path / "appdata", tmp_path / "home"
+    fabrica.prism(appdata / "PrismLauncher" / "instances", "1.20.1", nombre="Uno")
+    (appdata / "ModrinthApp" / "profiles" / "Tres" / "mods").mkdir(parents=True)
+    monkeypatch.setenv("APPDATA", str(appdata))
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
+    listar = Path.iterdir
+
+    def iterdir(self: Path) -> Iterator[Path]:
+        if self.name == "profiles":
+            raise PermissionError("Acceso denegado")
+        return listar(self)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    assert {(e.lanzador, e.nombre) for e in lanzadores.buscar()} == {("Prism Launcher", "Uno")}
 
 
 def test_existente_prefiere_las_variantes_elegidas(tmp_path: Path) -> None:

@@ -45,19 +45,37 @@ class Respaldo:
     def _clave(self, ruta: Path) -> str:
         return ruta.resolve().relative_to(self.juego.resolve()).as_posix()
 
+    def _nuestro(self, clave: str, entrada: dict[str, Any] | None, actual: bytes | None) -> bool:
+        """El archivo sigue como lo dejó la app y, si existía antes, su copia sigue ahí.
+
+        También cuenta un archivo que creó la app y que quedó con su contenido neutro al restaurar: ese contenido
+        no es un original del modpack (si lo fuera, un libro restaurado no se volvería a traducir).
+        """
+        if entrada is None or actual is None:
+            return False
+        if entrada.get("escrito") == _huella(actual):
+            return not entrada.get("existia") or (self.base / clave).is_file()
+        neutro = entrada.get("neutro")
+        return (
+            entrada.get("escrito") is None
+            and not entrada.get("existia")
+            and isinstance(neutro, str)
+            and actual == neutro.encode("utf-8")
+        )
+
     def original(self, ruta: Path) -> bytes | None:
         """Contenido original (en inglés) del archivo. Solo lee: la copia se guarda al escribir.
 
         None si el archivo no existe o si lo creó la app.
         """
         clave = self._clave(ruta)
-        entrada = self._datos.get(clave)
         actual = ruta.read_bytes() if ruta.is_file() else None
-        copia = self.base / clave
-        if entrada is not None and actual is not None and entrada.get("escrito") == _huella(actual):
+        entrada = self._datos.get(clave)
+        if entrada is not None and self._nuestro(clave, entrada, actual):
             # El archivo sigue como lo dejó la app: el original es la copia (o no existía).
-            return copia.read_bytes() if entrada.get("existia") else None
-        # Primera vez o el archivo cambió por fuera (p. ej. se actualizó el modpack): lo de ahora es el original
+            return (self.base / clave).read_bytes() if entrada.get("existia") else None
+        # Primera vez, el archivo cambió por fuera (p. ej. se actualizó el modpack) o se borró su copia:
+        # lo de ahora es el original
         return actual
 
     def escribir(self, ruta: Path, datos: bytes, neutro: bytes = b"") -> None:
@@ -65,8 +83,7 @@ class Respaldo:
         clave = self._clave(ruta)
         entrada: dict[str, Any] | None = self._datos.get(clave)
         actual = ruta.read_bytes() if ruta.is_file() else None
-        nuestro = entrada is not None and actual is not None and entrada.get("escrito") == _huella(actual)
-        if not nuestro:
+        if not self._nuestro(clave, entrada, actual):
             # El archivo no está como lo dejó la app: lo que hay ahora es el original.
             if actual is None:
                 entrada = {"existia": False}
@@ -88,19 +105,35 @@ class Respaldo:
         self._guardar()
 
     def restaurar(self, prefijo: str = "") -> list[Path]:
-        """Devuelve a su estado original los archivos registrados cuya ruta empieza por `prefijo`."""
+        """Devuelve a su estado original los archivos registrados cuya ruta empieza por `prefijo`.
+
+        Si falta la copia de algún archivo (p. ej. se borró `traductor_es/respaldo`), restaura los demás, guarda lo
+        hecho y después lanza OSError con los que no pudo devolver (siguen registrados, por si vuelve la copia).
+        """
         hechos: list[Path] = []
+        sin_copia: list[str] = []
         for clave, entrada in sorted(self._datos.items()):
             if not clave.startswith(prefijo) or entrada.get("escrito") is None:
                 continue
             ruta = self.juego / clave
             if entrada.get("existia"):
-                ruta.write_bytes((self.base / clave).read_bytes())
+                copia = self.base / clave
+                if not copia.is_file():
+                    sin_copia.append(clave)
+                    continue
+                ruta.parent.mkdir(parents=True, exist_ok=True)
+                ruta.write_bytes(copia.read_bytes())
             elif ruta.is_file():
                 ruta.write_bytes(str(entrada.get("neutro") or "").encode("utf-8"))
             entrada["escrito"] = None
             hechos.append(ruta)
         self._guardar()
+        if sin_copia:
+            lista = ", ".join(sin_copia[:5]) + (f" y {len(sin_copia) - 5} más" if len(sin_copia) > 5 else "")
+            raise OSError(
+                f"Restauré {len(hechos)} archivos, pero falta la copia de seguridad de {len(sin_copia)}: {lista}. "
+                f"Estaba en {self.base}; para esos, vuelve a instalar los archivos originales del modpack."
+            )
         return hechos
 
     def registrados(self, prefijo: str = "") -> list[str]:

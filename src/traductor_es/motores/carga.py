@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import threading
 import time
 from collections.abc import Callable
 
@@ -46,7 +47,7 @@ class Enfriador:
         maxima: int = TEMPERATURA_MAXIMA,
         espera_maxima: float = ESPERA_MAXIMA,
         leer: Callable[[], int | None] = temperatura_gpu,
-        dormir: Callable[[float], None] = time.sleep,
+        dormir: Callable[[float], None] | None = None,
         aviso: Callable[[str], None] = lambda _m: None,
     ) -> None:
         if not 0.1 <= ciclo <= 1.0:
@@ -58,24 +59,37 @@ class Enfriador:
         self._dormir = dormir
         self._aviso = aviso
         self.pausas = 0.0  #: segundos totales de descanso (para informar)
+        #: Si se activa, las pausas terminan enseguida (el motor la comparte con el trabajo en curso)
+        self.cancelar: threading.Event | None = None
+
+    def _cancelado(self) -> bool:
+        return self.cancelar is not None and self.cancelar.is_set()
+
+    def _pausa(self, segundos: float) -> None:
+        if self._dormir is not None:
+            self._dormir(segundos)
+        elif self.cancelar is not None:
+            self.cancelar.wait(segundos)
+        else:
+            time.sleep(segundos)
 
     def antes(self) -> None:
         """Espera mientras la GPU esté demasiado caliente, hasta `espera_maxima` segundos."""
         esperado = 0.0
-        while esperado < self._espera_maxima:
+        while esperado < self._espera_maxima and not self._cancelado():
             temperatura = self._leer()
             if temperatura is None or temperatura < self.maxima:
                 return
             if esperado == 0.0:
                 self._aviso(f"La GPU está a {temperatura} °C: espero a que baje de {self.maxima} °C.")
-            self._dormir(_SONDEO)
+            self._pausa(_SONDEO)
             esperado += _SONDEO
             self.pausas += _SONDEO
 
     def despues(self, duracion: float) -> None:
         """Descansa en proporción a lo que duró el pedido para cumplir el ciclo de trabajo."""
-        if self.ciclo >= 1.0 or duracion <= 0:
+        if self.ciclo >= 1.0 or duracion <= 0 or self._cancelado():
             return
         pausa = duracion * (1 - self.ciclo) / self.ciclo
-        self._dormir(pausa)
+        self._pausa(pausa)
         self.pausas += pausa

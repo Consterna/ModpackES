@@ -136,6 +136,17 @@ def test_linea_de_comandos(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     assert main(["analizar", str(tmp_path / "no-existe")]) == 1
 
 
+def test_simular_no_ensucia_la_memoria_real(tmp_path: Path) -> None:
+    """Si «ES …» quedara en la memoria, la próxima traducción de verdad lo reutilizaría sin preguntar al motor."""
+    from traductor_es import configuracion
+
+    juego = _modpack(tmp_path)
+    assert main(["traducir", str(juego), "--simular", "--no-activar"]) == 0
+    assert "«ES» Rotates blocks" in (juego / "kubejs" / "client_scripts" / "t.js").read_text("utf-8")
+    with Memoria(configuracion.ruta_memoria()) as memoria:
+        assert memoria.cantidad() == 0
+
+
 class PorLotesQueDana(PorLotes):
     """Por lotes devuelve los códigos dañados; en modo normal, bien."""
 

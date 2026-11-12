@@ -83,7 +83,7 @@ class Compatible:
         clave: str | None = None,
         direccion: str | None = None,
         cliente: httpx.Client | None = None,
-        esperar: Callable[[float], None] = time.sleep,
+        esperar: Callable[[float], None] | None = None,
         reintentos: int = 6,
         temperatura: float = 0.2,
         enfriador: Enfriador | None = None,
@@ -111,6 +111,15 @@ class Compatible:
     @property
     def nombre(self) -> str:
         return f"{self.perfil.id}:{self.modelo}"
+
+    def _dormir(self, segundos: float) -> None:
+        """Espera antes de reintentar; si el usuario cancela mientras tanto, despierta enseguida."""
+        if self._esperar is not None:
+            self._esperar(segundos)
+        elif self.cancelar is not None:
+            self.cancelar.wait(segundos)
+        else:
+            time.sleep(segundos)
 
     @property
     def es_local(self) -> bool:
@@ -148,7 +157,10 @@ class Compatible:
 
     def _antes_del_pedido(self) -> None:
         if self.enfriador is not None:
+            self.enfriador.cancelar = self.cancelar  # cancelar también corta la espera a que se enfríe la GPU
             self.enfriador.antes()
+        if self.cancelar is not None and self.cancelar.is_set():
+            raise Cancelado()
 
     def _despues_del_pedido(self, inicio: float) -> None:
         if self.enfriador is not None:
@@ -193,7 +205,7 @@ class Compatible:
                         )
                     return {}
                 espera = max(espera, self._retry_after(respuesta))
-            self._esperar(min(espera, _ESPERA_MAXIMA))
+            self._dormir(min(espera, _ESPERA_MAXIMA))
             espera = min(espera * 2, _ESPERA_MAXIMA)
         return {}
 

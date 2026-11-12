@@ -204,7 +204,8 @@ El **glosario del usuario** (`glosario`) son los términos que quieres que se tr
 que no se traducen (`"Fluix": "Fluix"`). Mandan sobre todo lo demás y, si una traducción no los usa, el texto se reintenta
 con un aviso. Se guardan en `glosario.json` de la carpeta de datos de la app y valen para todos tus modpacks.
 
-`traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia.
+`traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia. No
+guarda nada en la memoria de traducciones, para que la próxima traducción de verdad no reutilice esos textos.
 
 ## Cómo protege el modpack
 

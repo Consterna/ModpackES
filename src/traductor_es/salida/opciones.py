@@ -23,12 +23,14 @@ def _linea_lista(clave: str, lista: list[str]) -> str:
     return f"{clave}:" + json.dumps(lista, ensure_ascii=False, separators=(",", ":"))
 
 
-def _subir_pack(linea: str, nombre_pack: str) -> tuple[str, str | None]:
-    """resourcePacks con el pack al final (arriba del todo en el juego), respetando el prefijo «file/»."""
+def _subir_pack(linea: str, nombre_pack: str, con_prefijo: bool | None) -> tuple[str, str | None]:
+    """resourcePacks con el pack al final (arriba del todo en el juego), con el prefijo «file/» si lo usa el juego."""
     lista = _lista_de(linea)
     if lista is None:
         raise ValueError("No pude leer la lista de resource packs de options.txt: actívalo a mano en el juego.")
-    entrada = f"file/{nombre_pack}" if any(p.startswith("file/") for p in lista) else nombre_pack
+    if con_prefijo is None:  # sin la versión, se imita lo que ya hay en la lista
+        con_prefijo = any(p.startswith("file/") for p in lista)
+    entrada = f"file/{nombre_pack}" if con_prefijo else nombre_pack
     nueva = [p for p in lista if p.removeprefix("file/") != nombre_pack] + [entrada]
     if nueva == lista:
         return linea, None
@@ -43,8 +45,12 @@ def _sacar_de_incompatibles(linea: str, nombre_pack: str) -> str:
     return linea if nueva == lista else _linea_lista("incompatibleResourcePacks", nueva)
 
 
-def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
+def activar(juego: Path, nombre_pack: str, idioma: str | None, con_prefijo: bool | None = None) -> list[str]:
     """Devuelve la lista de cambios hechos. Si no hay options.txt, no crea uno (el juego lo hace al abrirse).
+
+    `con_prefijo`: si el juego nombra los packs como «file/Nombre» (desde 1.13) o solo «Nombre» (1.12 y antes).
+    Hay que pasarlo: una instancia nueva solo tiene ["vanilla"] y de ahí no se puede deducir. Con None se imita
+    lo que ya haya en la lista.
 
     Lanza ValueError si options.txt tiene la lista de packs dañada (no se toca nada en ese caso).
     """
@@ -61,7 +67,7 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
         cambio: str | None = None
         if clave == "resourcePacks":
             vio_packs = True
-            lineas[i], cambio = _subir_pack(linea, nombre_pack)
+            lineas[i], cambio = _subir_pack(linea, nombre_pack, con_prefijo)
         elif clave == "incompatibleResourcePacks":
             lineas[i] = _sacar_de_incompatibles(linea, nombre_pack)
         elif clave == "lang" and idioma:
@@ -71,7 +77,8 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None) -> list[str]:
         if cambio:
             cambios.append(cambio)
     if not vio_packs:
-        lineas.append(_linea_lista("resourcePacks", ["vanilla", f"file/{nombre_pack}"]))
+        nuevos = [nombre_pack] if con_prefijo is False else ["vanilla", f"file/{nombre_pack}"]  # 1.12: sin «vanilla»
+        lineas.append(_linea_lista("resourcePacks", nuevos))
         cambios.append("pack activado")
     if idioma and not vio_idioma:
         lineas.append(f"lang:{idioma}")

@@ -218,6 +218,9 @@ public final class Tabla {
             String prefijo = null;
             int grupos = 0;
             int ultimo = 0;
+            int siguiente = 1;
+            // Argumento de String.format que llena cada grupo: «%2$s of %1$s» captura primero el 2 y después el 1
+            List<Integer> argumentos = new ArrayList<>();
             Matcher m = MARCADOR.matcher(clave);
             while (m.find()) {
                 String tramo = clave.substring(ultimo, m.start());
@@ -233,6 +236,7 @@ public final class Tabla {
                         prefijo = clave.substring(0, m.start());
                     }
                     grupos++;
+                    argumentos.add(m.group(1) != null ? Integer.parseInt(m.group(1)) : siguiente++);
                     regex.append(m.group(2).equals("d") ? "(-?\\d+)" : "(.+?)");
                 }
                 ultimo = m.end();
@@ -246,7 +250,7 @@ public final class Tabla {
             if (grupos == 0 || sinBordes(fijo.toString()).length() < MINIMO_FIJO) {
                 return null;
             }
-            List<Object> destino = destino(valor, grupos);
+            List<Object> destino = destino(valor, argumentos);
             if (destino == null) {
                 return null;
             }
@@ -254,7 +258,9 @@ public final class Tabla {
                     Pattern.compile(regex.toString(), Pattern.DOTALL), destino);
         }
 
-        private static List<Object> destino(String valor, int grupos) {
+        /** Trozos del español; cada dato apunta al grupo de la clave que llenó ese mismo argumento. */
+        private static List<Object> destino(String valor, List<Integer> argumentos) {
+            int grupos = argumentos.size();
             List<Object> partes = new ArrayList<>();
             Matcher m = MARCADOR.matcher(valor);
             int ultimo = 0;
@@ -267,12 +273,13 @@ public final class Tabla {
                 if (m.group(2).equals("%")) {
                     partes.add("%");
                 } else {
-                    int indice = m.group(1) != null ? Integer.parseInt(m.group(1)) : siguiente++;
-                    if (indice < 1 || indice > grupos) {
-                        return null;
+                    int argumento = m.group(1) != null ? Integer.parseInt(m.group(1)) : siguiente++;
+                    int grupo = argumentos.indexOf(argumento) + 1;
+                    if (grupo == 0) {
+                        return null; // el español pide un dato que el inglés no tiene
                     }
-                    usado[indice] = true;
-                    partes.add(indice);
+                    usado[grupo] = true;
+                    partes.add(grupo);
                 }
                 ultimo = m.end();
             }

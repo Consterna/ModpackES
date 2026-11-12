@@ -86,3 +86,17 @@ def test_los_pedidos_locales_son_mas_chicos() -> None:
     assert fabrica.limites_de_lote(local) == fabrica.LIMITES_LOCALES
     assert fabrica.limites_de_lote(Gemini("clave")) == fabrica.LIMITES_NORMALES
     local.cerrar()
+
+
+def test_cancelar_corta_las_pausas_y_la_espera_de_la_gpu() -> None:
+    import threading
+    import time
+
+    evento = threading.Event()
+    e = Enfriador(maxima=80, leer=lambda: 95)  # GPU siempre caliente: sin cancelar esperaría 180 s
+    e.cancelar = evento
+    threading.Timer(0.05, evento.set).start()
+    inicio = time.monotonic()
+    e.antes()
+    e.despues(1000.0)  # ya cancelado: no descansa
+    assert time.monotonic() - inicio < 10

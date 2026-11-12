@@ -203,3 +203,20 @@ def test_markdown_traduce_sin_tocar_codigo_ni_crlf() -> None:
     salida = markdown.reconstruir(lineas, segs, trad)
     assert "code stays" in salida and "«ES» Some text about iron." in salida
     assert salida.count("\r\n") == md.count("\r\n")
+
+
+def test_hover_de_objeto_o_criatura_no_se_traduce() -> None:
+    """El `value` de show_item (1.12) es un SNBT del objeto: traducirlo rompería el comando."""
+    from traductor_es.formatos import json_texto
+
+    objeto = (
+        '{"text":"Look at this","hoverEvent":{"action":"show_item",'
+        '"value":"{id:\\"minecraft:diamond_sword\\",Count:1b,tag:{display:{Name:\\"Excalibur\\"}}}"}}'
+    )
+    assert json_texto.extraer(objeto) == ["Look at this"]
+    criatura = '{"text":"Hi","hoverEvent":{"action":"show_entity","contents":{"type":"minecraft:pig","id":"x"}}}'
+    assert json_texto.extraer(criatura) == ["Hi"]
+    texto = '{"text":"Hi","hoverEvent":{"action":"show_text","contents":"More info"}}'
+    assert json_texto.extraer(texto) == ["Hi", "More info"]
+    assert '"value"' in json_texto.reconstruir(objeto, {"Look at this": "Mira esto"})
+    assert "Excalibur" in json_texto.reconstruir(objeto, {"Look at this": "Mira esto"})

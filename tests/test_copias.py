@@ -83,3 +83,27 @@ def test_original_solo_lee(tmp_path: Path) -> None:
     archivo.write_bytes(b"v1")
     assert Respaldo(tmp_path).original(archivo) == b"v1"
     assert not (tmp_path / "traductor_es").exists()
+
+
+def test_sin_la_copia_restaura_lo_demas_y_lo_dice(tmp_path: Path) -> None:
+    import shutil
+
+    import pytest
+
+    a, b = tmp_path / "config" / "a.snbt", tmp_path / "config" / "b.snbt"
+    a.parent.mkdir(parents=True)
+    a.write_bytes(b"ingles a")
+    b.write_bytes(b"ingles b")
+    r = Respaldo(tmp_path)
+    r.escribir(a, b"espanol a")
+    r.escribir(b, b"espanol b")
+    (r.base / "config" / "a.snbt").unlink()  # alguien borró una copia
+    with pytest.raises(OSError, match=r"Restauré 1 archivos.*config/a\.snbt"):
+        Respaldo(tmp_path).restaurar()
+    assert b.read_bytes() == b"ingles b" and a.read_bytes() == b"espanol a"
+    assert Respaldo(tmp_path).registrados() == ["config/a.snbt"]  # lo de b quedó guardado
+    shutil.rmtree(r.base)  # sin ninguna copia, volver a traducir no falla: lo de ahora pasa a ser el original
+    r = Respaldo(tmp_path)
+    assert r.original(a) == b"espanol a"
+    r.escribir(a, b"espanol a2")
+    assert Respaldo(tmp_path).restaurar() == [a] and a.read_bytes() == b"espanol a"

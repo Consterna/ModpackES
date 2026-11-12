@@ -185,6 +185,33 @@ def test_cancelar_durante_la_espera_del_lote() -> None:
     assert lotes.cancelados == ["trabajo"]
 
 
+def test_cancelar_corta_los_reintentos_del_modo_normal() -> None:
+    import threading
+
+    from traductor_es.motores.base import Cancelado
+
+    evento = threading.Event()
+    modelos = Modelos([error(503, "Unavailable")] * 7)
+    g = Gemini("clave", cliente=SimpleNamespace(models=modelos), esperar=lambda _s: evento.set())
+    g.cancelar = evento
+    with pytest.raises(Cancelado):
+        g.traducir_lote(lote("Hello"))
+    assert len(modelos.llamadas) == 1  # no siguió reintentando después de cancelar
+
+
+def test_la_espera_entre_reintentos_despierta_al_cancelar() -> None:
+    import threading
+    import time
+
+    evento = threading.Event()
+    g = Gemini("clave", cliente=SimpleNamespace(models=None))
+    g.cancelar = evento
+    threading.Timer(0.05, evento.set).start()
+    inicio = time.monotonic()
+    g._dormir(30)  # pyright: ignore[reportPrivateUsage]
+    assert time.monotonic() - inicio < 5
+
+
 def test_el_contexto_del_modpack_va_en_el_sistema_y_solo_si_hay() -> None:
     con = Lote(lote("x").entradas, "mision", "español", {}, "Granja acogedora; «Bells» es la moneda")
     assert "Contexto del modpack" in sistema(con) and "«Bells» es la moneda" in sistema(con)

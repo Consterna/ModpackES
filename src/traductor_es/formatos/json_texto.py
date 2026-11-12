@@ -48,7 +48,8 @@ def _recorrer(nodo: Any, hacer: Callable[[str], str]) -> Any:
         if "extra" in d:
             d["extra"] = _recorrer(d["extra"], hacer)
         evento = d.get("hoverEvent") or d.get("hover_event")
-        if isinstance(evento, dict):
+        # Solo show_text lleva texto: en show_item y show_entity el valor es un objeto o un SNBT («{id:…}»)
+        if isinstance(evento, dict) and cast(dict[str, Any], evento).get("action", "show_text") == "show_text":
             evento = dict(cast(dict[str, Any], evento))
             for c in ("contents", "value", "text"):
                 if c in evento and isinstance(evento[c], (str, list, dict)):

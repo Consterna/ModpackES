@@ -97,6 +97,16 @@ def _diccionario(valor: object) -> dict[str, str]:
     return {str(k): str(v) for k, v in cast(dict[object, object], valor).items()}
 
 
+def _entero(valor: object, defecto: int) -> int:
+    """Un número leído de las preferencias (el de por defecto si el archivo tenía otra cosa)."""
+    if isinstance(valor, bool):
+        return defecto
+    try:
+        return int(cast(Any, valor))
+    except (TypeError, ValueError):
+        return defecto
+
+
 def _miles(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
@@ -194,6 +204,9 @@ class Ventana(QMainWindow):
 
     `_estado` dice qué hace ese botón: «analizar», «traducir», «trabajando» o «listo».
     """
+
+    #: Cuánto se espera a cada hilo al cerrar antes de ocultar la ventana y cerrarla cuando termine
+    ESPERA_AL_CERRAR_MS = 5000
 
     def __init__(
         self,
@@ -431,7 +444,8 @@ class Ventana(QMainWindow):
     def _tarjetas_grupos(self) -> QGridLayout:
         rejilla = QGridLayout()
         rejilla.setSpacing(12)
-        elegidos = set(self._preferencias.get("grupos", GRUPOS))
+        guardados: object = self._preferencias.get("grupos", GRUPOS)
+        elegidos = set(cast(list[object], guardados)) if isinstance(guardados, list | tuple) else set(GRUPOS)
         self.grupos: dict[str, TarjetaGrupo] = {}
         for i, g in enumerate(GRUPOS):
             titulo, nombre_icono, abarca = GRUPOS_VISIBLES[g]
@@ -486,7 +500,7 @@ class Ventana(QMainWindow):
         self.c_hilos.setRange(1, 16)
         self.c_hilos.setSuffix(" pedidos a la vez")
         self.c_hilos.setToolTip("Más es más rápido, pero los planes gratuitos y los modelos en tu PC aguantan pocos")
-        self.c_hilos.setValue(int(self._preferencias.get("hilos", 4)))
+        self.c_hilos.setValue(_entero(self._preferencias.get("hilos"), 4))
         formulario.addRow("Velocidad:", self.c_hilos)
         self.c_activar = QCheckBox("Activar el pack y poner el juego en español (con Minecraft cerrado)")
         self.c_activar.setChecked(True)
@@ -1047,15 +1061,20 @@ class Ventana(QMainWindow):
     def _comprobar_apoyo(self) -> None:
         self._con_instancia(lambda inst: "\n".join(mod_apoyo.estado(inst)))
 
-    def _guardar_informe(self, destino: str | None = None) -> None:
+    def _guardar_informe(self) -> None:
+        """Pide dónde guardar el informe. Sin parámetros: `triggered` y `clicked` mandan `checked` (un bool)."""
         if not self.ultima_cobertura:
             self.avisar("Primero usa «Más ▸ Qué queda en inglés».")
             return
-        if destino is None:
-            destino, _ = QFileDialog.getSaveFileName(
-                self, "Guardar el informe", str(Path.home() / "Que_queda_en_ingles.txt"), "Texto (*.txt)"
-            )
-        if not destino:
+        destino, _ = QFileDialog.getSaveFileName(
+            self, "Guardar el informe", str(Path.home() / "Que_queda_en_ingles.txt"), "Texto (*.txt)"
+        )
+        if destino:
+            self.guardar_informe_en(destino)
+
+    def guardar_informe_en(self, destino: str) -> None:
+        if not self.ultima_cobertura:
+            self.avisar("Primero usa «Más ▸ Qué queda en inglés».")
             return
         try:
             Path(destino).write_text(texto_del_informe(self.ultima_cobertura), encoding="utf-8")
@@ -1266,7 +1285,18 @@ class Ventana(QMainWindow):
             lector.parar.set()
         for lector in self._lectores:
             lector.esperar(2)  # que no quede avisando mientras Qt se cierra
-        if self._hilo is not None:
-            self._hilo.quit()
-            self._hilo.wait(5000)
+        # «Probar conexión» también: destruir un QThread que sigue corriendo tumba Qt al salir
+        vivos = [h for h in (self._hilo, self._sondeo) if h is not None and h.isRunning()]
+        for hilo in vivos:
+            hilo.quit()
+            hilo.wait(self.ESPERA_AL_CERRAR_MS)
+        pendientes = [h for h in vivos if h.isRunning()]
+        if pendientes:
+            # quit() no corta una llamada bloqueada (p. ej. un servidor que no contesta): la ventana se oculta y se
+            # cierra de verdad cuando el hilo termine
+            event.ignore()
+            self.hide()
+            for hilo in pendientes:
+                hilo.finished.connect(self.close, Qt.ConnectionType.UniqueConnection)
+            return
         event.accept()

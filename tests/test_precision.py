@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from traductor_es.modulos.base import Pieza, reunir_pistas
 from traductor_es.modulos.mods import Mods, tipo_de_clave
@@ -168,3 +169,19 @@ def test_una_palabra_o_un_texto_ya_en_espanol_no_se_reintenta() -> None:
     with Memoria(":memory:") as mem:
         Traductor(motor, mem, Glosario()).traducir(["Botania", "Bolsa de tela"], "mision")
     assert len(motor.lotes) == 1
+
+
+def test_la_app_manda_las_pistas_de_todas_las_claves(tmp_path: Path) -> None:
+    """Proceso (lo que usan la ventana y la línea de comandos) junta las pistas igual que `reunir_pistas`."""
+    from traductor_es.proceso import Proceso
+
+    from . import fabrica
+
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    textos = {"gui.m.open": "Open the gate", "key.m.open": "Open the gate"}
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", textos))
+    motor = Simulador()
+    with Memoria(":memory:") as mem, Proceso(juego, motor, grupos=["mods"], memoria=mem) as p:
+        p.ejecutar(activar=False)
+    pista = next(e.pista for lote in motor.lotes_recibidos for e in lote.entradas if e.texto == "Open the gate")
+    assert "gui.m.open" in pista and "key.m.open" in pista
