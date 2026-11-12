@@ -205,6 +205,9 @@ class Ventana(QMainWindow):
     `_estado` dice qué hace ese botón: «analizar», «traducir», «trabajando» o «listo».
     """
 
+    #: Cuánto se espera a cada hilo al cerrar antes de ocultar la ventana y cerrarla cuando termine
+    ESPERA_AL_CERRAR_MS = 5000
+
     def __init__(
         self,
         buscar_instancias: Callable[[], list[InstanciaEncontrada]] = buscar,
@@ -1282,8 +1285,18 @@ class Ventana(QMainWindow):
             lector.parar.set()
         for lector in self._lectores:
             lector.esperar(2)  # que no quede avisando mientras Qt se cierra
-        for hilo in (self._hilo, self._sondeo):  # «Probar conexión» también: un QThread vivo al cerrar tumba Qt
-            if hilo is not None:
-                hilo.quit()
-                hilo.wait(5000)
+        # «Probar conexión» también: destruir un QThread que sigue corriendo tumba Qt al salir
+        vivos = [h for h in (self._hilo, self._sondeo) if h is not None and h.isRunning()]
+        for hilo in vivos:
+            hilo.quit()
+            hilo.wait(self.ESPERA_AL_CERRAR_MS)
+        pendientes = [h for h in vivos if h.isRunning()]
+        if pendientes:
+            # quit() no corta una llamada bloqueada (p. ej. un servidor que no contesta): la ventana se oculta y se
+            # cierra de verdad cuando el hilo termine
+            event.ignore()
+            self.hide()
+            for hilo in pendientes:
+                hilo.finished.connect(self.close, Qt.ConnectionType.UniqueConnection)
+            return
         event.accept()

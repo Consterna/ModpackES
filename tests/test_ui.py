@@ -407,6 +407,39 @@ def test_cerrar_espera_a_probar_conexion(qtbot: QtBot) -> None:
     assert not sondeo.isRunning()
 
 
+def test_cerrar_con_conexion_bloqueada_espera_a_que_termine(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si la prueba no contesta a tiempo, la ventana se oculta y se cierra recién cuando el hilo termina."""
+    import threading
+
+    from PySide6.QtGui import QCloseEvent
+
+    soltar = threading.Event()
+
+    class Colgado(Simulador):
+        def listar_modelos(self) -> list[str]:
+            soltar.wait(10)
+            return ["modelo"]
+
+    class Registra(Ventana):
+        aceptado = False
+
+        def closeEvent(self, event: QCloseEvent) -> None:
+            super().closeEvent(event)
+            self.aceptado = event.isAccepted()
+
+    monkeypatch.setattr(Ventana, "ESPERA_AL_CERRAR_MS", 50)
+    v = Registra(buscar_instancias=list, fabrica_motor=siempre(Colgado()))
+    qtbot.addWidget(v)
+    v.show()
+    v.b_probar.click()
+    sondeo = v._sondeo  # pyright: ignore[reportPrivateUsage]
+    assert sondeo is not None
+    assert v.close() is False  # todavía no: el hilo sigue vivo
+    assert sondeo.isRunning() and v.isHidden() and not v.aceptado
+    soltar.set()
+    qtbot.waitUntil(lambda: v.aceptado and not sondeo.isRunning(), timeout=10000)  # se cierra sola al terminar
+
+
 def test_soltar_la_carpeta_de_un_modpack(qtbot: QtBot, tmp_path: Path) -> None:
     from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl
     from PySide6.QtGui import QDropEvent
