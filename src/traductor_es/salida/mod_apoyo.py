@@ -16,6 +16,7 @@ from ..fuentes.instancia import Instancia
 PREFIJO = "modpackes_runtime-"
 #: (loader, versión de Minecraft) para los que hay mod de apoyo. Cada entrada es un proyecto en `mod-runtime/`.
 SOPORTADOS: dict[tuple[str, tuple[int, ...]], str] = {
+    ("forge", (1, 12, 2)): "forge-1.12.2",
     ("forge", (1, 16, 5)): "forge-1.16.5",
     ("forge", (1, 17, 1)): "forge-1.17.1",
     ("forge", (1, 18, 2)): "forge-1.18.2",
