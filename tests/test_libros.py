@@ -157,6 +157,27 @@ def test_libro_propio_del_modpack_se_restaura_al_ingles(tmp_path: Path, memoria:
         Libros(Contexto(inst, Respaldo(juego))).restaurar()
     assert (base / "es_mx" / "entries" / "w.json").read_bytes() == original
     assert (base / "en_us" / "entries" / "w.json").read_bytes() == original
+    correr(juego, memoria)  # restaurar y volver a traducir: el inglés que dejó la restauración no es del autor
+    assert json.loads((base / "es_mx" / "entries" / "w.json").read_text("utf-8"))["name"] == "«ES» Welcome"
+
+
+def test_libro_propio_aplica_correcciones_en_la_segunda_pasada(tmp_path: Path, memoria: Memoria) -> None:
+    """Lo que escribió la app en patchouli_books/<libro>/es_mx no se toma como traducción del autor."""
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    base = juego / "patchouli_books" / "manual"
+    (base / "en_us" / "entries").mkdir(parents=True)
+    (base / "en_us" / "entries" / "w.json").write_text(
+        json.dumps({"name": "Welcome", "pages": [{"type": "text", "text": "Hello there, player"}]}), encoding="utf-8"
+    )
+    correr(juego, memoria)
+    memoria.corregir("Hello there, player", "es_mx", "Hola, jugador")
+    correr(juego, memoria)
+    es = json.loads((base / "es_mx" / "entries" / "w.json").read_text("utf-8"))
+    assert es["pages"][0]["text"] == "Hola, jugador" and es["name"] == "«ES» Welcome"
+    # Un español que puso el autor del modpack (o el jugador) a mano sí se respeta
+    (base / "es_es" / "entries" / "w.json").write_text(json.dumps({"name": "Bienvenida"}), encoding="utf-8")
+    correr(juego, memoria)
+    assert json.loads((base / "es_es" / "entries" / "w.json").read_text("utf-8")) == {"name": "Bienvenida"}
 
 
 def test_markdown_sin_traducciones_queda_igual() -> None:

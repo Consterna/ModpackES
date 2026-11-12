@@ -45,6 +45,21 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - El kit para servidores incluye las funciones y los logros traducidos dondequiera que estén, también los de un datapack comprimido (`.zip`); los `.zip` que solo traen tips siguen fuera porque son de cliente.
 - «Instalar el mod de apoyo» copia el mod nuevo antes de borrar los viejos, para no dejarte sin mod si la copia falla, y «Estado del mod de apoyo» avisa cuando el jar instalado es de otra versión de Minecraft en lugar de decir que todo está listo.
 
+### Corregido
+
+- **El pack no se activaba en una instancia nueva.** Si en `options.txt` solo estaban los packs internos (`["vanilla"]` o `["vanilla","mod_resources"]`), se escribía `Traduccion_ES` sin el prefijo `file/` que usa Minecraft desde 1.13, y el juego lo ignoraba. Ahora el formato sale de la versión de la instancia (también en 1.12, que no usa el prefijo).
+- **«Guardar el informe de lo que queda…» no guardaba nada**, ni desde el menú «Más» ni desde el botón del cuadro del informe.
+- **Libros propios del modpack** (`patchouli_books/` en la instancia): una segunda traducción no aplicaba las correcciones ni lo nuevo de la memoria, porque el español que había escrito la app se tomaba como traducción del autor; y después de «Restaurar el original», volver a traducir los dejaba en inglés.
+- `traducir --simular` guardaba sus textos de prueba («ES» delante) en la memoria de traducciones, y una traducción de verdad posterior los reutilizaba. Ahora la simulación usa una memoria aparte.
+- Las varias pistas de un texto que sale con distintas claves (hasta tres) llegaban al motor solo en las pruebas: la app mandaba una sola.
+- En el mod de apoyo, una frase con índices explícitos fuera de orden (`"%2$s of %1$s"`) mostraba cada dato en el lugar del otro.
+- El texto de un `hoverEvent` de objeto o criatura (`show_item`, `show_entity`) ya no se manda a traducir: en 1.12 es el SNBT del objeto y traducirlo rompía el comando.
+- Cancelar con Gemini cortaba recién al agotar los reintentos (minutos); ahora corta enseguida, también durante la espera entre reintentos y con los demás motores.
+- Cerrar la ventana mientras «Probar conexión» seguía esperando podía cerrar la app con un error de Qt.
+- Unas preferencias dañadas (por ejemplo `"hilos": "muchos"`) impedían abrir la ventana, y una carpeta de un lanzador sin permiso de lectura también.
+- «Restaurar el original» se cortaba a medias si faltaba alguna copia de seguridad: ahora restaura el resto, guarda lo hecho y dice cuáles faltan. Volver a traducir un archivo sin copia ya no falla.
+- La línea de comandos muestra un mensaje claro, sin traza, ante un archivo bloqueado o sin permiso.
+
 ## [2.2.0] - 2026-11-04
 
 Interfaz nueva: una ventana guiada en pasos, con tarjetas y un solo botón principal, y un tema propio

@@ -67,7 +67,7 @@ class Gemini:
         clave: str,
         modelo: str = MODELO_POR_DEFECTO,
         cliente: Any = None,
-        esperar: Callable[[float], None] = time.sleep,
+        esperar: Callable[[float], None] | None = None,
         reintentos: int = 7,
         temperatura: float = 0.2,
     ) -> None:
@@ -87,6 +87,18 @@ class Gemini:
     @property
     def nombre(self) -> str:
         return f"gemini:{self.modelo}"
+
+    def _cancelado(self) -> bool:
+        return self.cancelar is not None and self.cancelar.is_set()
+
+    def _dormir(self, segundos: float) -> None:
+        """Espera antes de reintentar; si el usuario cancela mientras tanto, despierta enseguida."""
+        if self._esperar is not None:
+            self._esperar(segundos)
+        elif self.cancelar is not None:
+            self.cancelar.wait(segundos)
+        else:
+            time.sleep(segundos)
 
     def listar_modelos(self) -> list[str]:
         try:
@@ -117,6 +129,8 @@ class Gemini:
     def traducir_lote(self, lote: Lote) -> dict[str, str]:
         espera = _ESPERA_INICIAL
         for intento in range(self._reintentos):
+            if self._cancelado():  # sin esto, cancelar esperaría a que se agoten los reintentos (minutos)
+                raise Cancelado()
             try:
                 respuesta = self._cliente.models.generate_content(
                     model=self.modelo, contents=usuario(lote), config=self._config(lote)
@@ -141,7 +155,7 @@ class Gemini:
             except (OSError, TimeoutError, ValueError, httpx.HTTPError):  # cortes de red: se reintenta
                 if intento == self._reintentos - 1:
                     return {}
-            self._esperar(espera)
+            self._dormir(espera)
             espera = min(espera * 2, _ESPERA_MAXIMA)
         return {}
 
@@ -168,12 +182,14 @@ class Gemini:
             trabajo = self._cliente.batches.create(model=self.modelo, src=pedidos, config={"display_name": "modpackes"})
             terminados = {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"}
             while (estado := str(getattr(trabajo.state, "name", trabajo.state))) not in terminados:
-                if self.cancelar is not None and self.cancelar.is_set():
+                if self._cancelado():
                     with contextlib.suppress(errors.APIError):
                         self._cliente.batches.cancel(name=trabajo.name)  # que Google no lo siga procesando
                     raise Cancelado()
                 self.al_esperar(estado)
-                self._esperar(_SONDEO_LOTES)
+                self._dormir(_SONDEO_LOTES)
+                if self._cancelado():
+                    continue  # se cancela el trabajo arriba, sin volver a consultar
                 trabajo = self._cliente.batches.get(name=trabajo.name)
         except errors.APIError as e:
             raise ErrorFatal(explicar(e) or f"La Batch API de Gemini falló: {e.message}") from e

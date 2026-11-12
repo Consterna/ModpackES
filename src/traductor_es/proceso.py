@@ -13,7 +13,7 @@ from typing import Self
 from . import configuracion
 from .fuentes.instancia import Instancia
 from .modulos import datos, libros, misiones, mods, runtime, scripts
-from .modulos.base import Contexto, Modulo, Resumen
+from .modulos.base import Contexto, Modulo, Resumen, reunir_pistas
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
 from .motores import fabrica
@@ -246,7 +246,7 @@ class Proceso:
             piezas = modulo.recolectar()
             textos = [p.texto for p in piezas]
             pendientes = self.traductor.pendientes(textos, modulo.ambito)
-            pistas = {p.texto: p.pista for p in piezas if p.pista}
+            pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
             resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
             if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
                 self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
@@ -276,8 +276,9 @@ class Proceso:
         if activar and (self.ctx.pack is not None and (self.ctx.pack.raiz / "pack.mcmeta").is_file()):
             try:
                 informe.pack_activado = opciones_salida.activar(
-                    self.instancia.juego, NOMBRE, self._idioma_del_juego() if poner_idioma else None
-                )
+                    self.instancia.juego, NOMBRE, self._idioma_del_juego() if poner_idioma else None,
+                    con_prefijo=not self.instancia.legacy,  # «file/Nombre» desde 1.13
+                )  # fmt: skip
             except ValueError as e:
                 informe.avisos.append(str(e))
         return informe

@@ -50,6 +50,14 @@ def _nombre_json(ruta: Path, clave: str, defecto: str) -> str:
     return str(valor) if isinstance(valor, str) and valor.strip() else defecto
 
 
+def _subcarpetas(base: Path) -> list[Path]:
+    """Las carpetas dentro de `base`, en orden; ninguna si no existe o no se puede leer (sin permiso, red caída)."""
+    try:
+        return sorted(p for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
+    except OSError:
+        return []
+
+
 def buscar() -> list[InstanciaEncontrada]:
     appdata = Path(os.environ.get("APPDATA", Path.home()))
     home = Path.home()
@@ -61,24 +69,19 @@ def buscar() -> list[InstanciaEncontrada]:
             encontradas.append(InstanciaEncontrada(lanzador, nombre, juego))
 
     for lanzador, base in (("Prism Launcher", appdata / "PrismLauncher"), ("MultiMC", home / "MultiMC")):
-        instancias = _carpeta_instancias_prism(base)
-        if instancias.is_dir():
-            for c in sorted(p for p in instancias.iterdir() if p.is_dir() and not p.name.startswith(".")):
-                if (c / "instance.cfg").exists():
-                    nombre = _nombre_prism(c)
-                    agregar(lanzador, c, nombre if nombre == c.name else f"{nombre} ({c.name})")
-    curse = home / "curseforge" / "minecraft" / "Instances"
-    if curse.is_dir():
-        for c in sorted(p for p in curse.iterdir() if p.is_dir()):
-            agregar("CurseForge", c, _nombre_json(c / "minecraftinstance.json", "name", c.name))
+        for c in _subcarpetas(_carpeta_instancias_prism(base)):
+            if not c.name.startswith(".") and (c / "instance.cfg").exists():
+                nombre = _nombre_prism(c)
+                agregar(lanzador, c, nombre if nombre == c.name else f"{nombre} ({c.name})")
+    for c in _subcarpetas(home / "curseforge" / "minecraft" / "Instances"):
+        agregar("CurseForge", c, _nombre_json(c / "minecraftinstance.json", "name", c.name))
     for lanzador, base in (
         ("Modrinth", appdata / "ModrinthApp" / "profiles"),
         ("ATLauncher", appdata / "ATLauncher" / "instances"),
         ("GDLauncher", appdata / "gdlauncher_carbon" / "data" / "instances"),
     ):
-        if base.is_dir():
-            for c in sorted(p for p in base.iterdir() if p.is_dir()):
-                agregar(lanzador, c, c.name)
+        for c in _subcarpetas(base):
+            agregar(lanzador, c, c.name)
     oficial = appdata / ".minecraft"
     if (oficial / "mods").is_dir():
         agregar("Launcher oficial", oficial, ".minecraft")

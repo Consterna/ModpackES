@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import getpass
 import sys
 from collections.abc import Sequence
@@ -17,6 +18,7 @@ from .motores.base import Cancelado, ErrorFatal, Motor
 from .motores.gemini import MODELO_POR_DEFECTO
 from .motores.simulador import Simulador
 from .nucleo.dialectos import DIALECTOS
+from .nucleo.memoria import Memoria
 from .proceso import GRUPOS, Informe, Proceso
 from .registro import LOGGER, configurar
 from .salida import mod_apoyo
@@ -95,7 +97,9 @@ def _argumentos() -> argparse.ArgumentParser:
     traducir = sub.add_parser("traducir", help="traduce y escribe el resultado")
     comunes(traducir)
     traducir.add_argument("--hilos", type=int, default=4)
-    traducir.add_argument("--simular", action="store_true", help="prueba sin API: antepone «ES» a todo")
+    traducir.add_argument(
+        "--simular", action="store_true", help="prueba sin API: antepone «ES» a todo (no toca la memoria)"
+    )
     traducir.add_argument("--no-activar", action="store_true", help="no tocar options.txt")
     traducir.add_argument("--no-idioma", action="store_true", help="no cambiar el idioma del juego")
     cob = sub.add_parser("cobertura", help="dice qué texto queda en inglés y por qué (solo lee, no escribe nada)")
@@ -125,12 +129,19 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
     else:
         motor = _crear(args)
     grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
-    with Proceso(
-        args.carpeta, motor, args.dialecto, grupos, registro=_escribir,
-        hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
-        texto_java=args.java,
-        scripts_exhaustivo=args.exhaustivo,
-    ) as p:  # fmt: skip
+    simular = args.orden == "traducir" and args.simular
+    # Lo simulado («ES» delante) no puede ir a la memoria real: la próxima traducción de verdad lo reutilizaría
+    with (
+        Memoria(":memory:") if simular else contextlib.nullcontext() as memoria,
+        Proceso(
+            args.carpeta, motor, args.dialecto, grupos, memoria=memoria, registro=_escribir,
+            hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
+            texto_java=args.java,
+            scripts_exhaustivo=args.exhaustivo,
+        ) as p,
+    ):  # fmt: skip
+        if simular:
+            _escribir("Simulación: la memoria de traducciones no se toca.")
         _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
         if args.orden == "analizar":
             informe = p.analizar()
@@ -197,7 +208,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             _escribir(f"Restaurados {len(restaurados)} archivos.")
         else:
             _traducir_o_analizar(args)
-    except (ErrorFatal, ValueError) as e:
+    except (ErrorFatal, ValueError, OSError) as e:  # como la ventana: un archivo bloqueado o sin permiso no es un fallo
         _escribir(f"✖ {e}")
         return 1
     except (Cancelado, KeyboardInterrupt):

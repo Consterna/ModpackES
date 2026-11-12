@@ -98,6 +98,16 @@ class TablaTest {
     }
 
     @Test
+    void plantillaConIndicesExplicitosEnElIngles() {
+        // String.format("%2$s of %1$s", "Tom", "Ana") muestra «Ana of Tom»: cada dato es su argumento, no su posición
+        Tabla t = tabla("%2$s of %1$s left", "%2$s de %1$s se fue");
+        assertEquals("Ana de Tom se fue", t.traducir("Ana of Tom left"));
+        Tabla mixta = tabla("%2$s wins %s points", "%s puntos para %2$s");
+        assertEquals("10 puntos para Ana", mixta.traducir("Ana wins 10 points"));
+        assertNull(tabla("%1$s and %1$s again", "%1$s y %1$s otra vez").traducir("a and a again"));
+    }
+
+    @Test
     void plantillaConBordesYPorcentajeLiteral() {
         Tabla t = tabla("Progress: %d%% of %s", "Progreso: %d%% de %s");
         assertEquals("  Progreso: 50% de la misión ", t.traducir("  Progress: 50% of la misión "));

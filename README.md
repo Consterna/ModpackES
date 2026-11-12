@@ -199,7 +199,8 @@ Con otro motor: `--motor openrouter|deepseek|lmstudio|ollama|personalizado`, `--
 personalizado, `--direccion http://servidor/v1`. La clave también se puede pasar por variable de entorno:
 `GEMINI_API_KEY` o `MODPACKES_CLAVE_<MOTOR>` (por ejemplo `MODPACKES_CLAVE_OPENROUTER`).
 
-`traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia.
+`traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia. No
+guarda nada en la memoria de traducciones, para que la próxima traducción de verdad no reutilice esos textos.
 
 ## Cómo protege el modpack
 

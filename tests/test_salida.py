@@ -83,3 +83,26 @@ def test_resumen_y_conteos_en_singular_y_plural() -> None:
     assert contar(1, "mod") == "1 mod" and contar(0, "script") == "0 scripts"
     assert str(Resumen([Path("a")], 1)) == "1 archivo escrito, 1 texto traducido"
     assert str(Resumen([Path("a"), Path("b")], 5, 1)) == "2 archivos escritos, 5 textos traducidos, 1 sigue en inglés"
+
+
+def test_activar_en_una_instancia_nueva_usa_el_formato_de_la_version(tmp_path: Path) -> None:
+    """Una instancia en la que nunca se activó un pack solo tiene los internos: el prefijo sale de la versión."""
+    fabrica.opciones(tmp_path, ["vanilla", "mod_resources"])
+    assert opciones.activar(tmp_path, "P", None, con_prefijo=True) == ["pack activado arriba del todo"]
+    assert 'resourcePacks:["vanilla","mod_resources","file/P"]' in (tmp_path / "options.txt").read_text("utf-8")
+    (tmp_path / "options.txt").write_text("version:1343\n", encoding="utf-8")  # 1.12.2 sin línea de packs
+    assert opciones.activar(tmp_path, "P", None, con_prefijo=False) == ["pack activado"]
+    assert (tmp_path / "options.txt").read_text("utf-8").endswith('resourcePacks:["P"]\n')
+
+
+def test_traducir_activa_el_pack_en_una_instancia_nueva(tmp_path: Path) -> None:
+    from traductor_es.motores.simulador import Simulador
+    from traductor_es.nucleo.memoria import Memoria
+    from traductor_es.proceso import Proceso
+
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench"}))
+    fabrica.opciones(juego, ["vanilla"], "en_us")
+    with Memoria(":memory:") as mem, Proceso(juego, Simulador(), grupos=["mods"], memoria=mem) as p:
+        p.ejecutar()
+    assert 'resourcePacks:["vanilla","file/Traduccion_ES"]' in (juego / "options.txt").read_text("utf-8")
