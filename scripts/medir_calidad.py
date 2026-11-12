@@ -31,6 +31,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--sin-contexto", action="store_true", help="medir sin las pistas ni los ejemplos del banco (como antes)"
     )
+    ap.add_argument(
+        "--glosario-laxo", action="store_true", help="no rechazar traducciones a las que les falta un término"
+    )
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
@@ -46,7 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.sin_contexto:
         banco.ejemplos = {}
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia) for c in banco.casos]
-    resultados = medicion.medir(motor, banco, nombre, modelo, args.motor, revisar=args.revisar)
+    resultados = medicion.medir(
+        motor, banco, nombre, modelo, args.motor, revisar=args.revisar, glosario_estricto=not args.glosario_laxo
+    )
     for m in resultados:
         print(m.tabla(), end="\n\n")
     peores = resultados[-1].ejemplos[:5]

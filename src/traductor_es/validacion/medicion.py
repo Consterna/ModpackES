@@ -252,7 +252,13 @@ def _medir(
 
 
 def medir(
-    motor: Motor, banco: Banco, nombre: str = "", modelo: str = "", motor_id: str = "gemini", revisar: bool = False
+    motor: Motor,
+    banco: Banco,
+    nombre: str = "",
+    modelo: str = "",
+    motor_id: str = "gemini",
+    revisar: bool = False,
+    glosario_estricto: bool = True,
 ) -> list[Medicion]:
     """Traduce el banco con el motor (memoria vacía) y devuelve la medición; con `revisar`, también la de después."""
     glosario = Glosario()
@@ -260,7 +266,10 @@ def medir(
     with Memoria(":memory:") as memoria:
         ejemplos = Ejemplos()
         ejemplos.agregar_pares(banco.ejemplos)
-        traductor = Traductor(motor, memoria, glosario, banco.dialecto, validador=validar, ejemplos=ejemplos)
+        traductor = Traductor(
+            motor, memoria, glosario, banco.dialecto, validador=validar, ejemplos=ejemplos,
+            glosario_estricto=glosario_estricto,
+        )  # fmt: skip
         por_ambito: dict[str, list[str]] = {}
         pistas: dict[str, str] = {}
         for caso in banco.casos:
