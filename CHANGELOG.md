@@ -8,6 +8,10 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Paquete de traducción compartible** (`.modpackes.zip`): «Más ▸ Exportar paquete de traducción…» y `modpackes paquete exportar` guardan la parte de la memoria que usa el modpack, tus correcciones de esos textos, tu glosario y los datos del pack (nombre, versión, Minecraft, dialecto, modelos y si se revisó). «Más ▸ Importar traducción…» y `modpackes paquete importar` lo aplican sin llamar a ningún motor; no pisan tus correcciones ni tus términos, descartan textos dañados (códigos cambiados, vacíos, enormes) y avisan si el paquete es de otro modpack, otra versión u otro Minecraft.
+- **Importar un resource pack en español** (`.zip` o carpeta), aunque no esté activo en `options.txt`: sus textos se emparejan con el inglés de los mods de la instancia y pasan a la memoria, y luego se escribe la traducción sin gastar.
+- **Pack listo para publicar:** «Exportar pack…» y `modpackes exportar` agregan `pack.png`, un `LEEME.txt` con aviso de traducción automática, si se revisó, los motores usados y créditos, la versión del modpack en el nombre del archivo (`Traduccion_ES_<pack>_<versión>.zip`) y `supported_formats` en el `pack.mcmeta` de 1.20.2 a 1.21.8. El pack anota en su marca qué motores tradujeron algo.
+
 - **Glosario del usuario desde la línea de comandos:** `modpackes glosario listar | agregar INGLÉS ESPAÑOL | quitar INGLÉS | importar ARCHIVO.json`. Son los términos (y los nombres que no se traducen) que quieres que salgan siempre igual; mandan sobre todo lo demás y, si faltan en una traducción, el texto se reintenta.
 
 - **Texto escrito en el código de los mods** (opcional, apagado por defecto): la app traduce las frases que encuentra en el código Java de los

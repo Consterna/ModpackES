@@ -107,7 +107,7 @@ def test_exportar_kit_y_pack(tmp_path: Path) -> None:
     assert exportar.exportar_kit_servidor(juego, destino) >= 2
     with zipfile.ZipFile(destino) as z:
         assert z.testzip() is None and "kubejs/server_scripts/s.js" in z.namelist()
-    assert exportar.exportar_pack(juego, tmp_path / "salida" / "pack.zip") == 2
+    assert exportar.exportar_pack(juego, tmp_path / "salida" / "pack.zip") == 4  # + pack.png y LEEME.txt
     with pytest.raises(ValueError, match="traduce primero"):
         exportar.exportar_pack(tmp_path / "otro", tmp_path / "x.zip")
 

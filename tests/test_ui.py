@@ -630,3 +630,43 @@ def test_informe_en_cuadro_y_guardado_en_archivo(qtbot: QtBot, tmp_path: Path, m
     assert "This sentence looks like a message" in destino.read_text("utf-8")
     v.a_comprobar_apoyo.trigger()
     assert "mod de apoyo" in v.aviso.e_texto.text().lower() or "mod de apoyo" in v.log.toPlainText().lower()
+
+
+def test_paquete_e_importar_desde_el_menu(qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QFileDialog
+
+    from traductor_es import configuracion
+    from traductor_es.nucleo.memoria import Memoria
+
+    juego = _modpack(tmp_path / "a")
+    with Memoria(configuracion.ruta_memoria()) as memoria:
+        memoria.guardar({"Wrench": "Llave inglesa"}, "es_mx", "ui", "gemini:x")
+    elegido = {"ruta": str(tmp_path / "compartir.zip")}  # el diálogo puede devolverlo sin la extensión doble
+
+    def elegir(*_a: object, **_k: object) -> tuple[str, str]:
+        return elegido["ruta"], ""
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(elegir))
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(elegir))
+    v = _ventana(qtbot, juego)
+    v.a_paquete.trigger()
+    qtbot.waitUntil(lambda: v._hilo is None and "Paquete guardado" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    compartido = tmp_path / "compartir.modpackes.zip"
+    assert compartido.is_file()
+    configuracion.ruta_memoria().unlink()  # quien lo recibe no tiene nada traducido
+
+    otra = _modpack(tmp_path / "b")
+    lang = otra / "resourcepacks" / "Traduccion_ES" / "assets" / "m" / "lang" / "es_mx.json"
+    v2 = _ventana(qtbot, otra)
+    elegido["ruta"] = str(compartido)
+    v2.a_importar.trigger()
+    qtbot.waitUntil(lambda: v2._hilo is None and lang.is_file(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    assert json.loads(lang.read_text("utf-8"))["item.m.wrench"] == "Llave inglesa"
+    assert "Importado (paquete): 1 traducción" in v2.log.toPlainText()
+
+    elegido["ruta"] = str(tmp_path / "publicar.zip")
+    v2.a_exportar.trigger()
+    with zipfile.ZipFile(tmp_path / "publicar.zip") as z:
+        leeme = z.read("LEEME.txt").decode("utf-8")
+        assert "pack.png" in z.namelist()
+    assert "gemini (x)" in leeme and "Una persona la revisó" in leeme

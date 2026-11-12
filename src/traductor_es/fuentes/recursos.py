@@ -31,9 +31,10 @@ class Fuente:
     tipo: str  #: «mod», «kubejs», «global», «pack», «resourceloader»
 
 
-def _abrir_pack(ruta: Path, nombre: str | None = None) -> Contenedor | None:
+def _abrir_pack(ruta: Path, nombre: str | None = None, propios: bool = False) -> Contenedor | None:
+    """Un resource pack en carpeta o .zip. Los que generó esta app se saltan, salvo con `propios`."""
     if ruta.is_dir():
-        if (ruta / MARCA).exists() or not (ruta / "assets").is_dir():
+        if (not propios and (ruta / MARCA).exists()) or not (ruta / "assets").is_dir():
             return None
         return Carpeta(ruta, nombre or ruta.name)
     if ruta.suffix.lower() == ".zip" and ruta.is_file():
@@ -41,11 +42,16 @@ def _abrir_pack(ruta: Path, nombre: str | None = None) -> Contenedor | None:
             z = Zip.abrir(ruta)
         except (zipfile.BadZipFile, OSError):
             return None
-        if MARCA in z.nombres():
+        if not propios and MARCA in z.nombres():
             z.cerrar()
             return None
         return z
     return None
+
+
+def abrir_pack(ruta: Path) -> Contenedor | None:
+    """Un resource pack cualquiera, esté o no activo en options.txt (también uno exportado por esta app)."""
+    return _abrir_pack(ruta, propios=True)
 
 
 def _packs_en(carpeta: Path) -> list[Path]:

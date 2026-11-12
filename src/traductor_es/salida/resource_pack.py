@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 
 from .. import NOMBRE as NOMBRE_APP
 from .. import __version__
@@ -22,6 +24,22 @@ _PARTE_VALIDA = re.compile(r"[^\\/:*?\"<>|\x00-\x1f]+")
 _RESERVADOS = frozenset(
     {"CON", "PRN", "AUX", "NUL", *(f"COM{n}" for n in range(1, 10)), *(f"LPT{n}" for n in range(1, 10))}
 )
+
+
+def leer_marca(raiz: Path) -> dict[str, Any]:
+    """Lo que la app anotó en su pack (versión, fecha, motores); vacío si no hay marca o está dañada."""
+    try:
+        datos: Any = json.loads((raiz / MARCA).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return cast(dict[str, Any], datos) if isinstance(datos, dict) else {}
+
+
+def motores_de(marca: dict[str, Any]) -> list[str]:
+    lista: object = marca.get("motores")
+    if not isinstance(lista, list):
+        return []
+    return sorted({m for m in cast(list[object], lista) if isinstance(m, str)})
 
 
 def _parte_segura(parte: str) -> bool:
@@ -51,12 +69,26 @@ class PackSalida:
         self.raiz.mkdir(parents=True, exist_ok=True)
         meta = mcmeta(self.instancia.formato_recursos(), "§eTraducción al español del modpack")
         self.escribir("pack.mcmeta", (json.dumps(meta, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-        marca = {
+        self._escribir_marca(motores_de(leer_marca(self.raiz)))
+
+    def _escribir_marca(self, motores: list[str]) -> None:
+        marca: dict[str, Any] = {
             "app": NOMBRE_APP,
             "version": __version__,
             "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
         }
+        if motores:
+            marca["motores"] = motores  # para los créditos del pack publicado
         self.escribir(MARCA, (json.dumps(marca, indent=2) + "\n").encode("utf-8"))
+
+    def anotar_motores(self, motores: Iterable[str]) -> None:
+        """Suma a la marca los motores (y modelos) que tradujeron algo de este pack."""
+        nuevos = {m for m in motores if m}
+        if not nuevos or not (self.raiz / "pack.mcmeta").is_file():
+            return
+        previos = motores_de(leer_marca(self.raiz))
+        if not nuevos <= set(previos):
+            self._escribir_marca(sorted({*previos, *nuevos}))
 
     def escribir(self, relativa: str, datos: bytes) -> Path:
         ruta = self._ruta(relativa)

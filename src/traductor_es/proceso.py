@@ -25,7 +25,7 @@ from .nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
-from .nucleo.traductor import Traductor
+from .nucleo.traductor import Resultado, Traductor
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
 from .salida.resource_pack import NOMBRE, PackSalida
@@ -38,6 +38,8 @@ GRUPOS_REVISADOS = ("misiones", "libros")
 _ESTADOS = {"JOB_STATE_PENDING": "en cola", "JOB_STATE_RUNNING": "procesando"}
 #: Tokens por carácter y sobrecarga por lote, medidos a ojo con textos de mods: solo para estimar.
 _CARACTERES_POR_TOKEN, _TOKENS_POR_LOTE = 3.5, 450
+#: Motores que no se anotan en los créditos del pack: no traducen de verdad.
+_SIN_CREDITO = frozenset({"simulador"})
 
 
 @dataclass(slots=True)
@@ -239,17 +241,24 @@ class Proceso:
             "Detalle con «modpackes cobertura»."
         ]
 
-    def ejecutar(self, activar: bool = True, poner_idioma: bool = True) -> Informe:
+    def ejecutar(self, activar: bool = True, poner_idioma: bool = True, solo_memoria: bool = False) -> Informe:
+        """Traduce y escribe. Con `solo_memoria` no se llama al motor: se escribe lo que ya está en la memoria,
+        las correcciones y el glosario (así se aplica un paquete importado), y lo demás queda en inglés."""
         self._preparar_glosario()
         informe = Informe()
         todas: dict[str, str] = {}
+        tradujo_el_motor = False
         for grupo, modulo in self.modulos():
             self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
             piezas = modulo.recolectar()
             textos = [p.texto for p in piezas]
             pendientes = self.traductor.pendientes(textos, modulo.ambito)
             pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
-            resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
+            if solo_memoria:
+                resultado = Resultado(traducciones=self.traductor.conocidas(textos, modulo.ambito))
+            else:
+                resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
+                tradujo_el_motor = tradujo_el_motor or bool(resultado.nuevas)
             if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
                 self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
                 por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
@@ -272,6 +281,8 @@ class Proceso:
                 # Los nombres recién traducidos pasan al glosario: libros, misiones y scripts los usarán igual
                 nuevos = modulo.nombres(resultado.traducciones)
                 self.glosario.agregar_pares({en: en for en in nuevos}, nuevos)
+        if tradujo_el_motor and self.motor.nombre not in _SIN_CREDITO and self.ctx.pack is not None:
+            self.ctx.pack.anotar_motores([self.motor.nombre])
         relevantes = self.glosario.relevantes(todas, maximo=500)
         informe.revision = revisar_glosario(todas, relevantes, relevantes)
         informe.avisos.extend(self._avisos())

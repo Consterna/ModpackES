@@ -49,6 +49,7 @@ from .. import AUTOR, NOMBRE, REPOSITORIO, __version__, actualizaciones, configu
 from ..actualizaciones import Novedad
 from ..fuentes.instancia import Instancia, resolver_carpeta_juego
 from ..fuentes.lanzadores import InstanciaEncontrada, buscar
+from ..fuentes.modpack import datos_del_modpack
 from ..modulos.cobertura import Hallazgo, texto_del_informe
 from ..motores import fabrica
 from ..motores.base import Cancelado, ErrorFatal, Motor
@@ -57,7 +58,7 @@ from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
 from ..nucleo.traductor import LARGO_CONTEXTO
 from ..proceso import GRUPOS, Informe, Proceso
-from ..salida import exportar, mod_apoyo
+from ..salida import exportar, mod_apoyo, paquete
 from . import correcciones, iconos, tema
 from .bienvenida import TarjetaBienvenida
 from .componentes import (
@@ -181,6 +182,12 @@ class Trabajador(QObject):
                     resultado = p.ejecutar(activar=self.opciones["activar"], poner_idioma=self.opciones["idioma"])
                 elif self.accion == "cobertura":
                     resultado = p.que_queda(java=True, progreso=self.progreso.emit)
+                elif self.accion == "importar":
+                    resultado = paquete.aplicar(
+                        p, Path(self.opciones["archivo"]), self.opciones["activar"], self.opciones["idioma"]
+                    )[1]
+                elif self.accion == "paquete":
+                    resultado = paquete.exportar_paquete(p, Path(self.opciones["archivo"]), self.opciones["revisado"])
                 else:
                     resultado = p.restaurar()
             self.terminado.emit(resultado)
@@ -554,7 +561,19 @@ class Ventana(QMainWindow):
         self.a_quitar_apoyo = agregar("Quitar el mod de apoyo", "undo-2", self._quitar_apoyo)
         self.a_restaurar = agregar("Restaurar el original…", "undo-2", self._confirmar_restaurar)
         self.a_exportar = agregar("Exportar pack…", "package", lambda: self._exportar(kit=False))
+        self.a_exportar.setToolTip("El resource pack listo para publicar: con ícono, LEEME y la versión del modpack")
         self.a_kit = agregar("Kit de servidor…", "server", lambda: self._exportar(kit=True))
+        self.a_paquete = agregar("Exportar paquete de traducción…", "download", self._exportar_paquete)
+        self.a_paquete.setToolTip(
+            f"Un {paquete.EXTENSION} con lo traducido de este modpack: otra persona lo aplica sin gastar"
+        )
+        self.a_importar = agregar("Importar traducción…", "folder-plus", lambda: self._importar(carpeta=False))
+        self.a_importar.setToolTip(
+            f"Aplica un {paquete.EXTENSION} o un resource pack en español (.zip) sin llamar a ningún motor"
+        )
+        self.a_importar_carpeta = agregar(
+            "Importar resource pack en carpeta…", "folder-open", lambda: self._importar(carpeta=True)
+        )
         self.a_abrir = agregar("Abrir la carpeta", "folder-open", self._abrir_carpeta)
         menu.addSeparator()
         self.a_diagnostico = agregar("Copiar diagnóstico", "copy", self.copiar_diagnostico)
@@ -917,14 +936,14 @@ class Ventana(QMainWindow):
     def _es_prueba(self) -> bool:
         return os.environ.get("TRADUCTOR_ES_PRUEBA_UI") == "1"
 
-    def lanzar(self, accion: str) -> None:
+    def lanzar(self, accion: str, extra: dict[str, Any] | None = None) -> None:
         carpeta = self.carpeta()
         if not carpeta:
             self.avisar("Elige primero una instancia.")
             return
         if self._hilo is not None:
             return
-        opciones = self.opciones()
+        opciones = self.opciones() | (extra or {})
         if accion == "traducir":
             try:
                 motor = self._fabrica_motor(
@@ -936,7 +955,7 @@ class Ventana(QMainWindow):
                 return
         else:
             motor = Simulador()  # analizar y restaurar no llaman al motor
-            if accion == "analizar":  # el análisis es gratis: se cuentan todos los grupos y luego se eligen
+            if accion in ("analizar", "paquete", "importar"):  # sin costo: se miran todos los grupos
                 opciones["grupos"] = list(GRUPOS)
         self._guardar_preferencias(carpeta)
         self._cancelar.clear()
@@ -946,9 +965,13 @@ class Ventana(QMainWindow):
         self._inicio = None
         self._fase = ""
         self.estado.setText(
-            {"analizar": "Analizando…", "traducir": "Preparando…", "cobertura": "Buscando texto en inglés…"}.get(
-                accion, "Restaurando…"
-            )
+            {
+                "analizar": "Analizando…",
+                "traducir": "Preparando…",
+                "cobertura": "Buscando texto en inglés…",
+                "paquete": "Armando el paquete de traducción…",
+                "importar": "Importando la traducción…",
+            }.get(accion, "Restaurando…")
         )
         self._accion = accion
         self._antes = self._estado
@@ -1007,7 +1030,7 @@ class Ventana(QMainWindow):
         self._limpiar_hilo()
         if isinstance(resultado, Informe):
             self.ultimo_informe = resultado
-            self._mostrar(resultado, hecho=accion == "traducir")
+            self._mostrar(resultado, hecho=accion in ("traducir", "importar"))
             if accion == "analizar":
                 self._estado = "traducir"
                 if not self.bienvenida.isHidden():
@@ -1022,6 +1045,12 @@ class Ventana(QMainWindow):
         elif accion == "cobertura":
             self._estado = self._antes  # no cambia nada en la instancia: el botón principal sigue como estaba
             self._mostrar_cobertura(cast("list[Hallazgo]", resultado))
+        elif isinstance(resultado, paquete.ResumenExportacion):
+            self._estado = self._antes
+            for aviso in resultado.avisos:
+                self.escribir(f"⚠ {aviso}")
+            self.estado.setText(str(resultado))
+            self.aviso.mostrar(f"Paquete guardado: {resultado.ruta.name}.", "exito")
         else:
             self._olvidar_analisis()  # el texto volvió al original: lo contado antes ya no vale
             n = len(resultado) if isinstance(resultado, list) else 0  # pyright: ignore[reportUnknownArgumentType]
@@ -1150,18 +1179,66 @@ class Ventana(QMainWindow):
         if not carpeta:
             self.avisar("Elige primero una instancia.")
             return
-        sugerido = str(Path.home() / ("Kit_servidor_traduccion.zip" if kit else "Traduccion_ES.zip"))
+        juego = resolver_carpeta_juego(Path(carpeta)) or Path(carpeta)
+        sugerido = str(Path.home() / ("Kit_servidor_traduccion.zip" if kit else exportar.nombre_sugerido(juego)))
         destino, _ = QFileDialog.getSaveFileName(self, "Guardar como", sugerido, "Zip (*.zip)")
         if not destino:
             return
-        juego = resolver_carpeta_juego(Path(carpeta)) or Path(carpeta)
         try:
-            n = (exportar.exportar_kit_servidor if kit else exportar.exportar_pack)(juego, Path(destino))
+            if kit:
+                n = exportar.exportar_kit_servidor(juego, Path(destino))
+            else:
+                n = exportar.exportar_pack(juego, Path(destino), revisado=self._preguntar_revisado())
         except (ValueError, OSError) as e:
             self.avisar(str(e), "error")
             return
         self.escribir(f"Exportado: {destino} ({n} archivos)")
         self.aviso.mostrar(f"Exportado: {destino} ({n} archivos).", "exito")
+
+    def _preguntar_revisado(self) -> bool:
+        return self._preguntar(
+            "¿Revisada?", "¿Una persona revisó esta traducción? Se anota para quien la use (en el LEEME o el paquete)."
+        )
+
+    def _exportar_paquete(self) -> None:
+        carpeta = self.carpeta()
+        if not carpeta:
+            self.avisar("Elige primero una instancia.")
+            return
+        juego = resolver_carpeta_juego(Path(carpeta)) or Path(carpeta)
+        sugerido = str(Path.home() / paquete.nombre_de_archivo(datos_del_modpack(juego)))
+        filtro = f"Paquete de traducción (*{paquete.EXTENSION})"
+        destino, _ = QFileDialog.getSaveFileName(self, "Guardar el paquete", sugerido, filtro)
+        if not destino:
+            return
+        if not destino.lower().endswith(paquete.EXTENSION):
+            destino = destino.removesuffix(".zip") + paquete.EXTENSION
+        self.lanzar("paquete", {"archivo": destino, "revisado": self._preguntar_revisado()})
+
+    def _importar(self, carpeta: bool) -> None:
+        if not self.carpeta():
+            self.avisar("Elige primero una instancia.")
+            return
+        if carpeta:
+            ruta = QFileDialog.getExistingDirectory(self, "Resource pack en español (carpeta)", str(Path.home()))
+        else:
+            filtro = f"Paquete o resource pack (*{paquete.EXTENSION} *.zip)"
+            ruta, _ = QFileDialog.getOpenFileName(self, "Importar traducción", str(Path.home()), filtro)
+        if not ruta:
+            return
+        extra: dict[str, Any] = {"archivo": ruta}
+        if paquete.es_paquete(Path(ruta)):
+            try:
+                extra["dialecto"] = str(paquete.leer_metadatos(Path(ruta))["dialecto"])
+            except ValueError as e:
+                self.avisar(str(e), "error")
+                return
+        texto = (
+            "Cierra Minecraft antes de seguir.\n\nLa traducción se guarda en tu memoria y se escribe sin llamar a "
+            "ningún motor: no cuesta nada. Lo que no traiga queda en inglés."
+        )
+        if self._preguntar("Importar traducción", texto):
+            self.lanzar("importar", extra)
 
     def abrir_correcciones(self) -> None:
         correcciones.mostrar(self, str(self.c_dialecto.currentData()))
