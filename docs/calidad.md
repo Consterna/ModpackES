@@ -95,6 +95,23 @@ glosario de 2.101 términos sacado de otros mods, Gemini 3.8 Flash, tres corrida
 El efecto es pequeño: Gemini ya respeta casi todos los términos y la regla recupera uno o dos más sin tocar el chrF.
 Se queda como red de seguridad, que importará más con modelos locales y con glosarios del usuario.
 
+## 12 de noviembre de 2026 · ¿ayudan los ejemplos parecidos? (resultado negativo)
+
+Se probó con el banco de 399 textos (con familias de nombres), Gemini 3.8 Flash y tres corridas por condición, comparando
+de forma pareada: sin ejemplos, 8 ejemplos por palabras sueltas, 8 ejemplos con peso extra a las frases de dos palabras
+seguidas (bigramas) y 14 ejemplos.
+
+| Comparación | Diferencia de chrF (IC 95 %) |
+|---|---|
+| 0 ejemplos → 8 por palabras sueltas | −0,64 (−1,68 a +0,51), no se distingue del ruido |
+| 8 por palabras → 8 con bigramas | +0,12 (−0,42 a +0,68), no se distingue del ruido |
+| 8 → 14 ejemplos | +0,23 (−0,39 a +0,85), no se distingue del ruido |
+
+Con Gemini y este banco los ejemplos no mejoran el chrF, y ajustar cómo se buscan (bigramas) o cuántos se mandan tampoco.
+Por eso **no se agregó** la búsqueda con bigramas: sumaría código sin una ganancia medida. Lo que sí queda abierto es
+si ayudan con modelos locales pequeños, que cometen más errores de términos y estilo, y si mejoran la consistencia
+en packs grandes; se mide cuando se pruebe el modelo local.
+
 ## Cómo repetirlo
 
 ```
