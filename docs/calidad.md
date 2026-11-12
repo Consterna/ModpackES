@@ -116,6 +116,25 @@ y el chrF del mismo motor sube a ~75. Con ese banco limpio (399 textos, Gemini 3
 - Las pistas (clave y tipo) quedan: no empeoran y la tendencia es positiva (+0,70), aunque no es concluyente.
 - Los modelos no usaban regionalismos de España: busqué «vosotros», «ordenador», «zumo», «coger» y formas en «-áis/-éis» en
   las salidas de Gemini y de Gemma E2B y no apareció ninguno, así que no hice un chequeo de dialecto.
+## 12 de noviembre de 2026 · contexto de vecindad en misiones
+
+Cada texto de una misión (y de un libro) ahora lleva el título bajo el que está y la línea que viene antes, además
+de su clave: «misión: description · dentro de «Mechanical Press…» · viene después de «The boiler will…»». En el corpus
+no hay traducciones humanas de misiones, así que se mide con una comparación pareada: dos traducciones del mismo
+texto (sin y con el contexto) pasan por un juez en los dos órdenes (`scripts/preferencia_pareada.py`). Una victoria
+solo cuenta si el juez elige lo mismo en los dos órdenes. Banco local: misiones de FTB Quests de dos packs del corpus.
+
+| Comparación | Textos distintos | Gana la mejora | Gana la base | Empate o juez inconsistente | p (signos) |
+|---|---|---|---|---|---|
+| Control: base contra base (120 textos) | 89 | 35 | 35 | 19 | 1,000 |
+| Con vecindad contra base (120 textos) | 91 | 39 | 30 | 22 | 0,336 |
+| Con vecindad contra base (400 textos) | 277 | 101 | 80 | 96 | 0,137 |
+
+- El control sale 35 a 35: con el orden cambiado el juez no favorece a ningún lado cuando no hay diferencia real.
+- La vecindad gana el 56–57 % de los casos decididos en las dos medidas, pero la diferencia no llega a ser
+  concluyente (p = 0,14). Es una tendencia positiva, no una mejora demostrada. Cuesta unos 150 caracteres más por
+  texto de entrada. Se mantiene porque no empeora y es barata, y se vuelve a medir con otros motores.
+- El juez es el mismo modelo que tradujo, así que puede preferir su propio estilo; conviene repetirlo con otro.
 
 ## Cómo repetirlo
 
@@ -127,6 +146,10 @@ uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.
 uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.json --sin-contexto
 uv run python scripts/comparar_mediciones.py --a build/sin1.json build/sin2.json --b build/con1.json build/con2.json
 uv run python scripts/juzgar_calidad.py --entrada build/con1.json
+uv run python scripts/armar_banco_misiones.py --textos 400
+uv run python scripts/medir_calidad.py --sin-vecindad --banco .descargas/banco/misiones.json --salida build/base.json
+uv run python scripts/medir_calidad.py --banco .descargas/banco/misiones.json --salida build/mejora.json
+uv run python scripts/preferencia_pareada.py --a build/base.json --b build/mejora.json
 ```
 
 El costo es una estimación con los precios de Google de noviembre de 2026, no lo que cobró la API.
