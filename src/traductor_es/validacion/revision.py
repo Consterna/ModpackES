@@ -72,9 +72,9 @@ def interpretar_veredicto(valor: str) -> tuple[str, str, str] | None:
     return gravedad, categoria, partes[2][:300]
 
 
-def revisar(traductor: Traductor, pares: Mapping[str, str], ambito: str) -> list[Hallazgo]:
+def revisar(traductor: Traductor, pares: Mapping[str, str], ambito: str, invertir: bool = False) -> list[Hallazgo]:
     """Pide al motor que juzgue cada par (núcleo original → traducción). Devuelve lo que marcó."""
-    items = sorted(pares.items())
+    items = sorted(pares.items(), reverse=invertir)  # invertir: otro orden de lectura, para ver el sesgo de posición
     lotes = [items[i : i + _POR_LOTE] for i in range(0, len(items), _POR_LOTE)]
 
     def un_lote(lote: list[tuple[str, str]]) -> list[Hallazgo]:

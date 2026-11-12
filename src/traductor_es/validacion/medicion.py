@@ -9,7 +9,9 @@ las reglas, términos del glosario respetados y textos que quedaron en inglés.
 from __future__ import annotations
 
 import json
+import random
 import re
+import statistics
 import time
 import unicodedata
 from collections import Counter
@@ -19,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from ..motores.base import Motor
+from ..nucleo import terminos as terminos_repetidos
 from ..nucleo.ejemplos import Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.memoria import Memoria
@@ -100,6 +103,64 @@ def terminos(casos: Iterable[tuple[str, str]], glosario: Mapping[str, str]) -> t
     return presentes, respetados
 
 
+def intervalo(puntajes: list[float], remuestreos: int = 1000, semilla: int = 0) -> tuple[float, float] | None:
+    """Intervalo de confianza al 95 % del promedio, por remuestreo (bootstrap). None si hay menos de 5 puntajes."""
+    if len(puntajes) < 5:
+        return None
+    azar = random.Random(semilla)
+    n = len(puntajes)
+    medias = sorted(statistics.fmean(azar.choices(puntajes, k=n)) for _ in range(remuestreos))
+    return medias[int(0.025 * remuestreos)], medias[int(0.975 * remuestreos) - 1]
+
+
+_PALABRA_FIRMA = re.compile(r"[^\W\d_]{4,}")
+
+
+def _palabras_firma(texto: str) -> set[str]:
+    return set(_PALABRA_FIRMA.findall(_sin_tildes(texto)))
+
+
+def _mas_distintivas(
+    candidatas: list[str], dentro: Counter[str], fuera: Counter[str], n_dentro: int, n_fuera: int
+) -> list[str]:
+    """Las dos palabras que más distinguen a un grupo de nombres del resto."""
+
+    def clave(w: str) -> tuple[float, int]:
+        return dentro[w] / n_dentro - fuera[w] / max(n_fuera, 1), dentro[w]
+
+    return sorted(candidatas, key=clave, reverse=True)[:2]
+
+
+def consistencia(pares: Iterable[tuple[str, str]], minimo: int = 3) -> tuple[float, int]:
+    """(consistencia de 0 a 1, términos evaluados): ¿los nombres que comparten un término lo traducen igual?
+
+    Heurística sin alineación: para cada término que se repite en 3 o más nombres, mira las dos palabras en
+    español que más distinguen a esos nombres del resto y calcula en qué parte de ellos aparecen. Si «Moon
+    Berries» sale como «bayas lunares» en todos da 1; si sale «bayas de luna» en uno de seis, baja. Sirve para
+    comparar dos corridas del mismo banco, no como medida absoluta.
+    """
+    unicos = sorted(set(pares))
+    if not unicos:
+        return 0.0, 0
+    palabras = [_palabras_firma(t) for _, t in unicos]
+    puntajes: list[float] = []
+    for termino in terminos_repetidos.repetidos((o for o, _ in unicos), minimo=minimo):
+        patron = re.compile(r"(?<![^\W_])" + re.escape(termino) + r"(?![^\W_])")
+        dentro = [i for i, (o, _) in enumerate(unicos) if patron.search(o)]
+        fuera = [i for i in range(len(unicos)) if i not in set(dentro)]
+        if len(dentro) < minimo:
+            continue
+        df_dentro = Counter(w for i in dentro for w in palabras[i])
+        df_fuera = Counter(w for i in fuera for w in palabras[i])
+        candidatas = [w for w, c in df_dentro.items() if c >= 2]
+        if not candidatas:
+            continue
+
+        mejores = _mas_distintivas(candidatas, df_dentro, df_fuera, len(dentro), len(fuera))
+        puntajes.append(statistics.fmean(df_dentro[w] / len(dentro) for w in mejores))
+    return (statistics.fmean(puntajes) if puntajes else 0.0), len(puntajes)
+
+
 @dataclass(slots=True)
 class Medicion:
     motor: str
@@ -113,6 +174,10 @@ class Medicion:
     por_ambito: dict[str, float] = field(default_factory=dict[str, float])  #: chrF promedio por ámbito
     revision: str = ""
     ejemplos: list[dict[str, str]] = field(default_factory=list[dict[str, str]])  #: los de chrF más bajo
+    chrf_intervalo: tuple[float, float] | None = None  #: intervalo al 95 % del chrF promedio
+    consistencia: float | None = None  #: ver `consistencia()`; solo si hay términos que se repiten
+    terminos_evaluados: int = 0
+    traducciones: list[dict[str, str]] = field(default_factory=list[dict[str, str]])  #: todas, para juzgarlas
 
     @property
     def porcentaje(self) -> float:
@@ -122,9 +187,22 @@ class Medicion:
         filas = [
             ("Motor", self.motor),
             ("Textos traducidos", f"{self.traducidos} de {self.textos} ({self.porcentaje:.0f} %)"),
-            ("chrF promedio", f"{self.chrf:.1f}"),
+            (
+                "chrF promedio",
+                f"{self.chrf:.1f}"
+                + (
+                    f" (IC 95 %: {self.chrf_intervalo[0]:.1f} a {self.chrf_intervalo[1]:.1f})"
+                    if self.chrf_intervalo
+                    else ""
+                ),
+            ),
             *((f"  chrF {a}", f"{v:.1f}") for a, v in sorted(self.por_ambito.items())),
             ("Términos del glosario", f"{self.terminos_respetados} de {self.terminos_presentes}"),
+            *(
+                [("Consistencia de términos", f"{self.consistencia:.2f} ({self.terminos_evaluados} términos)")]
+                if self.consistencia is not None
+                else []
+            ),
             ("Costo estimado", "desconocido" if self.costo_estimado is None else f"US$ {self.costo_estimado:.3f}"),
             ("Tiempo", f"{self.segundos:.0f} s"),
         ]
@@ -147,6 +225,7 @@ def _medir(
         filas.append((puntaje, caso, hecha))
     todos = [p for lista in puntajes.values() for p in lista]
     presentes, respetados = terminos(((c.original, t) for _, c, t in filas), banco.glosario)
+    nivel, evaluados = consistencia((c.original, t) for _, c, t in filas)
     peores = sorted(filas, key=lambda f: f[0])[:8]
     return Medicion(
         motor=nombre,
@@ -158,6 +237,13 @@ def _medir(
         costo_estimado=costo,
         segundos=segundos,
         por_ambito={a: sum(v) / len(v) for a, v in puntajes.items()},
+        chrf_intervalo=intervalo(todos),
+        consistencia=nivel if evaluados else None,
+        terminos_evaluados=evaluados,
+        traducciones=[
+            {"ambito": c.ambito, "original": c.original, "referencia": c.referencia, "traduccion": t}
+            for _, c, t in filas
+        ],
         ejemplos=[
             {"original": c.original, "referencia": c.referencia, "traduccion": t, "chrf": f"{p:.1f}"}
             for p, c, t in peores
