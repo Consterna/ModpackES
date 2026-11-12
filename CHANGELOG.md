@@ -38,6 +38,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **El glosario ya no deja que un mod imponga su traducción a todo el modpack.** Los nombres del propio juego (primero es_mx, después es_es) mandan sobre los de un mod, y si dos mods traducen distinto el mismo término no se usa ninguno. Antes un mod que llamaba «Acechador de medianoche» a la vaca hacía que todo el modpack la tradujera así.
+
 - **El glosario ahora se exige.** Si un término del glosario sale en un texto y su traducción no lo usa (con tolerancia a plurales, tildes y mayúsculas), el texto se reintenta una vez con un aviso explícito; si sigue sin salir se acepta, para no dejar nada en inglés.
 
 - **Traducciones más precisas.** Cada texto de un mod va ahora con de dónde sale y qué es («nombre de un objeto», «tooltip», «disco de música»…), y si el mismo texto sale en varios sitios se mandan hasta tres pistas. El motor recibe además ejemplos de textos parecidos ya traducidos (el español que traen los mods del modpack, la memoria y lo que se va traduciendo en esa misma ejecución) para seguir los mismos términos y estilo. Los términos que se repiten en los nombres («Moon Berries» en «Moon Berries Pie», «Moon Berries Jam»…) se traducen primero y se fijan en el glosario, para que todos los nombres usen la misma palabra. Un nombre que el motor devuelve igual al original se reintenta con un aviso; si sigue igual, se acepta. Con 250 textos reales de mods y Gemini 3.8 Flash, el chrF subió de 68,9 a 70,6 (promedio de tres corridas); ver [docs/calidad.md](docs/calidad.md).
