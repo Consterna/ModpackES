@@ -25,6 +25,9 @@ _COMUNES = frozenset({
 })  # fmt: skip
 #: Una palabra que sale en más de esta parte de los pares no sirve para buscar.
 _FRECUENCIA_MAXIMA = 0.2
+#: Cuántos ejemplos se mandan por lote en la aplicación. Cero: con Gemini y referencias limpias, mandar ejemplos
+#: de otros mods bajó el chrF (docs/calidad.md); queda para probar con modelos locales (`--n-ejemplos`).
+CANTIDAD_EN_LA_APP = 0
 
 
 def _palabras(texto: str) -> set[str]:
@@ -34,8 +37,9 @@ def _palabras(texto: str) -> set[str]:
 class Ejemplos:
     """Pares (inglés → español) con índice de palabras. Seguro para varios hilos."""
 
-    def __init__(self, maximo: int = 200_000) -> None:
+    def __init__(self, maximo: int = 200_000, cantidad: int = 8) -> None:
         self._maximo = maximo
+        self.cantidad = cantidad
         self._pares: dict[str, str] = {}
         self._indice: dict[str, list[str]] = {}
         self._lock = threading.Lock()
@@ -73,8 +77,9 @@ class Ejemplos:
             }
         )
 
-    def parecidos(self, textos: Iterable[str], cantidad: int = 8, largo_total: int = 700) -> dict[str, str]:
+    def parecidos(self, textos: Iterable[str], cantidad: int | None = None, largo_total: int = 700) -> dict[str, str]:
         """Los pares más relevantes para estos textos, sin los textos mismos."""
+        cantidad = self.cantidad if cantidad is None else cantidad
         propios = {t.strip() for t in textos}
         buscadas = Counter(p for t in propios for p in _palabras(t))
         with self._lock:
