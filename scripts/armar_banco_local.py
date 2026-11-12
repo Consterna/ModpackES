@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 import sys
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -25,6 +26,7 @@ import descargar_corpus as dc
 
 from traductor_es.formatos import lang_json, lang_legacy
 from traductor_es.modulos.mods import Mods
+from traductor_es.nucleo import terminos
 from traductor_es.nucleo.glosario import Glosario
 from traductor_es.nucleo.mascara import es_traducible
 
@@ -75,6 +77,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--frases", type=int, default=150)
     ap.add_argument("--nombres", type=int, default=100)
+    ap.add_argument("--familias", type=int, default=25, help="términos repetidos cuyos nombres se agregan completos")
     args = ap.parse_args()
     todos = sorted(set(pares()))
     jars = sorted({p.jar for p in todos})
@@ -90,6 +93,15 @@ def main() -> int:
     elegidos = azar.sample(frases, min(args.frases, len(frases))) + azar.sample(
         nombres, min(args.nombres, len(nombres))
     )
+    # Familias de nombres que comparten un término («Moon Berries Pie», «… Jam»): miden la consistencia
+    vistos = {p.ingles for p in elegidos}
+    solo_nombres = [p for p in candidatos if len(p.ingles) <= 40]
+    for termino in terminos.repetidos((p.ingles for p in solo_nombres), minimo=4, maximo=args.familias):
+        patron = re.compile(r"(?<![^\W_])" + re.escape(termino) + r"(?![^\W_])")
+        miembros = [p for p in solo_nombres if patron.search(p.ingles) and p.ingles not in vistos]
+        for p in azar.sample(miembros, min(6, len(miembros))):
+            elegidos.append(p)
+            vistos.add(p.ingles)
     en_el_banco = {p.ingles for p in elegidos}
     ejemplos = {p.ingles: p.castellano for p in todos if p.jar not in medir and p.ingles not in en_el_banco}
     banco: dict[str, Any] = {
