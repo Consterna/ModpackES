@@ -7,6 +7,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -83,6 +84,14 @@ def guardar_preferencias(datos: dict[str, Any]) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     datos.pop("clave", None)  # por si acaso: la clave nunca va a un archivo
     ruta.write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def guardar_glosario_usuario(terminos: Mapping[str, str]) -> None:
+    """Guarda los términos del usuario ({inglés: español}); ignora los que tengan algo vacío."""
+    limpios = {k.strip(): v.strip() for k, v in terminos.items() if k.strip() and v.strip()}
+    ruta = ruta_glosario_usuario()
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(limpios, indent=2, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
 
 def leer_glosario_usuario() -> dict[str, str]:

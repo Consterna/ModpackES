@@ -191,6 +191,7 @@ uv run modpackes analizar "RUTA DE LA INSTANCIA"
 uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar]
 uv run modpackes restaurar "RUTA"
 uv run modpackes cobertura "RUTA" [--java]   # qué queda en inglés y por qué (solo lee)
+uv run modpackes glosario listar | agregar "Death Knights" "Caballeros de la Muerte" | quitar "Fluix" | importar terminos.json
 uv run modpackes clave guardar [--motor openrouter]
 uv run modpackes modelos [--motor ollama]
 ```
@@ -198,6 +199,10 @@ uv run modpackes modelos [--motor ollama]
 Con otro motor: `--motor openrouter|deepseek|lmstudio|ollama|personalizado`, `--modelo NOMBRE` y, para el
 personalizado, `--direccion http://servidor/v1`. La clave también se puede pasar por variable de entorno:
 `GEMINI_API_KEY` o `MODPACKES_CLAVE_<MOTOR>` (por ejemplo `MODPACKES_CLAVE_OPENROUTER`).
+
+El **glosario del usuario** (`glosario`) son los términos que quieres que se traduzcan siempre igual, también los nombres
+que no se traducen (`"Fluix": "Fluix"`). Mandan sobre todo lo demás y, si una traducción no los usa, el texto se reintenta
+con un aviso. Se guardan en `glosario.json` de la carpeta de datos de la app y valen para todos tus modpacks.
 
 `traducir --simular` hace una prueba completa sin la API (antepone «ES» a cada texto); úsalo en una copia. No
 guarda nada en la memoria de traducciones, para que la próxima traducción de verdad no reutilice esos textos.
