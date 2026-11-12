@@ -189,7 +189,9 @@ class Medicion:
             ("Textos traducidos", f"{self.traducidos} de {self.textos} ({self.porcentaje:.0f} %)"),
             (
                 "chrF promedio",
-                f"{self.chrf:.1f}"
+                "sin referencias (se juzga)"
+                if not self.por_ambito
+                else f"{self.chrf:.1f}"
                 + (
                     f" (IC 95 %: {self.chrf_intervalo[0]:.1f} a {self.chrf_intervalo[1]:.1f})"
                     if self.chrf_intervalo
@@ -220,8 +222,9 @@ def _medir(
         hecha = traducciones.get((caso.ambito, caso.original))
         if hecha is None:
             continue
-        puntaje = chrf(hecha, caso.referencia)
-        puntajes.setdefault(caso.ambito, []).append(puntaje)
+        puntaje = chrf(hecha, caso.referencia) if caso.referencia else 0.0
+        if caso.referencia:  # un banco sin referencias (misiones, libros) se juzga, no se puntúa con chrF
+            puntajes.setdefault(caso.ambito, []).append(puntaje)
         filas.append((puntaje, caso, hecha))
     todos = [p for lista in puntajes.values() for p in lista]
     presentes, respetados = terminos(((c.original, t) for _, c, t in filas), banco.glosario)
@@ -241,7 +244,7 @@ def _medir(
         consistencia=nivel if evaluados else None,
         terminos_evaluados=evaluados,
         traducciones=[
-            {"ambito": c.ambito, "original": c.original, "referencia": c.referencia, "traduccion": t}
+            {"ambito": c.ambito, "original": c.original, "referencia": c.referencia, "traduccion": t, "pista": c.pista}
             for _, c, t in filas
         ],
         ejemplos=[

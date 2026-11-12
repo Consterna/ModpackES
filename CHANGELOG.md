@@ -39,6 +39,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 ### Cambiado
 
 - **El glosario ya no deja que un mod imponga su traducción a todo el modpack.** Los nombres del propio juego (primero es_mx, después es_es) mandan sobre los de un mod, y si dos mods traducen distinto el mismo término no se usa ninguno. Antes un mod que llamaba «Acechador de medianoche» a la vaca hacía que todo el modpack la tradujera así.
+- **Contexto de vecindad en misiones y libros.** Cada texto de una misión o de un libro se manda al motor con el título bajo el que está y el texto que viene justo antes, para elegir mejor el sentido y el tono. En una comparación con un juez ganó el 56 % de los casos decididos, sin llegar a ser concluyente; ver [docs/calidad.md](docs/calidad.md).
 
 - **El glosario ahora se exige.** Si un término del glosario sale en un texto y su traducción no lo usa (con tolerancia a plurales, tildes y mayúsculas), el texto se reintenta una vez con un aviso explícito; si sigue sin salir se acepta, para no dejar nada en inglés.
 
