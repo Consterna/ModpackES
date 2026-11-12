@@ -95,6 +95,28 @@ glosario de 2.101 términos sacado de otros mods, Gemini 3.8 Flash, tres corrida
 El efecto es pequeño: Gemini ya respeta casi todos los términos y la regla recupera uno o dos más sin tocar el chrF.
 Se queda como red de seguridad, que importará más con modelos locales y con glosarios del usuario.
 
+## 12 de noviembre de 2026 · un juez más fuerte y glosarios que se contradicen
+
+Probé como juez a Gemini 3.1 Pro (distinto y más fuerte que el que tradujo) sobre las traducciones de Gemini 3.8 Flash. Con las
+traducciones sin ejemplos y referencias limpias marcó 4,1 y 4,6 errores graves por cada 100 textos (según el orden de lectura),
+contra 1,0 y 1,3 del juez Flash: el fuerte ve cuatro veces más. Casi todo es terminología (13 de 16), no cambios de sentido.
+Dos eran **críticos y venían del glosario**: «Cow» y «Villager» salían como «Acechador de medianoche», el nombre que un mod
+cualquiera le pone a esa criatura, y el glosario estricto lo imponía. Otros graves eran de dialecto («Cristal» en vez de «Vidrio»,
+«inframundita» en vez de «Netherita», «Azada» en vez de «Azadón»).
+
+Por eso el glosario ahora no deja que un mod imponga su término (`Glosario.agregar_pares(..., fuente=, oficial=)`): los
+nombres del propio juego (es_mx antes que es_es) ganan a los de un mod, y si dos mods traducen distinto el mismo término no
+se usa ninguno. `armar_banco_local.py` arma el glosario del banco igual (con los textos de vanilla de Mojang, solo en local).
+
+| Glosario del banco | Términos | Errores graves por cada 100 según el juez (orden normal / inverso) | chrF |
+|---|---|---|---|
+| Antes (lo primero que aparece) | 2.076 | 9,9 / 12,2 | 71,0 |
+| Ahora (juego primero, sin contradicciones) | 5.131 | 6,1 / 11,4 | 70,4 (−0,6, no se distingue del ruido) |
+
+El juez sigue siendo ruidoso (acuerdo entre órdenes del 30–50 %), pero baja en los dos órdenes y desaparecen los casos
+críticos del glosario («Cow» sale «Vaca», «Glass» sale «Vidrio»). El chrF no cambia porque las referencias de cada mod siguen
+sus propias convenciones. Lo que queda por encima de ~90 % de textos sin error grave es sobre todo terminología y dialecto, y
+la forma de cerrarlo es el glosario, no otra vuelta del modelo.
 ## 12 de noviembre de 2026 · ¿ayudan los ejemplos parecidos? (resultado negativo)
 
 Se probó con el banco de 399 textos (con familias de nombres), Gemini 3.8 Flash y tres corridas por condición, comparando

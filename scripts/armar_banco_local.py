@@ -90,12 +90,39 @@ def pares() -> list[Par]:
     return salida
 
 
+def glosario_del_banco(todos: list[Par], medir: set[str], ingenuo: bool) -> dict[str, str]:
+    """Los nombres que la app sacaría del español de los mods instalados (la mitad de los jars que no se mide).
+
+    Como en la app: primero los nombres del juego (es_mx antes que es_es) y después los de cada mod; si dos mods
+    traducen distinto el mismo término, no se usa ninguno. Con `ingenuo` se hace como antes: lo primero que aparece.
+    """
+    g = Glosario()
+    vanilla = dc.RAIZ / "vanilla"
+    if not ingenuo and (vanilla / "en_us.json").is_file():
+        ingles: dict[str, str] = json.loads((vanilla / "en_us.json").read_text(encoding="utf-8"))
+        nombres = {k: v for k, v in ingles.items() if es_nombre(k)}
+        for variante in ("es_mx", "es_es"):
+            traducido: dict[str, str] = json.loads((vanilla / f"{variante}.json").read_text(encoding="utf-8"))
+            g.agregar_pares(nombres, traducido, fuente="minecraft", oficial=True)
+    for jar in sorted({p.jar for p in todos if p.jar not in medir}):
+        propios = [p for p in todos if p.jar == jar and es_nombre(p.clave)]
+        g.agregar_pares(
+            {f"{p.namespace}:{p.clave}": p.ingles for p in propios},
+            {f"{p.namespace}:{p.clave}": p.castellano for p in propios},
+            fuente="" if ingenuo else jar,
+        )
+    if not ingenuo:
+        print(f"Glosario del banco: {len(g.todos())} términos ({len(g.en_conflicto)} descartados por contradicción)")
+    return g.todos()
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # pyright: ignore[reportAttributeAccessIssue]
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--frases", type=int, default=150)
     ap.add_argument("--nombres", type=int, default=100)
     ap.add_argument("--familias", type=int, default=25, help="términos repetidos cuyos nombres se agregan completos")
+    ap.add_argument("--glosario-ingenuo", action="store_true", help="glosario como antes: sin juego y sin descartar")
     ap.add_argument(
         "--salida", type=Path, default=None, help="dónde guardar (por defecto .descargas/banco/referencia_real.json)"
     )
@@ -125,12 +152,7 @@ def main() -> int:
             vistos.add(p.ingles)
     en_el_banco = {p.ingles for p in elegidos}
     ejemplos = {p.ingles: p.castellano for p in todos if p.jar not in medir and p.ingles not in en_el_banco}
-    # Los nombres de las otras mitades de mods, como los que la app sacaría del español de los mods instalados
-    glosario = {
-        p.ingles: p.castellano
-        for p in todos
-        if p.jar not in medir and es_nombre(p.clave) and 3 <= len(p.ingles) <= 48 and p.ingles != p.castellano
-    }
+    glosario = glosario_del_banco(todos, medir, args.glosario_ingenuo)
     banco: dict[str, Any] = {
         "descripcion": "Pares reales en/es de mods libres, solo para uso local (no se publica).",
         "dialecto": "es_mx",

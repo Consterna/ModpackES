@@ -158,7 +158,7 @@ class Proceso:
             ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
             todo_ingles = tabla.textos(ns, "en_us")
             for variante in dict.fromkeys(orden):
-                self.glosario.agregar_pares(ingles, tabla.textos(ns, variante))
+                self.glosario.agregar_pares(ingles, tabla.textos(ns, variante), fuente=ns, oficial=ns == "minecraft")
                 self.ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
         self.ejemplos.agregar_pares(self.memoria.recientes(self.ctx.dialecto))
         self._glosario_listo = True
