@@ -49,6 +49,19 @@ def _leer(ruta: Path) -> dict[str, str]:
         return {}
 
 
+_PALABRA = re.compile(r"[^\W\d_]{3,}")
+
+
+def referencia_limpia(ingles: str, castellano: str) -> bool:
+    """False si la «traducción» del mod está a medias (mezcla inglés y español): sería una mala referencia."""
+    en = {w.casefold() for w in _PALABRA.findall(ingles)}
+    es = [w.casefold() for w in _PALABRA.findall(castellano)]
+    compartidas = [w for w in es if w in en]
+    return not (
+        es and ((len(compartidas) >= 2 and len(compartidas) / len(es) >= 0.25) or len(compartidas) / len(es) >= 0.5)
+    )
+
+
 def pares() -> list[Par]:
     """Los textos de cada carpeta lang que existen en inglés y en castellano."""
     salida: list[Par] = []
@@ -67,7 +80,12 @@ def pares() -> list[Par]:
         en, es = _leer(ingles), _leer(castellano)
         for clave, valor_en in en.items():
             valor_es = es.get(clave)
-            if valor_es and valor_en.strip() != valor_es.strip() and es_traducible(valor_en):
+            if (
+                valor_es
+                and valor_en.strip() != valor_es.strip()
+                and es_traducible(valor_en)
+                and referencia_limpia(valor_en, valor_es)
+            ):
                 salida.append(Par(ingles.parts[-5], ingles.parts[-3], clave, valor_en.strip(), valor_es.strip()))
     return salida
 

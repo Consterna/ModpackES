@@ -20,9 +20,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..motores import fabrica
 from ..motores.base import Motor
 from ..nucleo import terminos as terminos_repetidos
-from ..nucleo.ejemplos import Ejemplos
+from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import Traductor
@@ -177,6 +178,8 @@ class Medicion:
     chrf_intervalo: tuple[float, float] | None = None  #: intervalo al 95 % del chrF promedio
     consistencia: float | None = None  #: ver `consistencia()`; solo si hay términos que se repiten
     terminos_evaluados: int = 0
+    rechazos: dict[str, int] = field(default_factory=dict[str, int])  #: motivo → textos que no pasaron las reglas
+    descanso: float = 0.0  #: segundos de pausa de la carga segura (motores locales)
     traducciones: list[dict[str, str]] = field(default_factory=list[dict[str, str]])  #: todas, para juzgarlas
 
     @property
@@ -205,8 +208,21 @@ class Medicion:
                 if self.consistencia is not None
                 else []
             ),
+            *(
+                [
+                    (
+                        "Rechazados por",
+                        ", ".join(f"{m} {n}" for m, n in sorted(self.rechazos.items(), key=lambda x: -x[1])),
+                    )
+                ]
+                if self.rechazos
+                else []
+            ),
             ("Costo estimado", "desconocido" if self.costo_estimado is None else f"US$ {self.costo_estimado:.3f}"),
-            ("Tiempo", f"{self.segundos:.0f} s"),
+            (
+                "Tiempo",
+                f"{self.segundos:.0f} s" + (f" (de ellos {self.descanso:.0f} s de descanso)" if self.descanso else ""),
+            ),
         ]
         if self.revision:
             filas.append(("Revisión", self.revision))
@@ -262,16 +278,19 @@ def medir(
     motor_id: str = "gemini",
     revisar: bool = False,
     glosario_estricto: bool = True,
+    hilos: int = 4,
+    cantidad_ejemplos: int = CANTIDAD_EN_LA_APP,
 ) -> list[Medicion]:
     """Traduce el banco con el motor (memoria vacía) y devuelve la medición; con `revisar`, también la de después."""
     glosario = Glosario()
     glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario)
     with Memoria(":memory:") as memoria:
-        ejemplos = Ejemplos()
+        ejemplos = Ejemplos(cantidad=cantidad_ejemplos)
         ejemplos.agregar_pares(banco.ejemplos)
+        limites = fabrica.limites_de_lote(motor)
         traductor = Traductor(
-            motor, memoria, glosario, banco.dialecto, validador=validar, ejemplos=ejemplos,
-            glosario_estricto=glosario_estricto,
+            motor, memoria, glosario, banco.dialecto, hilos, validador=validar, ejemplos=ejemplos,
+            glosario_estricto=glosario_estricto, limite_caracteres=limites[0], limite_entradas=limites[1],
         )  # fmt: skip
         por_ambito: dict[str, list[str]] = {}
         pistas: dict[str, str] = {}
@@ -290,6 +309,11 @@ def medir(
         )
         hechas = {(a, o): t for a, r in resultados.items() for o, t in r.traducciones.items()}
         mediciones = [_medir(nombre or motor.nombre, banco, hechas, informe.costo(modelo, False, motor_id), segundos)]
+        mediciones[0].rechazos = dict(
+            Counter(m.split(":")[0] for r in resultados.values() for m in r.rechazados.values())
+        )
+        enfriador = getattr(motor, "enfriador", None)
+        mediciones[0].descanso = float(getattr(enfriador, "pausas", 0.0))
         if revisar:
             inicio = time.perf_counter()
             resumen = revision.ResumenRevision()

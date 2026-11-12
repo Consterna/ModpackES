@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base import ErrorFatal, Motor
+from .carga import Enfriador
 from .compatible import PERFILES, Compatible
 from .gemini import Gemini
 
@@ -23,7 +24,17 @@ def direccion_por_defecto(motor: str) -> str:
     return PERFILES[motor].direccion if motor in PERFILES else ""
 
 
-def crear(motor: str, clave: str | None, modelo: str, direccion: str = "") -> Motor:
+#: (caracteres, textos) por pedido. Un modelo local pequeño se equivoca más con pedidos largos.
+LIMITES_NORMALES = (5000, 60)
+LIMITES_LOCALES = (1800, 12)
+
+
+def limites_de_lote(motor: Motor) -> tuple[int, int]:
+    """Tamaño de los pedidos que conviene mandarle a este motor."""
+    return LIMITES_LOCALES if isinstance(motor, Compatible) and motor.es_local else LIMITES_NORMALES
+
+
+def crear(motor: str, clave: str | None, modelo: str, direccion: str = "", enfriador: Enfriador | None = None) -> Motor:
     """El motor elegido. Lanza ErrorFatal si falta algo para usarlo (clave, modelo o dirección)."""
     if motor == GEMINI:
         if not clave:
@@ -34,4 +45,4 @@ def crear(motor: str, clave: str | None, modelo: str, direccion: str = "") -> Mo
     perfil = PERFILES[motor]
     if perfil.necesita_clave and not clave:
         raise ErrorFatal(f"Falta la clave de {perfil.nombre}: guárdala con «Guardar clave…».")
-    return Compatible(perfil, modelo, clave, direccion or None)
+    return Compatible(perfil, modelo, clave, direccion or None, enfriador=enfriador)

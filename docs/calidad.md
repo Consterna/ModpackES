@@ -117,6 +117,71 @@ El juez sigue siendo ruidoso (acuerdo entre órdenes del 30–50 %), pero baja e
 críticos del glosario («Cow» sale «Vaca», «Glass» sale «Vidrio»). El chrF no cambia porque las referencias de cada mod siguen
 sus propias convenciones. Lo que queda por encima de ~90 % de textos sin error grave es sobre todo terminología y dialecto, y
 la forma de cerrarlo es el glosario, no otra vuelta del modelo.
+## 12 de noviembre de 2026 · ¿ayudan los ejemplos parecidos? (resultado negativo)
+
+Se probó con el banco de 399 textos (con familias de nombres), Gemini 3.8 Flash y tres corridas por condición, comparando
+de forma pareada: sin ejemplos, 8 ejemplos por palabras sueltas, 8 ejemplos con peso extra a las frases de dos palabras
+seguidas (bigramas) y 14 ejemplos.
+
+| Comparación | Diferencia de chrF (IC 95 %) |
+|---|---|
+| 0 ejemplos → 8 por palabras sueltas | −0,64 (−1,68 a +0,51), no se distingue del ruido |
+| 8 por palabras → 8 con bigramas | +0,12 (−0,42 a +0,68), no se distingue del ruido |
+| 8 → 14 ejemplos | +0,23 (−0,39 a +0,85), no se distingue del ruido |
+
+Con Gemini y este banco los ejemplos no mejoran el chrF, y ajustar cómo se buscan (bigramas) o cuántos se mandan tampoco.
+Por eso **no se agregó** la búsqueda con bigramas: sumaría código sin una ganancia medida. Lo que sí queda abierto es
+si ayudan con modelos locales pequeños, que cometen más errores de términos y estilo, y si mejoran la consistencia
+en packs grandes; se mide cuando se pruebe el modelo local.
+
+## 12 de noviembre de 2026 · modelo local en «carga segura»
+
+Gemma 4 E2B (Q4, 3,3 GB) con `llama.cpp` (Vulkan), 12 capas en la GPU y el resto en RAM, 1 pedido a la vez, lotes de 12
+textos o 1.800 caracteres, descansando un 30 % del tiempo (`medir_calidad.py --carga-segura`). Banco de 100 textos reales.
+
+| | Gemma 4 E2B local, carga segura | Gemini 3.8 Flash (2 corridas) |
+|---|---|---|
+| Textos que pasaron las reglas | 100 de 100 | 100 de 100 |
+| chrF | 64,1 (IC 59,7 a 69,2) | 68,9 |
+| Términos del glosario | 6 de 8 | 7 de 8 |
+| Tiempo | 1.700 s (510 s de descanso) | 13 s |
+
+- Diferencia pareada con Gemini: **+4,8 de chrF a favor de Gemini** (IC +0,2 a +9,4): el modelo local pierde algo, pero
+  en este banco no se queda lejos.
+- **Uso del PC durante los 28 minutos:** temperatura máxima de la GPU 56 °C, uso máximo 49 % y promedio 21 %, VRAM máxima
+  1,1 GB (muestras cada 5 s con `nvidia-smi`). No se acercó al límite de 80 °C que vigila la app.
+- La corrida anterior sin carga segura (250 textos, lotes de 60, 4 pedidos a la vez) dejó 189 de 250 textos aceptados
+  (76 %) y la GPU al ~78 %. Ahora se aceptaron los 100, pero no es una comparación controlada (otro banco y varios
+  cambios a la vez: lotes más chicos, glosario estricto, contexto); no se puede atribuir la mejora a uno solo.
+- Costo: tarda unas 130 veces más que Gemini, pero no cuesta nada y no usa internet.
+
+Cómo repetirlo (con el servidor apagado al terminar y el puerto comprobado antes):
+
+```
+llama-server -m modelo.gguf --host 127.0.0.1 --port 8089 -c 4096 -ngl 12 -t 4 -np 1 --no-webui
+uv run python scripts/medir_calidad.py --motor personalizado --direccion http://127.0.0.1:8089/v1 --modelo gemma-4-e2b --carga-segura --banco .descargas/banco/referencia_100.json
+```
+## 12 de noviembre de 2026 · referencias limpias: los ejemplos de otros mods no ayudan
+
+Al revisar los textos con peor chrF vi que muchas «referencias» de los mods eran traducciones a medias, con inglés y
+español mezclados («Conveyor Belt Interruptor de», «Nivel II is better than Nivel I»). Castigaban traducciones buenas. Ahora
+`armar_banco_local.py` descarta los pares cuya referencia comparte demasiadas palabras con el inglés (unos 1.500 de 13.900)
+y el chrF del mismo motor sube a ~75. Con ese banco limpio (399 textos, Gemini 3.8 Flash, tres corridas por condición):
+
+| Comparación | Diferencia de chrF (IC 95 %) |
+|---|---|
+| Sin pistas ni ejemplos → pistas y 8 ejemplos (el PR 4 completo) | −0,54 (−1,64 a +0,60), no se distingue del ruido |
+| Sin pistas ni ejemplos → solo pistas | +0,70 (−0,18 a +1,59), no se distingue del ruido |
+| Solo pistas → pistas y 8 ejemplos | **−1,24 (−2,26 a −0,27), empeora** |
+
+- La ganancia de +1,4 que medí antes del PR 4 con el banco sucio **no se reproduce**: era en parte ruido de las referencias.
+- Mandar ejemplos de otros mods empeora un poco el chrF con Gemini (también −0,64, sin significación, con el banco
+  anterior). Una explicación posible es que cada mod tiene su propio vocabulario y los ejemplos arrastran el de otros.
+  Por eso **la app ya no manda ejemplos por defecto** (`CANTIDAD_EN_LA_APP = 0`); el código sigue y `medir_calidad.py
+  --n-ejemplos N` permite probarlos, sobre todo con modelos locales pequeños, que no se midieron.
+- Las pistas (clave y tipo) quedan: no empeoran y la tendencia es positiva (+0,70), aunque no es concluyente.
+- Los modelos no usaban regionalismos de España: busqué «vosotros», «ordenador», «zumo», «coger» y formas en «-áis/-éis» en
+  las salidas de Gemini y de Gemma E2B y no apareció ninguno, así que no hice un chequeo de dialecto.
 ## 12 de noviembre de 2026 · contexto de vecindad en misiones
 
 Cada texto de una misión (y de un libro) ahora lleva el título bajo el que está y la línea que viene antes, además
