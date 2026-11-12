@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from traductor_es import configuracion
+from traductor_es.modulos.base import quitar_vecindad
 from traductor_es.motores import fabrica
 from traductor_es.motores.base import Motor
 from traductor_es.motores.gemini import MODELO_POR_DEFECTO
@@ -34,6 +35,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--glosario-laxo", action="store_true", help="no rechazar traducciones a las que les falta un término"
     )
+    ap.add_argument(
+        "--sin-vecindad",
+        action="store_true",
+        help="quitar de las pistas el título y la línea anterior (misiones y libros)",
+    )
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
@@ -46,6 +52,8 @@ def main(argv: list[str] | None = None) -> int:
         motor = fabrica.crear(args.motor, configuracion.leer_clave(args.motor), modelo, args.direccion)
         nombre = f"{args.motor}:{modelo}"
     banco = medicion.Banco.leer(args.banco)
+    if args.sin_vecindad:
+        banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia, quitar_vecindad(c.pista)) for c in banco.casos]
     if args.sin_contexto:
         banco.ejemplos = {}
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia) for c in banco.casos]
