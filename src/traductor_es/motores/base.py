@@ -20,7 +20,8 @@ class Entrada:
     id: str
     texto: str  #: ya enmascarado
     pista: str = ""  #: contexto corto, p. ej. «item.create.wrench» o «misión: título»
-    traduccion: str = ""  #: solo para revisar: la traducción que hay que juzgar (también enmascarada)
+    traduccion: str = ""  #: solo para revisar o comparar: la traducción que hay que juzgar (también enmascarada)
+    alternativa: str = ""  #: solo para comparar: la otra traducción (también enmascarada)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +31,7 @@ class Lote:
     dialecto: str  #: descripción del dialecto destino
     glosario: dict[str, str] = field(default_factory=dict[str, str])
     contexto: str = ""  #: ambientación del modpack que escribe el usuario (tono, términos propios)
-    tarea: str = "traducir"  #: «traducir» o «revisar» (juzgar traducciones ya hechas)
+    tarea: str = "traducir"  #: «traducir», «revisar» (juzgar traducciones ya hechas) o «comparar» (elegir entre dos)
     ejemplos: dict[str, str] = field(default_factory=dict[str, str])  #: {inglés: español} de textos parecidos ya hechos
 
 

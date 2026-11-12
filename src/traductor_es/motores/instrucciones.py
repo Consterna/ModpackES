@@ -37,6 +37,8 @@ def _contexto(lote: Lote) -> str:
 
 
 def sistema(lote: Lote) -> str:
+    if lote.tarea == "comparar":
+        return _comparar(lote)
     return _revisar(lote) if lote.tarea == "revisar" else _traducir(lote)
 
 
@@ -57,6 +59,18 @@ def _revisar(lote: Lote) -> str:
     )
 
 
+def _comparar(lote: Lote) -> str:
+    return (
+        f"Eres un revisor profesional de traducciones de videojuegos. Comparas dos traducciones (A y B) del inglés "
+        f"al {lote.dialecto} de un texto de Minecraft o de uno de sus mods. {TONO.get(lote.ambito, '')}\n"
+        "Elige la mejor por exactitud, terminología, naturalidad y tono. Si el texto trae «contexto», es de dónde "
+        "sale: úsalo para juzgar si el sentido elegido es el correcto. Los marcadores como ⟦0⟧ son código y ya se "
+        "comprobaron: no los evalúes. No te dejes llevar por el orden ni por el largo.\n"
+        "Responde solo con el JSON pedido: una clave por texto y como valor «A», «B» o «igual» (si no hay una "
+        "diferencia clara)." + _contexto(lote)
+    )
+
+
 def _traducir(lote: Lote) -> str:
     return (
         f"Eres un traductor profesional de videojuegos. Traduces del inglés al {lote.dialecto} textos de Minecraft "
@@ -71,8 +85,9 @@ def _traducir(lote: Lote) -> str:
         "6. Usa los signos de apertura ¿ y ¡ cuando corresponda.\n"
         "7. Si un texto ya está en español o no se puede traducir, devuélvelo igual. Pero un nombre en inglés "
         "(objeto, bloque, criatura, efecto…) sí se traduce: «Moon Berries» es «Bayas lunares», no se deja igual.\n"
-        "8. Si un texto trae «contexto», es de dónde sale (la clave y el tipo, p. ej. «nombre de un objeto»): úsalo "
-        "para elegir el sentido correcto («playing» en un disco de música es «reproduciéndose»), no lo traduzcas.\n"
+        "8. Si un texto trae «contexto», es de dónde sale (la clave y el tipo, p. ej. «nombre de un objeto», o el "
+        "título bajo el que está y el texto que viene antes): úsalo para elegir el sentido correcto "
+        "(«playing» en un disco de música es «reproduciéndose») y mantener el hilo, no lo traduzcas.\n"
         "9. Si hay «ejemplos», son traducciones ya hechas de textos parecidos de este mismo modpack: usa sus "
         "términos y su estilo para ser consistente, sin copiarlos." + _contexto(lote)
     )
@@ -82,9 +97,19 @@ def usuario(lote: Lote) -> str:
     datos: dict[str, Any] = {}
     if lote.glosario:
         datos["glosario"] = lote.glosario
-    if lote.ejemplos and lote.tarea != "revisar":
+    if lote.ejemplos and lote.tarea == "traducir":
         datos["ejemplos"] = lote.ejemplos
-    if lote.tarea == "revisar":
+    if lote.tarea == "comparar":
+        datos["pares"] = {
+            e.id: {
+                "original": e.texto,
+                "a": e.traduccion,
+                "b": e.alternativa,
+                **({"contexto": e.pista} if e.pista else {}),
+            }
+            for e in lote.entradas
+        }
+    elif lote.tarea == "revisar":
         datos["pares"] = {
             e.id: {"original": e.texto, "traduccion": e.traduccion, **({"contexto": e.pista} if e.pista else {})}
             for e in lote.entradas
