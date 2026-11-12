@@ -8,6 +8,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Glosario del usuario desde la línea de comandos:** `modpackes glosario listar | agregar INGLÉS ESPAÑOL | quitar INGLÉS | importar ARCHIVO.json`. Son los términos (y los nombres que no se traducen) que quieres que salgan siempre igual; mandan sobre todo lo demás y, si faltan en una traducción, el texto se reintenta.
+
 - **Texto escrito en el código de los mods** (opcional, apagado por defecto): la app traduce las frases que encuentra en el código Java de los
   mods y las guarda en una tabla del resource pack; el nuevo mod de apoyo **ModpackES Runtime** (solo cliente, para Forge 1.16.5, 1.17.1, 1.18.2, 1.19.2 y 1.20.1, NeoForge 1.20.1, de 1.21 a 1.21.11 y de 26.1 a 26.3, y Fabric 1.19.4, de 1.20 a 1.20.6, de 1.21 a 1.21.11 y de 26.1 a 26.3, y Quilt con los mods de Fabric hasta 1.21.1) las muestra en
   español en el chat, la barra de acción, los tooltips y el texto de los botones de una pantalla al abrirla (en Forge y NeoForge también los tooltips que no son de objetos). No cambia el texto que una pantalla dibuja directamente. Solo cambia textos idénticos a los de la tabla. «Más ▸ Instalar el mod de apoyo» y
@@ -37,6 +39,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   sigue siendo válido, repetir no cambia nada y restaurar devuelve los bytes originales.
 
 ### Cambiado
+
+- **El glosario ya no deja que un mod imponga su traducción a todo el modpack.** Los nombres del propio juego (primero es_mx, después es_es) mandan sobre los de un mod, y si dos mods traducen distinto el mismo término no se usa ninguno. Antes un mod que llamaba «Acechador de medianoche» a la vaca hacía que todo el modpack la tradujera así.
+- **Motores en tu PC (LM Studio, Ollama o un servidor en localhost):** los pedidos son más chicos (12 textos o 1.800 caracteres en vez de 60 o 5.000), porque un modelo pequeño se equivoca más con pedidos largos. Para medir sin saturar la GPU hay una «carga segura» en las herramientas de desarrollo (`medir_calidad.py --carga-segura`: pausas entre pedidos y espera si la GPU pasa de 80 °C).
+- **Ya no se mandan ejemplos de otros mods al motor.** Con referencias limpias, los ejemplos parecidos bajaron el chrF de Gemini (−1,2, intervalo de −2,3 a −0,3) y la ganancia que se había medido antes con el contexto no se reprodujo; las pistas (clave y tipo de cada texto) se mantienen. Los ejemplos siguen en el código para probarlos con modelos locales; ver [docs/calidad.md](docs/calidad.md).
+- **Contexto de vecindad en misiones y libros.** Cada texto de una misión o de un libro se manda al motor con el título bajo el que está y el texto que viene justo antes, para elegir mejor el sentido y el tono. En una comparación con un juez ganó el 56 % de los casos decididos, sin llegar a ser concluyente; ver [docs/calidad.md](docs/calidad.md).
 
 - **El glosario ahora se exige.** Si un término del glosario sale en un texto y su traducción no lo usa (con tolerancia a plurales, tildes y mayúsculas), el texto se reintenta una vez con un aviso explícito; si sigue sin salir se acepta, para no dejar nada en inglés.
 

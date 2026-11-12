@@ -17,7 +17,7 @@ from ..formatos import json_cadenas, markdown
 from ..fuentes.contenedores import Carpeta
 from ..fuentes.recursos import Fuente
 from ..nucleo.mascara import es_traducible
-from .base import Contexto, Pieza, Resumen, aplicar, parece_clave, unidades
+from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, parece_clave, unidades
 
 AMBITO = "libro"
 CAMPOS_PATCHOULI = frozenset(
@@ -198,7 +198,10 @@ class Libros:
             for c in cadenas
             if c.campo in campos and not c.texto.strip().startswith("#") and not parece_clave(c.texto)
         ]
-        a.piezas = [Pieza(u, f"libro: {c.campo}") for c in elegidas for u in unidades(c.texto)]
+        a.piezas = con_vecindad(
+            [Pieza(u, f"libro: {c.campo}") for c in elegidas for u in unidades(c.texto)],
+            lambda p: p.pista in ("libro: name", "libro: title"),
+        )
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             nuevos = {c.inicio: aplicar(c.texto, trad) for c in elegidas}
@@ -219,7 +222,7 @@ class Libros:
                 bloques.append((True, [linea.strip()]))
         ancho = max((len(x) for es, b in bloques if es for x in b), default=80)
         parrafos = [" ".join(b) for es, b in bloques if es]
-        a.piezas = [Pieza(p, "libro: página") for p in parrafos if es_traducible(p)]
+        a.piezas = con_vecindad([Pieza(p, "libro: página") for p in parrafos if es_traducible(p)], lambda _p: False)
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             salida: list[str] = []
@@ -241,9 +244,10 @@ class Libros:
 
     def _preparar_markdown(self, a: _Archivo, texto: str) -> None:
         lineas, segs = markdown.segmentar(texto)
-        a.piezas = [
-            Pieza(s.texto, "guía: título" if s.inicio < 5 else "guía: texto") for s in segs if es_traducible(s.texto)
-        ]
+        a.piezas = con_vecindad(
+            [Pieza(s.texto, "guía: título" if s.inicio < 5 else "guía: texto") for s in segs if es_traducible(s.texto)],
+            lambda p: p.pista == "guía: título",
+        )
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             hechos = sum(1 for p in a.piezas if p.texto in trad)

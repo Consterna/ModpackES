@@ -7,12 +7,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..formatos import json_cadenas, nbt, snbt
-from .base import Contexto, Pieza, Resumen, aplicar, contar, unidades
+from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, contar, unidades
 
 AMBITO = "mision"
 #: Campos con texto visible en FTB Quests (1.12 usa «text» para la descripción larga).
 CAMPOS_FTBQ = frozenset({"title", "subtitle", "description", "text", "hover", "lock_message"})
 _NEUTRO_SNBT = b"{\n}\n"
+
+
+def _es_titulo(pieza: Pieza) -> bool:
+    return pieza.pista.endswith("title")
 
 
 def _relativa(ctx: Contexto, ruta: Path) -> str:
@@ -142,7 +146,10 @@ class FTBQuests(_Base):
         self, src: str, destinos: list[Path], filtro: Callable[[snbt.Cadena], bool], fijos: Mapping[int, str]
     ) -> _Trabajo:
         cadenas = [c for c in snbt.escanear(src) if filtro(c)]
-        piezas = [Pieza(u, f"misión: {c.campo}") for c in cadenas if c.inicio not in fijos for u in unidades(c.texto)]
+        piezas = con_vecindad(
+            [Pieza(u, f"misión: {c.campo}") for c in cadenas if c.inicio not in fijos for u in unidades(c.texto)],
+            _es_titulo,
+        )
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             nuevos: dict[int, str] = {}
@@ -215,7 +222,9 @@ class FTBQuests(_Base):
             textos = [c for c in nbt.cadenas(arbol) if c.campo in CAMPOS_FTBQ]
             if not textos:
                 continue
-            piezas = [Pieza(u, f"misión: {c.campo}") for c in textos for u in unidades(c.texto)]
+            piezas = con_vecindad(
+                [Pieza(u, f"misión: {c.campo}") for c in textos for u in unidades(c.texto)], _es_titulo
+            )
 
             def generar(
                 trad: Mapping[str, str], original: bytes = original, compresion: nbt.Compresion = compresion
