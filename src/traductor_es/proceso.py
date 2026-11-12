@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
-from typing import Self
+from typing import Self, cast
 
 from . import configuracion
 from .fuentes.instancia import Instancia
 from .modulos import datos, libros, misiones, mods, runtime, scripts
-from .modulos.base import Contexto, Modulo, Resumen, reunir_pistas
+from .modulos.base import Contexto, Modulo, Pieza, Resumen, reunir_pistas
+from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
 from .motores import fabrica
@@ -61,6 +63,15 @@ class Informe:
     fallidos: list[str] = field(default_factory=list[str])  #: grupos que el análisis no pudo leer
     #: Lo que queda en inglés aunque se traduzca todo, y por qué (ver `modulos/cobertura.py`)
     cobertura: list[Hallazgo] = field(default_factory=list[Hallazgo])
+    #: Qué cambió en el inglés desde la última traducción (ver `modulos/cambios.py`); solo al analizar
+    cambios: Cambios | None = None
+    #: Por módulo, lo que costaría traducir solo lo nuevo y lo cambiado
+    modulos_cambios: list[InformeModulo] = field(default_factory=list[InformeModulo])
+
+    @property
+    def diferencia(self) -> Informe:
+        """Un informe con solo lo nuevo y lo cambiado, para estimar su costo con `costo`."""
+        return Informe(modulos=list(self.modulos_cambios))
 
     @property
     def a_traducir(self) -> int:
@@ -90,6 +101,10 @@ class Informe:
         return total
 
 
+def _textos(lugar: Lugar) -> list[str]:
+    return list(lugar.textos.values()) if isinstance(lugar.textos, Mapping) else list(lugar.textos)
+
+
 def _costo_traduccion(caracteres: int, textos: int, precio: tuple[float, float]) -> float:
     if not caracteres:
         return 0.0
@@ -98,6 +113,14 @@ def _costo_traduccion(caracteres: int, textos: int, precio: tuple[float, float])
     entrada = tokens * 1.6 + lotes * _TOKENS_POR_LOTE
     salida = tokens * 1.4  # traducción (el español es algo más largo) más algo de razonamiento
     return (entrada * precio[0] + salida * precio[1]) / 1e6
+
+
+def lugares_de(modulo: Modulo, piezas: list[Pieza]) -> list[Lugar]:
+    """Los lugares del módulo (tras `recolectar`). Un módulo sin `lugares` cuenta como un solo lugar en orden."""
+    propios = getattr(modulo, "lugares", None)
+    if callable(propios):
+        return cast(list[Lugar], propios())
+    return [Lugar(modulo.nombre, [p.texto for p in piezas])]
 
 
 class Proceso:
@@ -205,6 +228,7 @@ class Proceso:
         self._preparar_glosario()
         informe = Informe()
         scripts_leidos: list[scripts.ScriptsKubeJS] = []
+        leidos: list[tuple[str, Modulo, list[Lugar]]] = []
         for grupo, modulo in self.modulos():
             try:
                 piezas = modulo.recolectar()
@@ -215,13 +239,47 @@ class Proceso:
                 continue
             if isinstance(modulo, scripts.ScriptsKubeJS):
                 scripts_leidos.append(modulo)
+            leidos.append((grupo, modulo, lugares_de(modulo, piezas)))
             pendientes = self.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre, modulo.describir(), len({p.texto for p in piezas}),
                               len(pendientes), sum(len(t) for t in pendientes))
             )  # fmt: skip
         informe.avisos.extend(self._avisos_de_cobertura(informe, scripts_leidos))
+        self._comparar_con_la_ultima(informe, leidos)
         return informe
+
+    def _comparar_con_la_ultima(self, informe: Informe, leidos: list[tuple[str, Modulo, list[Lugar]]]) -> None:
+        """Llena `informe.cambios`: qué cambió desde la última traducción y cuánto cuesta traducir solo eso.
+
+        Compara con el índice guardado en la marca del pack. Si no hay índice (nunca se tradujo, o se tradujo con
+        una versión anterior de la app), cuenta como nuevo lo que no está en la memoria ni en el glosario.
+        """
+        actuales = [(g, m.nombre, lugares) for g, m, lugares in leidos]
+        previo = leer_indice(self.ctx.pack.leer_marca()) if self.ctx.pack is not None else None
+        if previo is not None:
+            indice, fecha = previo
+            # Solo se comparan los grupos elegidos: los demás no se leyeron y no por eso se borraron
+            indice = {n: e for n, e in indice.items() if e.get("grupo") in self.grupos}
+            informe.cambios = Cambios(comparar(indice, actuales), "indice", fecha)
+        else:
+            pendientes = {
+                m.nombre: set(self.traductor.pendientes([t for lugar in lugares for t in _textos(lugar)], m.ambito))
+                for _g, m, lugares in leidos
+            }
+            informe.cambios = Cambios(
+                sin_indice(actuales, lambda nombre, t: separar_bordes(t)[1] in pendientes[nombre]),
+                "memoria",
+            )
+        for grupo, modulo, _lugares in leidos:
+            textos = [t for c in informe.cambios.lugares if c.modulo == modulo.nombre for t in c.textos]
+            if not textos:
+                continue
+            pendientes_mod = self.traductor.pendientes(textos, modulo.ambito)
+            informe.modulos_cambios.append(
+                InformeModulo(grupo, modulo.nombre, modulo.describir(), len(set(textos)), len(pendientes_mod),
+                              sum(len(t) for t in pendientes_mod))
+            )  # fmt: skip
 
     def _avisos_de_cobertura(self, informe: Informe, scripts_leidos: list[scripts.ScriptsKubeJS]) -> list[str]:
         """Lo barato de saber antes de traducir: frases de scripts que parecen texto y no se tocan.
@@ -243,9 +301,11 @@ class Proceso:
         self._preparar_glosario()
         informe = Informe()
         todas: dict[str, str] = {}
+        traducidos: list[tuple[str, str, list[Lugar]]] = []
         for grupo, modulo in self.modulos():
             self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
             piezas = modulo.recolectar()
+            traducidos.append((grupo, modulo.nombre, lugares_de(modulo, piezas)))
             textos = [p.texto for p in piezas]
             pendientes = self.traductor.pendientes(textos, modulo.ambito)
             pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
@@ -275,6 +335,7 @@ class Proceso:
         relevantes = self.glosario.relevantes(todas, maximo=500)
         informe.revision = revisar_glosario(todas, relevantes, relevantes)
         informe.avisos.extend(self._avisos())
+        self._guardar_indice(traducidos, informe)
         if activar and (self.ctx.pack is not None and (self.ctx.pack.raiz / "pack.mcmeta").is_file()):
             try:
                 informe.pack_activado = opciones_salida.activar(
@@ -284,6 +345,16 @@ class Proceso:
             except ValueError as e:
                 informe.avisos.append(str(e))
         return informe
+
+    def _guardar_indice(self, traducidos: list[tuple[str, str, list[Lugar]]], informe: Informe) -> None:
+        """Guarda en la marca del pack qué textos en inglés había, para comparar en el próximo análisis."""
+        pack = self.ctx.pack or PackSalida(self.instancia)
+        previo = leer_indice(pack.leer_marca())
+        indice = mezclar(previo[0] if previo else None, indice_de(traducidos), self.grupos)
+        try:
+            pack.guardar_indice(para_la_marca(indice, datetime.now(UTC).isoformat(timespec="seconds")))
+        except (OSError, ValueError) as e:  # la traducción ya está escrita: solo se pierde el informe de cambios
+            informe.avisos.append(f"No pude guardar el índice para el informe de cambios: {e}")
 
     def _idioma_del_juego(self) -> str | None:
         """Idioma a poner en options.txt: ninguno si el jugador ya usa una variante de español (se respeta),

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ..formatos import json_cadenas, nbt, snbt
 from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, contar, unidades
+from .cambios import Lugar
 
 AMBITO = "mision"
 #: Campos con texto visible en FTB Quests (1.12 usa «text» para la descripción larga).
@@ -32,6 +33,7 @@ class _Trabajo:
     generar: Callable[[Mapping[str, str]], tuple[bytes, int, int]]  #: (contenido, traducidos, pendientes)
     neutro: bytes = b""
     extra: dict[str, object] = field(default_factory=dict[str, object])
+    fuente: Path | None = None  #: el archivo en inglés, si no es el mismo destino (carpeta lang de FTB Quests)
 
 
 class _Base:
@@ -57,6 +59,20 @@ class _Base:
 
     def _preparar(self) -> Iterator[_Trabajo]:
         raise NotImplementedError
+
+    def lugares(self) -> list[Lugar]:
+        """Por archivo de misiones, sus textos en orden (tras `recolectar`)."""
+        vistos: set[str] = set()
+        salida: list[Lugar] = []
+        for t in self._trabajos:
+            ruta = t.fuente or (t.destinos[0] if t.destinos else None)
+            if ruta is None:
+                continue
+            donde = _relativa(self.ctx, ruta)
+            if donde not in vistos:  # en la carpeta lang hay un trabajo por variante del mismo archivo en inglés
+                vistos.add(donde)
+                salida.append(Lugar(donde, [p.texto for p in t.piezas]))
+        return salida
 
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
         resumen = Resumen()
@@ -184,7 +200,9 @@ class FTBQuests(_Base):
             for variante in self.ctx.variantes:
                 destino = lang / f"{variante}{relativa}"
                 fijos = self._fijos(destino, cadenas)
-                yield self._trabajo_snbt(src, [destino], lambda _c: True, fijos)
+                trabajo = self._trabajo_snbt(src, [destino], lambda _c: True, fijos)
+                trabajo.fuente = fuente
+                yield trabajo
 
     def _fijos(self, destino: Path, cadenas: list[snbt.Cadena]) -> dict[int, str]:
         """Traducciones que trae el modpack en ese idioma, puestas en las posiciones del archivo en inglés."""

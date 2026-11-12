@@ -15,6 +15,7 @@ from ..formatos import comandos, componente, flujo_js, javascript
 from ..formatos.kubejs_api import llamadas_de_texto
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, contar, parece_clave
+from .cambios import Lugar
 
 AMBITO = "script"
 CARPETAS = ("kubejs/client_scripts", "kubejs/server_scripts", "kubejs/startup_scripts")
@@ -290,6 +291,14 @@ class ScriptsKubeJS:
             for s in self._scripts
             for c in s.elegidas
             for t in s.unidades(c)
+        ]
+
+    def lugares(self) -> list[Lugar]:
+        """Por script, los textos que se traducen, en orden (tras `recolectar`)."""
+        juego = self.ctx.instancia.juego
+        return [
+            Lugar(s.ruta.relative_to(juego).as_posix(), [t for c in s.elegidas for t in s.unidades(c)])
+            for s in self._scripts
         ]
 
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
