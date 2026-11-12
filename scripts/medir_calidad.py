@@ -17,6 +17,7 @@ from traductor_es.motores import fabrica
 from traductor_es.motores.base import Motor
 from traductor_es.motores.gemini import MODELO_POR_DEFECTO
 from traductor_es.motores.simulador import Simulador
+from traductor_es.nucleo.ejemplos import CANTIDAD_EN_LA_APP
 from traductor_es.validacion import medicion
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -34,6 +35,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--glosario-laxo", action="store_true", help="no rechazar traducciones a las que les falta un término"
+    )
+    ap.add_argument(
+        "--n-ejemplos", type=int, default=CANTIDAD_EN_LA_APP, help="cuántos ejemplos parecidos se mandan por lote"
     )
     ap.add_argument(
         "--sin-vecindad",
@@ -58,7 +62,14 @@ def main(argv: list[str] | None = None) -> int:
         banco.ejemplos = {}
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia) for c in banco.casos]
     resultados = medicion.medir(
-        motor, banco, nombre, modelo, args.motor, revisar=args.revisar, glosario_estricto=not args.glosario_laxo
+        motor,
+        banco,
+        nombre,
+        modelo,
+        args.motor,
+        revisar=args.revisar,
+        glosario_estricto=not args.glosario_laxo,
+        cantidad_ejemplos=args.n_ejemplos,
     )
     for m in resultados:
         print(m.tabla(), end="\n\n")
