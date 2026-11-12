@@ -95,6 +95,24 @@ glosario de 2.101 términos sacado de otros mods, Gemini 3.8 Flash, tres corrida
 El efecto es pequeño: Gemini ya respeta casi todos los términos y la regla recupera uno o dos más sin tocar el chrF.
 Se queda como red de seguridad, que importará más con modelos locales y con glosarios del usuario.
 
+## 12 de noviembre de 2026 · revisión humana de 100 textos y una comparación a ciegas
+
+Una persona revisó 100 traducciones de Gemini 3.8 Flash (60 de interfaz de mods y 40 de misiones) con `scripts/hoja_revision.py`:
+**79 Bien, 20 Leve y 1 Grave**. Sin error grave: 99 %. Aceptable tal cual: 79 % (intervalo de Wilson ≈ 70–86 %). Interfaz: 47 Bien, 12 Leve,
+1 Grave. Misiones: 32 Bien, 8 Leve, 0 Grave. Los Leve se repiten: mayúsculas de términos propios («Caballeros de la Muerte»),
+«objetos» en vez de «ítems», «netherita» en vez de «inframundita», nombres propios que no se traducen, palabras duplicadas y
+preferencia por una traducción más literal. El único Grave fue un identificador técnico dejado en inglés.
+
+Con eso se probó un prompt con cuatro reglas nuevas (fidelidad literal, mayúsculas de términos propios, vocabulario, nombres propios
+intactos). Cambió 57 de 99 textos y la misma persona los comparó **a ciegas** (A/B sin saber cuál era la nueva):
+**20 prefirió la nueva, 32 la anterior y 5 igual** (prueba de signos p = 0,13). Arregló varios de los casos señalados («netherita»,
+«Fluix», «Caballeros de la Muerte», «Mejora de Salud»), pero estropeó otros (dejó «Starlit Crusher» sin traducir, escribió «Mejora»
+con mayúscula en frases donde no tocaba). **No se adoptó.**
+
+Hay un motivo que impide sacar conclusiones fuertes: con Gemini 3.8 Flash dos corridas con el mismo prompt dan textos idénticos
+en solo ~48 de 99 casos, y con temperatura 0 en ~38 de 99, así que la temperatura no estabiliza nada. La mitad de lo que "cambia"
+entre dos versiones es variación normal. Para fijar una decisión de estilo (p. ej. «Netherita», «Fluix», «Caballeros de la Muerte»)
+sirve más el **glosario del usuario** (`glosario.json`), que sí es determinista y se exige con reintento, que otra regla en el prompt.
 ## 12 de noviembre de 2026 · un juez más fuerte y glosarios que se contradicen
 
 Probé como juez a Gemini 3.1 Pro (distinto y más fuerte que el que tradujo) sobre las traducciones de Gemini 3.8 Flash. Con las
