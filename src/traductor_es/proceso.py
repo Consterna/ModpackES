@@ -131,9 +131,11 @@ class Proceso:
         self.ctx = Contexto(
             self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
         )
+        limites = fabrica.limites_de_lote(motor)
         self.traductor = Traductor(
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
             usar_lotes=usar_lotes, contexto=contexto, ejemplos=self.ejemplos,
+            limite_caracteres=limites[0], limite_entradas=limites[1],
         )  # fmt: skip
         self.motor = motor
         if isinstance(motor, Compatible):
