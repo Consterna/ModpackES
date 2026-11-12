@@ -24,7 +24,7 @@ from typing import Any, NamedTuple
 import descargar_corpus as dc
 
 from traductor_es.formatos import lang_json, lang_legacy
-from traductor_es.modulos.mods import Mods
+from traductor_es.modulos.mods import Mods, es_nombre
 from traductor_es.nucleo.glosario import Glosario
 from traductor_es.nucleo.mascara import es_traducible
 
@@ -92,10 +92,16 @@ def main() -> int:
     )
     en_el_banco = {p.ingles for p in elegidos}
     ejemplos = {p.ingles: p.castellano for p in todos if p.jar not in medir and p.ingles not in en_el_banco}
+    # Los nombres de las otras mitades de mods, como los que la app sacaría del español de los mods instalados
+    glosario = {
+        p.ingles: p.castellano
+        for p in todos
+        if p.jar not in medir and es_nombre(p.clave) and 3 <= len(p.ingles) <= 48 and p.ingles != p.castellano
+    }
     banco: dict[str, Any] = {
         "descripcion": "Pares reales en/es de mods libres, solo para uso local (no se publica).",
         "dialecto": "es_mx",
-        "glosario": {},
+        "glosario": glosario,
         "textos": [
             {
                 "ambito": "ui",

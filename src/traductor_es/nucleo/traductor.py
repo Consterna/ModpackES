@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import cast
 
 from ..motores.base import Cancelado, Entrada, Lote, Motor, MotorPorLotes
-from ..validacion.calidad import sin_traducir
+from ..validacion.calidad import sin_traducir, terminos_faltantes
 from . import terminos
 from .dialectos import DIALECTO_POR_DEFECTO, DIALECTOS
 from .ejemplos import Ejemplos
@@ -27,6 +27,8 @@ LARGO_CONTEXTO = 400
 AVISO_SIN_TRADUCIR = (
     "La primera vez lo devolviste igual al original: tradúcelo al español (solo es igual un nombre propio)."
 )
+#: Prefijo del motivo de rechazo cuando falta un término del glosario; lo que sigue es «inglés=español; …».
+MOTIVO_TERMINOLOGIA = "terminología: "
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
 
 
@@ -60,6 +62,7 @@ class Traductor:
         usar_lotes: bool = False,
         contexto: str = "",
         ejemplos: Ejemplos | None = None,
+        glosario_estricto: bool = True,
     ) -> None:
         if dialecto not in DIALECTOS:
             raise ValueError(f"Dialecto desconocido: {dialecto}")
@@ -79,6 +82,8 @@ class Traductor:
         self.contexto = " ".join(contexto.split())[:LARGO_CONTEXTO]
         #: Traducciones ya hechas de textos parecidos; crece con lo que se traduce en esta ejecución
         self.ejemplos = ejemplos if ejemplos is not None else Ejemplos()
+        #: Rechazar (y reintentar con aviso) una traducción a la que le falta un término del glosario
+        self.glosario_estricto = glosario_estricto
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
@@ -133,8 +138,9 @@ class Traductor:
                 # A los que volvieron iguales al original se les avisa; si siguen iguales se aceptan (nombres propios)
                 reintento = dict(pistas)
                 for n in nucleos:
-                    if resultado.rechazados.get(n) == "sin traducir":
-                        reintento[n] = f"{pistas[n]} · {AVISO_SIN_TRADUCIR}" if pistas.get(n) else AVISO_SIN_TRADUCIR
+                    aviso = self._aviso_de_reintento(resultado.rechazados.get(n, ""))
+                    if aviso:
+                        reintento[n] = f"{pistas[n]} · {aviso}" if pistas.get(n) else aviso
                 resultado.rechazados.clear()
                 # Lotes chicos y sin mover la barra de progreso, que ya llegó al total
                 # (en modo normal aunque se use la Batch API: son pocos y no vale la pena esperar otro trabajo)
@@ -147,6 +153,16 @@ class Traductor:
                 self.registro(f"{n} textos se quedan en inglés porque no pasaron la validación.")
         resultado.traducciones = self.conocidas(unicos, ambito)
         return resultado
+
+    @staticmethod
+    def _aviso_de_reintento(motivo: str) -> str:
+        """Qué decirle al motor en el segundo intento según por qué se rechazó el primero."""
+        if motivo == "sin traducir":
+            return AVISO_SIN_TRADUCIR
+        if motivo.startswith(MOTIVO_TERMINOLOGIA):
+            terminos = motivo.removeprefix(MOTIVO_TERMINOLOGIA)
+            return f"Usa exactamente estos términos del glosario: {terminos}."
+        return ""
 
     def _unificar_terminos(self, faltan: list[str], ambito: str) -> bool:
         """Traduce primero los términos que se repiten en los nombres y los fija en el glosario del pack.
@@ -234,8 +250,8 @@ class Traductor:
         fallidos: set[str] = set()
         hechos = 0
         total = sum(len(lote) for lote in lotes)
-        for lote, (_, mascaras), salida in zip(lotes, pedidos, salidas, strict=True):
-            buenos = self._procesar(lote, mascaras, salida, resultado, tolerante)
+        for lote, (pedido, mascaras), salida in zip(lotes, pedidos, salidas, strict=True):
+            buenos = self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario)
             self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
             fallidos.update(n for n in lote if n not in buenos)
             hechos += len(lote)
@@ -259,7 +275,7 @@ class Traductor:
         if self.cancelar.is_set():
             return {}
         pedido, mascaras = self._pedido(lote, ambito, pistas)
-        return self._procesar(lote, mascaras, self.motor.traducir_lote(pedido), resultado, tolerante)
+        return self._procesar(lote, mascaras, self.motor.traducir_lote(pedido), resultado, tolerante, pedido.glosario)
 
     def _procesar(
         self,
@@ -268,6 +284,7 @@ class Traductor:
         salida: Mapping[str, str],
         resultado: Resultado,
         tolerante: bool = False,
+        glosario: Mapping[str, str] | None = None,
     ) -> dict[str, str]:
         buenos: dict[str, str] = {}
         rechazados: dict[str, str] = {}
@@ -283,6 +300,10 @@ class Traductor:
             motivo = self.validador(n, final) if self.validador else None
             if not motivo and not tolerante and sin_traducir(n, final):
                 motivo = "sin traducir"
+            if not motivo and not tolerante and glosario and self.glosario_estricto:
+                faltan = terminos_faltantes(n, final, glosario)
+                if faltan:
+                    motivo = MOTIVO_TERMINOLOGIA + "; ".join(f"«{en}» = «{es}»" for en, es in faltan.items())
             if motivo:
                 rechazados[n] = motivo
                 continue
