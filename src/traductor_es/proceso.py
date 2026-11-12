@@ -21,7 +21,7 @@ from .motores.base import ErrorFatal, Motor
 from .motores.compatible import Compatible
 from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
-from .nucleo.ejemplos import Ejemplos
+from .nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
@@ -127,7 +127,7 @@ class Proceso:
         self._memoria_propia = memoria is None
         self.memoria = memoria or self._abrir_memoria()
         self.glosario = Glosario()
-        self.ejemplos = Ejemplos()
+        self.ejemplos = Ejemplos(cantidad=CANTIDAD_EN_LA_APP)
         self.ctx = Contexto(
             self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
         )

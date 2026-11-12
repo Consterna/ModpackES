@@ -23,7 +23,7 @@ from typing import Any
 from ..motores import fabrica
 from ..motores.base import Motor
 from ..nucleo import terminos as terminos_repetidos
-from ..nucleo.ejemplos import Ejemplos
+from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import Traductor
@@ -279,12 +279,13 @@ def medir(
     revisar: bool = False,
     glosario_estricto: bool = True,
     hilos: int = 4,
+    cantidad_ejemplos: int = CANTIDAD_EN_LA_APP,
 ) -> list[Medicion]:
     """Traduce el banco con el motor (memoria vacía) y devuelve la medición; con `revisar`, también la de después."""
     glosario = Glosario()
     glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario)
     with Memoria(":memory:") as memoria:
-        ejemplos = Ejemplos()
+        ejemplos = Ejemplos(cantidad=cantidad_ejemplos)
         ejemplos.agregar_pares(banco.ejemplos)
         limites = fabrica.limites_de_lote(motor)
         traductor = Traductor(

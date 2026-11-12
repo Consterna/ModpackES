@@ -18,6 +18,7 @@ from traductor_es.motores.base import Motor
 from traductor_es.motores.carga import Enfriador
 from traductor_es.motores.gemini import MODELO_POR_DEFECTO
 from traductor_es.motores.simulador import Simulador
+from traductor_es.nucleo.ejemplos import CANTIDAD_EN_LA_APP
 from traductor_es.validacion import medicion
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -42,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
         help="motor local: descansar entre pedidos (ciclo 70/30), vigilar la GPU (pausa sobre 80 °C) y usar 1 hilo",
     )
     ap.add_argument("--hilos", type=int, default=0, help="pedidos a la vez (0: 4, o 1 con --carga-segura)")
+    ap.add_argument(
+        "--n-ejemplos", type=int, default=CANTIDAD_EN_LA_APP, help="cuántos ejemplos parecidos se mandan por lote"
+    )
     ap.add_argument(
         "--sin-vecindad",
         action="store_true",
@@ -74,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         revisar=args.revisar,
         glosario_estricto=not args.glosario_laxo,
         hilos=args.hilos or (1 if args.carga_segura else 4),
+        cantidad_ejemplos=args.n_ejemplos,
     )
     for m in resultados:
         print(m.tabla(), end="\n\n")

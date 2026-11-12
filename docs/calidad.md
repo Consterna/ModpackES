@@ -139,6 +139,27 @@ Cómo repetirlo (con el servidor apagado al terminar y el puerto comprobado ante
 llama-server -m modelo.gguf --host 127.0.0.1 --port 8089 -c 4096 -ngl 12 -t 4 -np 1 --no-webui
 uv run python scripts/medir_calidad.py --motor personalizado --direccion http://127.0.0.1:8089/v1 --modelo gemma-4-e2b --carga-segura --banco .descargas/banco/referencia_100.json
 ```
+## 12 de noviembre de 2026 · referencias limpias: los ejemplos de otros mods no ayudan
+
+Al revisar los textos con peor chrF vi que muchas «referencias» de los mods eran traducciones a medias, con inglés y
+español mezclados («Conveyor Belt Interruptor de», «Nivel II is better than Nivel I»). Castigaban traducciones buenas. Ahora
+`armar_banco_local.py` descarta los pares cuya referencia comparte demasiadas palabras con el inglés (unos 1.500 de 13.900)
+y el chrF del mismo motor sube a ~75. Con ese banco limpio (399 textos, Gemini 3.8 Flash, tres corridas por condición):
+
+| Comparación | Diferencia de chrF (IC 95 %) |
+|---|---|
+| Sin pistas ni ejemplos → pistas y 8 ejemplos (el PR 4 completo) | −0,54 (−1,64 a +0,60), no se distingue del ruido |
+| Sin pistas ni ejemplos → solo pistas | +0,70 (−0,18 a +1,59), no se distingue del ruido |
+| Solo pistas → pistas y 8 ejemplos | **−1,24 (−2,26 a −0,27), empeora** |
+
+- La ganancia de +1,4 que medí antes del PR 4 con el banco sucio **no se reproduce**: era en parte ruido de las referencias.
+- Mandar ejemplos de otros mods empeora un poco el chrF con Gemini (también −0,64, sin significación, con el banco
+  anterior). Una explicación posible es que cada mod tiene su propio vocabulario y los ejemplos arrastran el de otros.
+  Por eso **la app ya no manda ejemplos por defecto** (`CANTIDAD_EN_LA_APP = 0`); el código sigue y `medir_calidad.py
+  --n-ejemplos N` permite probarlos, sobre todo con modelos locales pequeños, que no se midieron.
+- Las pistas (clave y tipo) quedan: no empeoran y la tendencia es positiva (+0,70), aunque no es concluyente.
+- Los modelos no usaban regionalismos de España: busqué «vosotros», «ordenador», «zumo», «coger» y formas en «-áis/-éis» en
+  las salidas de Gemini y de Gemma E2B y no apareció ninguno, así que no hice un chequeo de dialecto.
 ## 12 de noviembre de 2026 · contexto de vecindad en misiones
 
 Cada texto de una misión (y de un libro) ahora lleva el título bajo el que está y la línea que viene antes, además
