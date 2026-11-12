@@ -20,8 +20,8 @@ class Entrada:
     id: str
     texto: str  #: ya enmascarado
     pista: str = ""  #: contexto corto, p. ej. «item.create.wrench» o «misión: título»
+    traduccion: str = ""  #: solo para revisar o comparar: la traducción que hay que juzgar (también enmascarada)
     alternativa: str = ""  #: solo para comparar: la otra traducción (también enmascarada)
-    traduccion: str = ""  #: solo para revisar: la traducción que hay que juzgar (también enmascarada)
 
 
 @dataclass(frozen=True, slots=True)
