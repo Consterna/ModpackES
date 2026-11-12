@@ -158,6 +158,108 @@ def _html(args: argparse.Namespace) -> int:
     return 0
 
 
+_PLANTILLA_AB = """<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comparación A/B</title>
+<style>
+:root{--fondo:#fafaf7;--tarjeta:#fff;--texto:#1f2328;--suave:#656d76;--borde:#d8dee4;--acento:#0969da;--ok:#1a7f37}
+@media(prefers-color-scheme:dark){:root{--fondo:#0d1117;--tarjeta:#161b22;--texto:#e6edf3;--suave:#8b949e;--borde:#30363d;--acento:#58a6ff;--ok:#3fb950}}
+*{box-sizing:border-box}body{margin:0;background:var(--fondo);color:var(--texto);font:16px/1.5 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+header{position:sticky;top:0;background:var(--fondo);padding:12px 0;border-bottom:1px solid var(--borde);z-index:2}
+h1{font-size:1.2rem;margin:0 0 4px}.sub{color:var(--suave);font-size:.9rem;margin:0 0 8px}
+.barra{height:8px;background:var(--borde);border-radius:4px;overflow:hidden}.barra>i{display:block;height:100%;background:var(--acento);width:0}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:10px;padding:14px;margin:14px 0}
+.tarjeta.hecha{opacity:.85}.n{color:var(--suave);font-size:.8rem}.ctx{color:var(--suave);font-size:.8rem;margin:4px 0}
+.t{margin:6px 0;padding:8px 10px;border-radius:6px;white-space:pre-wrap;word-break:break-word}
+.en{background:color-mix(in srgb,var(--borde) 40%,transparent)}.opc{border-left:3px solid var(--borde)}
+.opc b{display:block;font-size:.75rem;color:var(--suave)}
+.botones{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);cursor:pointer;min-height:40px}
+button.on{background:var(--acento);color:#fff;border-color:var(--acento)}
+textarea{width:100%;min-height:90px;margin-top:10px;background:var(--fondo);color:var(--texto);border:1px solid var(--borde);border-radius:6px;padding:8px;font:13px/1.4 ui-monospace,monospace}
+</style></head><body><main>
+<header><h1>Comparación A/B</h1>
+<p class="sub">Elige cuál traducción es mejor, <b>A</b> o <b>B</b>, o <b>Igual</b> si las dejarías las dos o ninguna es mejor. No sabes cuál es la vieja y cuál la nueva.</p>
+<div class="barra"><i id="progreso"></i></div><div class="sub" id="resumen"></div></header>
+<div id="lista"></div>
+<p><button id="copiar" class="on">Mostrar resultados</button></p><textarea id="salida" readonly placeholder="Aquí aparece el resumen"></textarea>
+</main>
+<script>
+const DATOS = __DATOS__;
+const CLAVE = "hoja_ab_v1";
+let estado = {};
+try { estado = JSON.parse(localStorage.getItem(CLAVE) || "{}"); } catch (e) {}
+const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) {} };
+const h = (s) => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const lista = document.getElementById("lista");
+DATOS.forEach((d, i) => {
+  const t = document.createElement("section"); t.className = "tarjeta"; t.id = "t" + i;
+  t.innerHTML = `<div class="n">${i + 1} de ${DATOS.length} · ${d.tipo}</div><div class="ctx">${h(d.contexto)}</div>
+    <div class="t en" lang="en">${h(d.original)}</div>
+    <div class="t opc"><b>A</b>${h(d.a)}</div><div class="t opc"><b>B</b>${h(d.b)}</div>
+    <div class="botones"><button data-v="A">A es mejor</button><button data-v="B">B es mejor</button><button data-v="I">Igual</button></div>`;
+  t.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { estado[i] = {v: b.dataset.v}; guardar(); pintar(); }));
+  lista.appendChild(t);
+});
+function ganador(i) {
+  const v = (estado[i] || {}).v; if (!v) return null; if (v === "I") return "igual";
+  return (v === "A") === (DATOS[i].ahoraEsA) ? "ahora" : "antes";
+}
+function pintar() {
+  let n = {ahora: 0, antes: 0, igual: 0};
+  DATOS.forEach((_, i) => {
+    const g = ganador(i), t = document.getElementById("t" + i);
+    t.classList.toggle("hecha", !!g);
+    t.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.v === (estado[i] || {}).v));
+    if (g) n[g]++;
+  });
+  const hechas = n.ahora + n.antes + n.igual;
+  document.getElementById("progreso").style.width = (100 * hechas / DATOS.length) + "%";
+  document.getElementById("resumen").textContent = `${hechas} de ${DATOS.length} marcadas`;
+}
+document.getElementById("copiar").addEventListener("click", () => {
+  const n = {ahora: 0, antes: 0, igual: 0};
+  const filas = DATOS.map((_, i) => { const g = ganador(i); if (g) n[g]++; return `${i + 1}:${g || "-"}`; });
+  const o = document.getElementById("salida");
+  o.value = `AB ${DATOS.length} · ahora ${n.ahora} · antes ${n.antes} · igual ${n.igual}\\n` + filas.join(" ");
+  o.focus(); o.select();
+});
+pintar();
+</script></body></html>
+"""
+
+
+def _ab(args: argparse.Namespace) -> int:
+    antes: list[dict[str, Any]] = json.loads(args.antes.read_text(encoding="utf-8"))[-1]["traducciones"]
+    ahora: list[dict[str, Any]] = json.loads(args.ahora.read_text(encoding="utf-8"))[-1]["traducciones"]
+    nuevas = {t["original"]: t["traduccion"] for t in ahora}
+    azar = random.Random(7)
+    filas = []
+    for t in antes:
+        otra = nuevas.get(t["original"])
+        if otra is None or otra == t["traduccion"]:
+            continue
+        ahora_es_a = azar.random() < 0.5  # a ciegas: no se sabe cuál es la nueva
+        a, b = (otra, t["traduccion"]) if ahora_es_a else (t["traduccion"], otra)
+        tipo = "Misión" if t["ambito"] == "mision" else "Interfaz de un mod"
+        filas.append(
+            {
+                "tipo": tipo,
+                "contexto": t.get("pista", ""),
+                "original": t["original"],
+                "a": a,
+                "b": b,
+                "ahoraEsA": ahora_es_a,
+            }
+        )
+    pagina = _PLANTILLA_AB.replace("__DATOS__", json.dumps(filas, ensure_ascii=False).replace("</", "<\\/"))
+    destino = RAIZ / "build" / "hoja_ab.html"
+    destino.write_text(pagina, encoding="utf-8")
+    print(f"{len(filas)} textos que cambian en {destino}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # pyright: ignore[reportAttributeAccessIssue]
     ap = argparse.ArgumentParser(description=__doc__)
@@ -169,6 +271,10 @@ def main(argv: list[str] | None = None) -> int:
     h = sub.add_parser("html", help="armar la página de revisión")
     h.add_argument("--entrada", type=Path, default=RAIZ / "build" / "hoja.json")
     h.set_defaults(func=_html)
+    ab = sub.add_parser("ab", help="comparar a ciegas dos versiones")
+    ab.add_argument("--antes", type=Path, required=True)
+    ab.add_argument("--ahora", type=Path, required=True)
+    ab.set_defaults(func=_ab)
     args = ap.parse_args(argv)
     return int(args.func(args))
 
