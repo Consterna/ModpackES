@@ -60,7 +60,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
         with:
           distribution: temurin
-          java-version: "8"  # Minecraft 1.16.5 (Forge 1.16.5) se compila con Java 8
+          java-version: "8"  # Forge 1.12.2 (ForgeGradle 2.3) corre con Java 8 y Minecraft 1.16.5 (Forge 1.16.5) se compila con Java 8
 
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
         with:

@@ -1,0 +1,15 @@
+[
+  {
+    "modid": "${id}",
+    "name": "${name}",
+    "description": "${desc}",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "authorList": ["${authors}"],
+    "credits": "",
+    "url": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
