@@ -436,8 +436,8 @@ def test_cerrar_con_conexion_bloqueada_espera_a_que_termine(qtbot: QtBot, monkey
     assert sondeo is not None
     assert v.close() is False  # todavía no: el hilo sigue vivo
     assert sondeo.isRunning() and v.isHidden() and not v.aceptado
-    soltar.set()
-    qtbot.waitUntil(lambda: v.aceptado and not sondeo.isRunning(), timeout=10000)  # se cierra sola al terminar
+    soltar.set()  # desde aquí el QThread puede estar ya borrado (deleteLater): no se le pregunta nada
+    qtbot.waitUntil(lambda: v.aceptado and v._sondeo is None, timeout=10000)  # pyright: ignore[reportPrivateUsage]
 
 
 def test_soltar_la_carpeta_de_un_modpack(qtbot: QtBot, tmp_path: Path) -> None:
