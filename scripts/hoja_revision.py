@@ -26,23 +26,31 @@ from typing import Any
 
 import descargar_corpus as dc
 
+from traductor_es import configuracion
+
 RAIZ = Path(__file__).resolve().parent.parent
 
 
 def _banco(args: argparse.Namespace) -> int:
-    azar = random.Random(2026)
+    azar = random.Random(args.semilla)
+    vistos: set[str] = set()  # textos de hojas anteriores: una hoja nueva no los repite
+    for previa in args.excluir:
+        vistos |= {t["original"] for t in json.loads(previa.read_text(encoding="utf-8"))["textos"]}
     ui: dict[str, Any] = json.loads((dc.RAIZ / "banco" / "ui_final.json").read_text(encoding="utf-8"))
     mis: dict[str, Any] = json.loads((dc.RAIZ / "banco" / "misiones.json").read_text(encoding="utf-8"))
-    nombres = [t for t in ui["textos"] if len(t["original"].split()) <= 3]
-    frases = [t for t in ui["textos"] if len(t["original"].split()) >= 5]
+    nuevos = [t for t in ui["textos"] if t["original"] not in vistos]
+    nombres = [t for t in nuevos if len(t["original"].split()) <= 3]
+    frases = [t for t in nuevos if len(t["original"].split()) >= 5]
     mitad = args.ui // 2
     elegidos = azar.sample(nombres, min(mitad, len(nombres))) + azar.sample(frases, min(args.ui - mitad, len(frases)))
-    elegidos += azar.sample(mis["textos"], min(args.misiones, len(mis["textos"])))
+    pendientes = [t for t in mis["textos"] if t["original"] not in vistos]
+    elegidos += azar.sample(pendientes, min(args.misiones, len(pendientes)))
     azar.shuffle(elegidos)
     banco = {
         "descripcion": "Muestra para revisión humana; solo uso local (no se publica).",
         "dialecto": ui["dialecto"],
-        "glosario": ui["glosario"],
+        # Como en la app: los términos del usuario (glosario.json) mandan sobre los del banco
+        "glosario": {**ui["glosario"], **configuracion.leer_glosario_usuario()},
         "textos": [{**t, "referencia": ""} for t in elegidos],  # sin referencia: se juzga a mano
     }
     destino = dc.RAIZ / "banco" / "hoja.json"
@@ -86,7 +94,7 @@ input.nota{width:100%;margin-top:8px;padding:8px;border:1px solid var(--borde);b
 </main>
 <script>
 const DATOS = __DATOS__;
-const CLAVE = "hoja_revision_v1";
+const CLAVE = "hoja_revision_" + DATOS.reduce((h, d) => (h * 31 + [...d.original].reduce((x, c) => (x * 31 + c.charCodeAt(0)) | 0, 0)) | 0, 7);
 let estado = {};
 try { estado = JSON.parse(localStorage.getItem(CLAVE) || "{}"); } catch (e) {}
 const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) {} };
@@ -187,7 +195,7 @@ textarea{width:100%;min-height:90px;margin-top:10px;background:var(--fondo);colo
 </main>
 <script>
 const DATOS = __DATOS__;
-const CLAVE = "hoja_ab_v1";
+const CLAVE = "hoja_ab_" + DATOS.reduce((h, d) => (h * 31 + [...d.original].reduce((x, c) => (x * 31 + c.charCodeAt(0)) | 0, 0)) | 0, 7);
 let estado = {};
 try { estado = JSON.parse(localStorage.getItem(CLAVE) || "{}"); } catch (e) {}
 const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) {} };
@@ -267,6 +275,10 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("banco", help="armar la muestra")
     b.add_argument("--ui", type=int, default=60)
     b.add_argument("--misiones", type=int, default=40)
+    b.add_argument("--semilla", type=int, default=2026, help="otra semilla da otra muestra")
+    b.add_argument(
+        "--excluir", type=Path, nargs="*", default=[], help="hojas anteriores (hoja.json) cuyos textos no se repiten"
+    )
     b.set_defaults(func=_banco)
     h = sub.add_parser("html", help="armar la página de revisión")
     h.add_argument("--entrada", type=Path, default=RAIZ / "build" / "hoja.json")
