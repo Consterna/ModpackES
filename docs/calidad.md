@@ -80,6 +80,21 @@ en dos órdenes de lectura. El banco local ahora agrega «familias» de nombres 
   todos de terminología, pero solo coincidió en el 12 % entre los dos órdenes de lectura: con una sola pasada no es
   una métrica confiable. Antes de usarlo para decidir hace falta repetirlo varias veces y votar, o usar otro modelo.
 
+## 12 de noviembre de 2026 · glosario estricto
+
+Si un término del glosario sale en el original y su traducción no sale en el resultado (se toleran plurales, tildes
+y mayúsculas), el texto se reintenta con un aviso explícito («Usa exactamente estos términos: …»). Si tras el
+reintento sigue sin salir, se acepta. `medir_calidad.py --glosario-laxo` mide sin esta regla. Banco de 399 textos y un
+glosario de 2.101 términos sacado de otros mods, Gemini 3.8 Flash, tres corridas:
+
+| | Términos respetados (corridas 1 a 3) | chrF |
+|---|---|---|
+| Laxo | 29, 32 y 33 de 37 | 70,9 |
+| Estricto | 32, 32 y 33 de 37 | 70,9 (diferencia +0,06, IC −0,41 a +0,51) |
+
+El efecto es pequeño: Gemini ya respeta casi todos los términos y la regla recupera uno o dos más sin tocar el chrF.
+Se queda como red de seguridad, que importará más con modelos locales y con glosarios del usuario.
+
 ## Cómo repetirlo
 
 ```
