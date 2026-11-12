@@ -21,6 +21,7 @@ from .motores.base import ErrorFatal, Motor
 from .motores.compatible import Compatible
 from .motores.gemini import PRECIOS, Gemini
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
+from .nucleo.ejemplos import Ejemplos
 from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
@@ -126,12 +127,13 @@ class Proceso:
         self._memoria_propia = memoria is None
         self.memoria = memoria or self._abrir_memoria()
         self.glosario = Glosario()
+        self.ejemplos = Ejemplos()
         self.ctx = Contexto(
             self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
         )
         self.traductor = Traductor(
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
-            usar_lotes=usar_lotes, contexto=contexto,
+            usar_lotes=usar_lotes, contexto=contexto, ejemplos=self.ejemplos,
         )  # fmt: skip
         self.motor = motor
         if isinstance(motor, Compatible):
@@ -152,10 +154,15 @@ class Proceso:
         orden = [self.ctx.dialecto, *(v for v in ("es_mx", "es_es", *VARIANTES) if v != self.ctx.dialecto)]
         for ns in ["minecraft", *sorted(n for n in tabla.datos if n != "minecraft")]:
             ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
+            todo_ingles = tabla.textos(ns, "en_us")
             for variante in dict.fromkeys(orden):
                 self.glosario.agregar_pares(ingles, tabla.textos(ns, variante))
+                self.ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
+        self.ejemplos.agregar_pares(self.memoria.recientes(self.ctx.dialecto))
         self._glosario_listo = True
         self.registro(f"Glosario: {len(self.glosario)} términos oficiales")
+        if len(self.ejemplos):
+            self.registro(f"Ejemplos para guiar al motor: {len(self.ejemplos)} textos ya traducidos")
 
     def modulos(self) -> list[tuple[str, Modulo]]:
         """Módulos elegidos, en el orden en que se traducen (mods primero: sus nombres alimentan el glosario)."""

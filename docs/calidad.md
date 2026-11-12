@@ -44,6 +44,22 @@ quedan en inglés. Es útil para traducir sin conexión ni costo, pero con menos
 que Gemini. Se midió en una RTX 4050 con 6 GB, usando unos 2 GB de RAM; el modelo no se incluye en el
 instalador.
 
+## 11 de noviembre de 2026 · contexto, ejemplos y términos fijos
+
+Mismos textos reales de mods (250 de interfaz), medidos con Gemini 3.8 Flash, con y sin las mejoras de precisión:
+cada texto va con su clave y su tipo, el motor recibe ejemplos de textos parecidos ya traducidos, los términos que
+se repiten en los nombres se traducen primero y los nombres devueltos sin traducir se reintentan. Para que la
+comparación sea justa, la mitad de los mods se mide y los ejemplos salen solo de la otra mitad.
+
+| chrF | Corrida 1 | Corrida 2 | Corrida 3 | Promedio |
+|---|---|---|---|---|
+| Sin pistas ni ejemplos (`--sin-contexto`) | 69,2 | 69,0 | 68,4 | 68,9 |
+| Con pistas y ejemplos | 70,3 | 70,5 | 71,1 | 70,6 |
+
+La mejora es de unos 1,7 puntos y se repitió en las tres corridas, pero es pequeña frente a la variación entre
+corridas (hasta 0,8). Lo que más se espera de las pistas y los ejemplos es consistencia de términos dentro de un
+modpack, que chrF mide mal porque compara con una sola referencia. No se midió con modelos locales.
+
 ## Cómo repetirlo
 
 ```
@@ -51,6 +67,7 @@ uv run python scripts/medir_calidad.py --revisar
 uv run python scripts/medir_calidad.py --motor ollama --modelo NOMBRE --revisar
 uv run python scripts/armar_banco_local.py
 uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.json
+uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.json --sin-contexto
 ```
 
 El costo es una estimación con los precios de Google de noviembre de 2026, no lo que cobró la API.

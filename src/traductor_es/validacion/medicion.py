@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from ..motores.base import Motor
+from ..nucleo.ejemplos import Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import Traductor
@@ -34,6 +35,7 @@ class Caso:
     ambito: str
     original: str
     referencia: str
+    pista: str = ""  #: de dónde sale el texto (clave y tipo), como lo manda la app
 
 
 @dataclass(slots=True)
@@ -41,12 +43,20 @@ class Banco:
     dialecto: str
     glosario: dict[str, str]
     casos: list[Caso]
+    #: Traducciones ya hechas de otros textos del mismo modpack ({inglés: español}); guían al motor
+    ejemplos: dict[str, str] = field(default_factory=dict[str, str])
 
     @classmethod
     def leer(cls, ruta: Path) -> Banco:
         datos: Any = json.loads(ruta.read_text(encoding="utf-8"))
-        casos = [Caso(str(t["ambito"]), str(t["original"]), str(t["referencia"])) for t in datos["textos"]]
-        return cls(str(datos.get("dialecto", "es_mx")), {str(k): str(v) for k, v in datos["glosario"].items()}, casos)
+        casos = [
+            Caso(str(t["ambito"]), str(t["original"]), str(t["referencia"]), str(t.get("pista", "")))
+            for t in datos["textos"]
+        ]
+        ejemplos = {str(k): str(v) for k, v in datos.get("ejemplos", {}).items()}
+        return cls(
+            str(datos.get("dialecto", "es_mx")), {str(k): str(v) for k, v in datos["glosario"].items()}, casos, ejemplos
+        )
 
 
 def _ngramas(texto: str, n: int) -> Counter[str]:
@@ -162,12 +172,17 @@ def medir(
     glosario = Glosario()
     glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario)
     with Memoria(":memory:") as memoria:
-        traductor = Traductor(motor, memoria, glosario, banco.dialecto, validador=validar)
+        ejemplos = Ejemplos()
+        ejemplos.agregar_pares(banco.ejemplos)
+        traductor = Traductor(motor, memoria, glosario, banco.dialecto, validador=validar, ejemplos=ejemplos)
         por_ambito: dict[str, list[str]] = {}
+        pistas: dict[str, str] = {}
         for caso in banco.casos:
             por_ambito.setdefault(caso.ambito, []).append(caso.original)
+            if caso.pista:
+                pistas[caso.original] = caso.pista
         inicio = time.perf_counter()
-        resultados = {ambito: traductor.traducir(textos, ambito) for ambito, textos in por_ambito.items()}
+        resultados = {ambito: traductor.traducir(textos, ambito, pistas) for ambito, textos in por_ambito.items()}
         segundos = time.perf_counter() - inicio
         informe = Informe(
             [

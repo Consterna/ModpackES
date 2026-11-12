@@ -96,9 +96,24 @@ class Modulo(Protocol):
     def restaurar(self) -> list[Path]: ...
 
 
+#: Cuántas pistas distintas se mandan por texto cuando el mismo texto sale en varios sitios.
+MAX_PISTAS = 3
+
+
+def reunir_pistas(piezas: list[Pieza]) -> dict[str, str]:
+    """{texto: pista}. Si el mismo texto sale con varias pistas (claves distintas), se juntan hasta 3."""
+    por_texto: dict[str, list[str]] = {}
+    for p in piezas:
+        if p.pista:
+            vistas = por_texto.setdefault(p.texto, [])
+            if p.pista not in vistas and len(vistas) < MAX_PISTAS:
+                vistas.append(p.pista)
+    return {texto: " | ".join(vistas) for texto, vistas in por_texto.items()}
+
+
 def traducir_modulo(modulo: Modulo, traductor: Traductor) -> Resumen:
     """Recolecta los textos del módulo, los traduce (memoria, glosario o motor) y escribe el resultado."""
     piezas = modulo.recolectar()
-    pistas = {p.texto: p.pista for p in piezas if p.pista}
+    pistas = reunir_pistas(piezas)
     resultado = traductor.traducir([p.texto for p in piezas], modulo.ambito, pistas)
     return modulo.escribir(resultado.traducciones)

@@ -38,6 +38,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **Traducciones más precisas.** Cada texto de un mod va ahora con de dónde sale y qué es («nombre de un objeto», «tooltip», «disco de música»…), y si el mismo texto sale en varios sitios se mandan hasta tres pistas. El motor recibe además ejemplos de textos parecidos ya traducidos (el español que traen los mods del modpack, la memoria y lo que se va traduciendo en esa misma ejecución) para seguir los mismos términos y estilo. Los términos que se repiten en los nombres («Moon Berries» en «Moon Berries Pie», «Moon Berries Jam»…) se traducen primero y se fijan en el glosario, para que todos los nombres usen la misma palabra. Un nombre que el motor devuelve igual al original se reintenta con un aviso; si sigue igual, se acepta. Con 250 textos reales de mods y Gemini 3.8 Flash, el chrF subió de 68,9 a 70,6 (promedio de tres corridas); ver [docs/calidad.md](docs/calidad.md).
+
 - El kit para servidores incluye las funciones y los logros traducidos dondequiera que estén, también los de un datapack comprimido (`.zip`); los `.zip` que solo traen tips siguen fuera porque son de cliente.
 - «Instalar el mod de apoyo» copia el mod nuevo antes de borrar los viejos, para no dejarte sin mod si la copia falla, y «Estado del mod de apoyo» avisa cuando el jar instalado es de otra versión de Minecraft en lugar de decir que todo está listo.
 

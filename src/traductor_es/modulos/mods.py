@@ -28,6 +28,48 @@ _CLAVES_DE_NOMBRES = (
 )
 
 
+#: (prefijo o sufijo de la clave, qué es) en orden: lo primero que coincide manda.
+_TIPOS_POR_SUFIJO = (((".desc", ".description", ".tooltip", ".info", ".lore"), "descripción o tooltip de un objeto"),)
+_TIPOS_POR_PREFIJO = (
+    ("item.", "nombre de un objeto"),
+    ("block.", "nombre de un bloque"),
+    ("entity.", "nombre de una criatura o entidad"),
+    ("effect.", "nombre de un efecto de poción"),
+    ("enchantment.", "nombre de un encantamiento"),
+    ("biome.", "nombre de un bioma"),
+    ("fluid", "nombre de un fluido"),
+    ("jukebox_song.", "nombre de un disco de música"),
+    ("advancements.", "logro"),
+    ("subtitles.", "subtítulo de un sonido"),
+    ("key.", "nombre de una tecla o categoría de controles"),
+    ("death.", "mensaje de muerte"),
+    ("commands.", "mensaje de un comando"),
+    ("container.", "título de un menú o contenedor"),
+    ("gui.", "texto de la interfaz"),
+    ("screen.", "texto de una pantalla"),
+    ("itemgroup.", "pestaña del inventario creativo"),
+    ("creativetab.", "pestaña del inventario creativo"),
+    ("tooltip.", "tooltip"),
+    ("message.", "mensaje al jugador"),
+    ("config.", "opción de configuración"),
+    ("options.", "opción de configuración"),
+    ("jei.", "texto de JEI/REI/EMI (recetas)"),
+    ("emi.", "texto de JEI/REI/EMI (recetas)"),
+    ("rei.", "texto de JEI/REI/EMI (recetas)"),
+)
+
+
+def tipo_de_clave(clave: str) -> str:
+    """Qué es el texto según su clave («nombre de un objeto», «tooltip»…); vacío si no se sabe."""
+    bajo = clave.lower()
+    for sufijos, tipo in _TIPOS_POR_SUFIJO:
+        if bajo.endswith(sufijos):
+            return tipo
+    if bajo.startswith("item.") and any(m in bajo for m in ("music_disc", "record")):
+        return "nombre de un disco de música"
+    return next((tipo for prefijo, tipo in _TIPOS_POR_PREFIJO if bajo.startswith(prefijo)), "")
+
+
 def es_nombre(clave: str) -> bool:
     """La clave es el nombre de un objeto, bloque, criatura… (y no una descripción o un tooltip)."""
     return clave.startswith(_CLAVES_DE_NOMBRES) and not clave.endswith((".desc", ".description", ".tooltip", ".info"))
@@ -58,7 +100,13 @@ class Mods:
         copiados = sum(1 for p in self._pendientes if p.existente is not None)
         if copiados:
             self.ctx.registro(f"{copiados} textos se copian de otra variante de español, sin gastar")
-        return [Pieza(p.ingles, f"{p.namespace}: {p.clave}") for p in self._pendientes if p.existente is None]
+        return [Pieza(p.ingles, self.pista(p.namespace, p.clave)) for p in self._pendientes if p.existente is None]
+
+    @staticmethod
+    def pista(namespace: str, clave: str) -> str:
+        """«mod: clave · tipo»: de dónde sale el texto y qué es, para elegir el sentido correcto."""
+        tipo = tipo_de_clave(clave)
+        return f"{namespace}: {clave} · {tipo}" if tipo else f"{namespace}: {clave}"
 
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
         resumen = Resumen()
