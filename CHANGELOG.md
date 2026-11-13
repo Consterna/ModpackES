@@ -40,6 +40,12 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **Controles de forma sin depender del modelo.** Atacan lo que más se corrigió en la revisión humana de 100 textos:
+  - Mayúsculas: un término del glosario que el original escribe como nombre propio («the Quantum Ring») sale con las mayúsculas del glosario («el Anillo Cuántico»). Los nombres del juego («Lingote de hierro», «Cofre») siguen en minúscula en medio de una frase.
+  - Nombres que no se traducen: los del juego («Creeper», «Redstone») y los de una palabra que el modelo dejó igual al traducir los mods («Arachnarch») se protegen. Si una misión los traduce, se reintenta.
+  - Palabras repetidas: un nombre corto que repite una palabra que el original no repite («Mejora de Salud mejorada») se reintenta.
+  - Reintento acotado: el segundo intento recibe la primera traducción y se le pide corregir solo lo que falló. Si el término sigue en inglés, se cambia por el del glosario; lo que no se puede arreglar se acepta y se avisa como «aceptado con dudas».
+- **Gemini 3.5 Flash-Lite, 3.6 Flash y posteriores ya no reciben `temperature`.** Google la ignora en esos modelos y anunció que las próximas generaciones la rechazarán. Además, cada modelo recibe un nivel de razonamiento que admite (la familia 4 no acepta «minimal»).
 - **El glosario ya no deja que un mod imponga su traducción a todo el modpack.** Los nombres del propio juego (primero es_mx, después es_es) mandan sobre los de un mod, y si dos mods traducen distinto el mismo término no se usa ninguno. Antes un mod que llamaba «Acechador de medianoche» a la vaca hacía que todo el modpack la tradujera así.
 - **Motores en tu PC (LM Studio, Ollama o un servidor en localhost):** los pedidos son más chicos (12 textos o 1.800 caracteres en vez de 60 o 5.000), porque un modelo pequeño se equivoca más con pedidos largos. Para medir sin saturar la GPU hay una «carga segura» en las herramientas de desarrollo (`medir_calidad.py --carga-segura`: pausas entre pedidos y espera si la GPU pasa de 80 °C).
 - **Ya no se mandan ejemplos de otros mods al motor.** Con referencias limpias, los ejemplos parecidos bajaron el chrF de Gemini (−1,2, intervalo de −2,3 a −0,3) y la ganancia que se había medido antes con el contexto no se reprodujo; las pistas (clave y tipo de cada texto) se mantienen. Los ejemplos siguen en el código para probarlos con modelos locales; ver [docs/calidad.md](docs/calidad.md).

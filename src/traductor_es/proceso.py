@@ -158,7 +158,10 @@ class Proceso:
             ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
             todo_ingles = tabla.textos(ns, "en_us")
             for variante in dict.fromkeys(orden):
-                self.glosario.agregar_pares(ingles, tabla.textos(ns, variante), fuente=ns, oficial=ns == "minecraft")
+                oficial = ns == "minecraft"  # los nombres del juego que no se traducen («Creeper») se protegen
+                self.glosario.agregar_pares(
+                    ingles, tabla.textos(ns, variante), fuente=ns, oficial=oficial, proteger_iguales=oficial
+                )
                 self.ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
         self.ejemplos.agregar_pares(self.memoria.recientes(self.ctx.dialecto))
         self._glosario_listo = True
@@ -272,6 +275,10 @@ class Proceso:
                 # Los nombres recién traducidos pasan al glosario: libros, misiones y scripts los usarán igual
                 nuevos = modulo.nombres(resultado.traducciones)
                 self.glosario.agregar_pares({en: en for en in nuevos}, nuevos)
+                # Un nombre de una sola palabra que el modelo dejó igual es un nombre propio («Arachnarch»): se
+                # protege para que las misiones no lo traduzcan. Con varias palabras suele ser un olvido.
+                iguales = {en: es for en, es in nuevos.items() if en == es and " " not in en}
+                self.glosario.agregar_pares({en: en for en in iguales}, iguales, proteger_iguales=True)
         relevantes = self.glosario.relevantes(todas, maximo=500)
         informe.revision = revisar_glosario(todas, relevantes, relevantes)
         informe.avisos.extend(self._avisos())

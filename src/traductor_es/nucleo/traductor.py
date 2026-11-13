@@ -9,7 +9,13 @@ from dataclasses import dataclass, field
 from typing import cast
 
 from ..motores.base import Cancelado, Entrada, Lote, Motor, MotorPorLotes
-from ..validacion.calidad import sin_traducir, terminos_faltantes
+from ..validacion.calidad import (
+    ajustar_mayusculas,
+    palabra_repetida,
+    reemplazar_en_ingles,
+    sin_traducir,
+    terminos_faltantes,
+)
 from . import terminos
 from .dialectos import DIALECTO_POR_DEFECTO, DIALECTOS
 from .ejemplos import Ejemplos
@@ -29,6 +35,8 @@ AVISO_SIN_TRADUCIR = (
 )
 #: Prefijo del motivo de rechazo cuando falta un término del glosario; lo que sigue es «inglés=español; …».
 MOTIVO_TERMINOLOGIA = "terminología: "
+#: Prefijo del motivo de rechazo cuando la traducción repite una palabra que el original no repite.
+MOTIVO_REPETIDA = "palabra repetida: "
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
 
 
@@ -43,6 +51,10 @@ class Resultado:
     enviados: int = 0
     #: Lo que el motor tradujo en esta ejecución (núcleo → traducción), sin lo que salió de la memoria
     nuevas: dict[str, str] = field(default_factory=dict[str, str])
+    #: Primera traducción de lo rechazado por términos o repeticiones (núcleo → borrador): el reintento la corrige
+    borradores: dict[str, str] = field(default_factory=dict[str, str])
+    #: Lo que se aceptó en el reintento sin cumplir todas las reglas (núcleo → motivo): conviene revisarlo
+    dudosos: dict[str, str] = field(default_factory=dict[str, str])
 
 
 class Traductor:
@@ -63,6 +75,7 @@ class Traductor:
         contexto: str = "",
         ejemplos: Ejemplos | None = None,
         glosario_estricto: bool = True,
+        controles_de_forma: bool = True,
     ) -> None:
         if dialecto not in DIALECTOS:
             raise ValueError(f"Dialecto desconocido: {dialecto}")
@@ -84,6 +97,9 @@ class Traductor:
         self.ejemplos = ejemplos if ejemplos is not None else Ejemplos()
         #: Rechazar (y reintentar con aviso) una traducción a la que le falta un término del glosario
         self.glosario_estricto = glosario_estricto
+        #: Mayúsculas del glosario, nombres que no se traducen, palabras repetidas y reparación del reintento.
+        #: Solo se apaga para medir cuánto aportan.
+        self.controles_de_forma = controles_de_forma
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
@@ -138,10 +154,11 @@ class Traductor:
                 # A los que volvieron iguales al original se les avisa; si siguen iguales se aceptan (nombres propios)
                 reintento = dict(pistas)
                 for n in nucleos:
-                    aviso = self._aviso_de_reintento(resultado.rechazados.get(n, ""))
+                    aviso = self._aviso_de_reintento(resultado.rechazados.get(n, ""), resultado.borradores.get(n))
                     if aviso:
                         reintento[n] = f"{pistas[n]} · {aviso}" if pistas.get(n) else aviso
                 resultado.rechazados.clear()
+                resultado.borradores.clear()
                 # Lotes chicos y sin mover la barra de progreso, que ya llegó al total
                 # (en modo normal aunque se use la Batch API: son pocos y no vale la pena esperar otro trabajo)
                 self._ronda(
@@ -151,18 +168,29 @@ class Traductor:
             if resultado.rechazados:
                 n = len(resultado.rechazados)
                 self.registro(f"{n} textos se quedan en inglés porque no pasaron la validación.")
+            if resultado.dudosos:
+                self.registro(f"{len(resultado.dudosos)} textos se aceptaron con dudas (términos o repeticiones).")
         resultado.traducciones = self.conocidas(unicos, ambito)
         return resultado
 
     @staticmethod
-    def _aviso_de_reintento(motivo: str) -> str:
-        """Qué decirle al motor en el segundo intento según por qué se rechazó el primero."""
+    def _aviso_de_reintento(motivo: str, borrador: str | None = None) -> str:
+        """Qué decirle al motor en el segundo intento según por qué se rechazó el primero.
+
+        Si hay un borrador, se le pide que corrija solo lo que falló y deje el resto igual: rehacer todo el texto
+        cambia cosas que estaban bien.
+        """
         if motivo == "sin traducir":
             return AVISO_SIN_TRADUCIR
         if motivo.startswith(MOTIVO_TERMINOLOGIA):
-            terminos = motivo.removeprefix(MOTIVO_TERMINOLOGIA)
-            return f"Usa exactamente estos términos del glosario: {terminos}."
-        return ""
+            regla = f"usa exactamente estos términos del glosario: {motivo.removeprefix(MOTIVO_TERMINOLOGIA)}"
+        elif motivo.startswith(MOTIVO_REPETIDA):
+            regla = f"no repitas «{motivo.removeprefix(MOTIVO_REPETIDA)}»: el original no repite esa palabra"
+        else:
+            return ""
+        if borrador:
+            return f"Tu primera traducción fue «{borrador}». Corrige solo esto y deja lo demás igual: {regla}."
+        return regla[0].upper() + regla[1:] + "."
 
     def _unificar_terminos(self, faltan: list[str], ambito: str) -> bool:
         """Traduce primero los términos que se repiten en los nombres y los fija en el glosario del pack.
@@ -288,6 +316,8 @@ class Traductor:
     ) -> dict[str, str]:
         buenos: dict[str, str] = {}
         rechazados: dict[str, str] = {}
+        borradores: dict[str, str] = {}
+        dudosos: dict[str, str] = {}
         for i, (n, m) in enumerate(zip(lote, mascaras, strict=True)):
             crudo = salida.get(str(i))
             if not isinstance(crudo, str) or not crudo.strip():
@@ -298,22 +328,66 @@ class Traductor:
                 rechazados[n] = "códigos dañados"
                 continue
             motivo = self.validador(n, final) if self.validador else None
-            if not motivo and not tolerante and sin_traducir(n, final):
-                motivo = "sin traducir"
-            if not motivo and not tolerante and glosario and self.glosario_estricto:
-                faltan = terminos_faltantes(n, final, glosario)
-                if faltan:
-                    motivo = MOTIVO_TERMINOLOGIA + "; ".join(f"«{en}» = «{es}»" for en, es in faltan.items())
             if motivo:
                 rechazados[n] = motivo
+                continue
+            if glosario and self.controles_de_forma:  # determinista: mayúsculas de los nombres propios del glosario
+                final = ajustar_mayusculas(n, final, self._con_mayusculas(glosario))
+            motivo = self._motivo_de_forma(n, final, glosario)
+            if motivo and tolerante:  # segundo intento: se arregla lo que se pueda y se acepta, marcado
+                if self.controles_de_forma:
+                    final, motivo = self._reparar(n, final, glosario, motivo)
+                    if motivo:
+                        dudosos[n] = motivo
+            elif motivo:
+                rechazados[n] = motivo
+                borradores[n] = final
                 continue
             buenos[n] = final
         self.ejemplos.agregar_pares(buenos)  # lo que ya se tradujo guía a los lotes que faltan
         with self._lock:
             resultado.enviados += len(lote)
             resultado.rechazados.update(rechazados)
+            resultado.borradores.update(borradores)
+            resultado.dudosos.update(dudosos)
             resultado.nuevas.update(buenos)
         return buenos
+
+    def _motivo_de_forma(self, original: str, final: str, glosario: Mapping[str, str] | None) -> str | None:
+        """Reglas que un reintento puede arreglar: sin traducir, términos del glosario y palabras repetidas."""
+        if sin_traducir(original, final):
+            return "sin traducir"
+        if glosario and self.glosario_estricto:
+            exigidos = glosario if self.controles_de_forma else {en: es for en, es in glosario.items() if en != es}
+            faltan = terminos_faltantes(original, final, exigidos)
+            if faltan:
+                return MOTIVO_TERMINOLOGIA + "; ".join(f"«{en}» = «{es}»" for en, es in faltan.items())
+        repetida = palabra_repetida(original, final) if self.controles_de_forma else None
+        return MOTIVO_REPETIDA + repetida if repetida else None
+
+    def _con_mayusculas(self, glosario: Mapping[str, str]) -> dict[str, str]:
+        """Términos cuyas mayúsculas se respetan: los del pack y del usuario. Los del juego («Cofre») no: en medio
+        de una frase en español los objetos del juego van en minúscula."""
+        return {en: es for en, es in glosario.items() if not self.glosario.del_juego(en)}
+
+    def _reparar(
+        self, original: str, final: str, glosario: Mapping[str, str] | None, motivo: str
+    ) -> tuple[str, str | None]:
+        """Arreglo determinista en el reintento: un término del glosario que quedó en inglés se cambia por el suyo.
+
+        Devuelve la traducción y el motivo que sigue sin resolverse (None si quedó bien). Lo que vuelve igual al
+        original en el reintento se acepta sin marcar: es un nombre propio.
+        """
+        if motivo == "sin traducir":
+            return final, None
+        if motivo.startswith(MOTIVO_TERMINOLOGIA) and glosario:
+            faltan = terminos_faltantes(original, final, glosario)
+            final, siguen = reemplazar_en_ingles(final, faltan)
+            final = ajustar_mayusculas(original, final, self._con_mayusculas(glosario))
+            if not siguen:
+                return final, None
+            return final, MOTIVO_TERMINOLOGIA + "; ".join(f"«{en}» = «{es}»" for en, es in siguen.items())
+        return final, motivo
 
     # ------------------------------------------------------------------ revisión
     def rehacer(self, motivos: Mapping[str, tuple[str, str]], ambito: str, pistas: Mapping[str, str]) -> dict[str, str]:

@@ -8,11 +8,13 @@ Con Gemini cuesta unos centavos; --simular no gasta nada.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from traductor_es import configuracion
 from traductor_es.modulos.base import quitar_vecindad
+from traductor_es.modulos.mods import es_nombre
 from traductor_es.motores import fabrica
 from traductor_es.motores.base import Motor
 from traductor_es.motores.carga import Enfriador
@@ -22,6 +24,22 @@ from traductor_es.nucleo.ejemplos import CANTIDAD_EN_LA_APP
 from traductor_es.validacion import medicion
 
 RAIZ = Path(__file__).resolve().parent.parent
+
+
+def nombres_del_juego(carpeta: Path, dialecto: str) -> dict[str, str]:
+    """{inglés: español} de los nombres de objetos, bloques y criaturas del juego (el dialecto primero)."""
+    ingles: dict[str, str] = json.loads((carpeta / "en_us.json").read_text(encoding="utf-8"))
+    salida: dict[str, str] = {}
+    for variante in dict.fromkeys((dialecto, "es_mx", "es_es")):
+        ruta = carpeta / f"{variante}.json"
+        if not ruta.is_file():
+            continue
+        traducido: dict[str, str] = json.loads(ruta.read_text(encoding="utf-8"))
+        for clave, en in ingles.items():
+            es = traducido.get(clave)
+            if es_nombre(clave) and isinstance(es, str) and en.strip() and es.strip():
+                salida.setdefault(en.strip(), es.strip())
+    return salida
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -51,6 +69,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="quitar de las pistas el título y la línea anterior (misiones y libros)",
     )
+    ap.add_argument(
+        "--sin-controles",
+        action="store_true",
+        help="sin los controles de forma (mayúsculas del glosario, nombres que no se traducen, repeticiones)",
+    )
+    ap.add_argument(
+        "--vanilla",
+        type=Path,
+        default=None,
+        help="carpeta con en_us.json, es_mx.json y es_es.json del juego: sus nombres entran como oficiales (como "
+        "en la app) si el banco no los trae",
+    )
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
@@ -64,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
         motor = fabrica.crear(args.motor, configuracion.leer_clave(args.motor), modelo, args.direccion, enfriador)
         nombre = f"{args.motor}:{modelo}"
     banco = medicion.Banco.leer(args.banco)
+    if args.vanilla is not None and not banco.juego:
+        banco.juego = nombres_del_juego(args.vanilla, banco.dialecto)
+        print(f"Nombres del juego: {len(banco.juego)}")
     if args.sin_vecindad:
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia, quitar_vecindad(c.pista)) for c in banco.casos]
     if args.sin_contexto:
@@ -79,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         glosario_estricto=not args.glosario_laxo,
         hilos=args.hilos or (1 if args.carga_segura else 4),
         cantidad_ejemplos=args.n_ejemplos,
+        controles_de_forma=not args.sin_controles,
     )
     for m in resultados:
         print(m.tabla(), end="\n\n")

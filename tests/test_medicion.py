@@ -30,6 +30,16 @@ def test_terminos_sin_distinguir_tildes_ni_mayusculas() -> None:
     assert medicion.terminos(casos, glosario) == (2, 1)
 
 
+def test_terminos_con_lema_acepta_plurales_como_wmt25() -> None:
+    glosario = {"Iron Ingot": "Lingote de hierro"}
+    casos = [
+        ("An Iron Ingot", "Un lingote de hierro"),  # forma exacta
+        ("Two Iron Ingot", "Dos lingotes de hierro"),  # otra forma de la misma palabra
+        ("An Iron Ingot", "Una barra de hierro"),  # no está
+    ]
+    assert medicion.terminos_con_lema(casos, glosario) == (3, 1, 2)
+
+
 def test_el_banco_es_coherente() -> None:
     banco = medicion.Banco.leer(BANCO)
     assert len(banco.casos) >= 140 and {c.ambito for c in banco.casos} == {"ui", "mision", "libro", "script"}
