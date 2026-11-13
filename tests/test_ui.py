@@ -663,6 +663,9 @@ def test_paquete_e_importar_desde_el_menu(qtbot: QtBot, tmp_path: Path, monkeypa
     qtbot.waitUntil(lambda: v2._hilo is None and lang.is_file(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
     assert json.loads(lang.read_text("utf-8"))["item.m.wrench"] == "Llave inglesa"
     assert "Importado (paquete): 1 traducción" in v2.log.toPlainText()
+    # La misión y el script no venían en el paquete: no se dice «ya está en español»
+    assert "Importado en parte" in v2.estado.text() and v2.aviso.tipo == "aviso"
+    assert v2.b_principal.text().startswith("Traducir")
 
     elegido["ruta"] = str(tmp_path / "publicar.zip")
     v2.a_exportar.trigger()

@@ -1030,8 +1030,15 @@ class Ventana(QMainWindow):
         self._limpiar_hilo()
         if isinstance(resultado, Informe):
             self.ultimo_informe = resultado
-            self._mostrar(resultado, hecho=accion in ("traducir", "importar"))
-            if accion == "analizar":
+            # Una importación incompleta deja textos en inglés: se muestra como un análisis, con su costo
+            parcial = accion == "importar" and resultado.a_traducir > 0
+            self._mostrar(resultado, hecho=accion in ("traducir", "importar") and not parcial)
+            if parcial:
+                self._estado = "traducir"  # el botón principal ofrece traducir con el motor lo que falta
+                faltan = f"{_miles(resultado.a_traducir)} textos siguen en inglés porque no venían en lo importado"
+                self.estado.setText(f"Importado en parte: {faltan}. Puedes traducirlos con el botón de abajo.")
+                self.aviso.mostrar(f"Traducción importada en parte: {faltan}.", "aviso")
+            elif accion == "analizar":
                 self._estado = "traducir"
                 if not self.bienvenida.isHidden():
                     self.bienvenida.setVisible(False)
