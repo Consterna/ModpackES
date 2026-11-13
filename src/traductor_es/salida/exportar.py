@@ -39,15 +39,6 @@ Para volver al inglés, copia de nuevo los archivos originales del modpack.
 """
 
 
-def _agregar_carpeta(zf: zipfile.ZipFile, carpeta: Path, prefijo: str = "") -> int:
-    n = 0
-    for ruta in sorted(carpeta.rglob("*")):
-        if ruta.is_file() and not ruta.name.endswith(".tmp"):
-            zf.write(ruta, prefijo + ruta.relative_to(carpeta).as_posix())
-            n += 1
-    return n
-
-
 def _es_dato_del_servidor(juego: Path, relativa: str) -> bool:
     """Funciones y logros de un datapack los lee el servidor; los tips son de cliente.
 
@@ -124,29 +115,34 @@ def exportar_pack(juego: Path, destino: Path, revisado: bool = False) -> int:
     pack = juego / "resourcepacks" / NOMBRE
     if not (pack / "pack.mcmeta").is_file():
         raise ValueError("Todavía no hay traducción de mods ni de libros para exportar: traduce primero.")
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zf:
+        return _escribir_pack(zf, juego, revisado)
+
+
+def _escribir_pack(zf: zipfile.ZipFile, juego: Path, revisado: bool) -> int:
+    """Los archivos del pack publicado dentro de `zf`: los del pack, más pack.png y el LEEME."""
+    pack = juego / "resourcepacks" / NOMBRE
     datos = datos_del_modpack(juego)
     assets = pack / "assets"
     mods = sorted(p.name for p in assets.iterdir() if p.is_dir() and p.name != "minecraft") if assets.is_dir() else []
-    destino.parent.mkdir(parents=True, exist_ok=True)
     n = 0
-    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zf:
-        for ruta in sorted(pack.rglob("*")):
-            relativa = ruta.relative_to(pack).as_posix()
-            if not ruta.is_file() or ruta.name.endswith(".tmp") or relativa in ("pack.png", _LEEME_PACK):
-                continue
-            datos_archivo = ruta.read_bytes()
-            if relativa == "pack.mcmeta":
-                datos_archivo = mcmeta_publicable(datos_archivo, datos)
-            zf.writestr(relativa, datos_archivo)
-            n += 1
-        icono = pack / "pack.png" if (pack / "pack.png").is_file() else _ICONO
-        if icono.is_file():
-            zf.write(icono, "pack.png")
-            n += 1
-        motores = motores_de(leer_marca(pack))
-        zf.writestr(_LEEME_PACK, leeme_pack(datos, motores, revisado, mods))
+    for ruta in sorted(pack.rglob("*")):
+        relativa = ruta.relative_to(pack).as_posix()
+        if not ruta.is_file() or ruta.name.endswith(".tmp") or relativa in ("pack.png", _LEEME_PACK):
+            continue
+        datos_archivo = ruta.read_bytes()
+        if relativa == "pack.mcmeta":
+            datos_archivo = mcmeta_publicable(datos_archivo, datos)
+        zf.writestr(relativa, datos_archivo)
         n += 1
-    return n
+    icono = pack / "pack.png" if (pack / "pack.png").is_file() else _ICONO
+    if icono.is_file():
+        zf.write(icono, "pack.png")
+        n += 1
+    motores = motores_de(leer_marca(pack))
+    zf.writestr(_LEEME_PACK, leeme_pack(datos, motores, revisado, mods))
+    return n + 1
 
 
 def exportar_kit_servidor(juego: Path, destino: Path) -> int:
@@ -167,7 +163,7 @@ def exportar_kit_servidor(juego: Path, destino: Path) -> int:
         if (pack / "pack.mcmeta").is_file():
             interno = io.BytesIO()
             with zipfile.ZipFile(interno, "w", zipfile.ZIP_DEFLATED) as zpack:
-                _agregar_carpeta(zpack, pack)
+                _escribir_pack(zpack, juego, revisado=False)  # el mismo pack que «Exportar pack…»
             zf.writestr(f"{NOMBRE}.zip", interno.getvalue())
             n += 1
         zf.writestr("LEEME.txt", LEEME_KIT.format(pack=NOMBRE))

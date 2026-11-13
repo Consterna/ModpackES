@@ -316,3 +316,17 @@ def test_linea_de_comandos_exporta_e_importa(tmp_path: Path, capsys: pytest.Capt
     assert main(["exportar", str(otra), str(tmp_path / "kit.zip"), "--kit"]) == 0
     assert main(["paquete", "importar", str(otra)]) == 1
     assert "Uso: paquete importar" in capsys.readouterr().out
+
+
+def test_el_kit_de_servidor_lleva_el_pack_publicable(tmp_path: Path) -> None:
+    import io
+
+    juego = _instancia(tmp_path / "a")
+    with Memoria(":memory:") as memoria, Proceso(juego, MotorDePrueba(), grupos=["mods"], memoria=memoria) as p:
+        p.ejecutar()
+    exportar.exportar_kit_servidor(juego, tmp_path / "kit.zip")
+    with zipfile.ZipFile(tmp_path / "kit.zip") as kit:
+        interno = zipfile.ZipFile(io.BytesIO(kit.read("Traduccion_ES.zip")))
+    with interno:
+        assert {"pack.png", "LEEME.txt", "pack.mcmeta"} <= set(interno.namelist())
+        assert "prueba (modelo-1)" in interno.read("LEEME.txt").decode("utf-8")
