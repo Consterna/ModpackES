@@ -101,6 +101,12 @@ class Informe:
         return total
 
 
+def _grupo_del_indice(grupo: str, modulo: Modulo) -> str:
+    """El grupo con que el módulo va al índice. El texto del código de los mods es opcional (`--java`): va aparte,
+    para que una ejecución sin `--java` no lo borre del índice ni lo cuente como borrado."""
+    return "java" if isinstance(modulo, runtime.TextoDeJava) else grupo
+
+
 def _textos(lugar: Lugar) -> list[str]:
     return list(lugar.textos.values()) if isinstance(lugar.textos, Mapping) else list(lugar.textos)
 
@@ -255,12 +261,12 @@ class Proceso:
         Compara con el índice guardado en la marca del pack. Si no hay índice (nunca se tradujo, o se tradujo con
         una versión anterior de la app), cuenta como nuevo lo que no está en la memoria ni en el glosario.
         """
-        actuales = [(g, m.nombre, lugares) for g, m, lugares in leidos]
+        actuales = [(_grupo_del_indice(g, m), m.nombre, lugares) for g, m, lugares in leidos]
         previo = leer_indice(self.ctx.pack.leer_marca()) if self.ctx.pack is not None else None
         if previo is not None:
             indice, fecha = previo
-            # Solo se comparan los grupos elegidos: los demás no se leyeron y no por eso se borraron
-            indice = {n: e for n, e in indice.items() if e.get("grupo") in self.grupos}
+            # Solo se compara lo que se leyó: lo demás no se miró y no por eso se borró
+            indice = {n: e for n, e in indice.items() if e.get("grupo") in self._alcance()}
             informe.cambios = Cambios(comparar(indice, actuales), "indice", fecha)
         else:
             pendientes = {
@@ -305,7 +311,7 @@ class Proceso:
         for grupo, modulo in self.modulos():
             self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
             piezas = modulo.recolectar()
-            traducidos.append((grupo, modulo.nombre, lugares_de(modulo, piezas)))
+            traducidos.append((_grupo_del_indice(grupo, modulo), modulo.nombre, lugares_de(modulo, piezas)))
             textos = [p.texto for p in piezas]
             pendientes = self.traductor.pendientes(textos, modulo.ambito)
             pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
@@ -346,11 +352,15 @@ class Proceso:
                 informe.avisos.append(str(e))
         return informe
 
+    def _alcance(self) -> list[str]:
+        """Los grupos del índice que esta ejecución lee: los elegidos, y «java» solo si se pidió el texto del código."""
+        return [*self.grupos, *(["java"] if self.texto_java and "mods" in self.grupos else [])]
+
     def _guardar_indice(self, traducidos: list[tuple[str, str, list[Lugar]]], informe: Informe) -> None:
         """Guarda en la marca del pack qué textos en inglés había, para comparar en el próximo análisis."""
         pack = self.ctx.pack or PackSalida(self.instancia)
         previo = leer_indice(pack.leer_marca())
-        indice = mezclar(previo[0] if previo else None, indice_de(traducidos), self.grupos)
+        indice = mezclar(previo[0] if previo else None, indice_de(traducidos), self._alcance())
         try:
             pack.guardar_indice(para_la_marca(indice, datetime.now(UTC).isoformat(timespec="seconds")))
         except (OSError, ValueError) as e:  # la traducción ya está escrita: solo se pierde el informe de cambios

@@ -251,3 +251,23 @@ def test_linea_de_comandos_cambios(tmp_path: Path, capsys: pytest.CaptureFixture
     assert datos["base"] == "indice" and datos["nuevas"] == 3 and datos["cambiadas"] == 1 and datos["borradas"] == 1
     assert {"m", "config/ftbquests/quests/chapters/a.snbt"} == {lugar["donde"] for lugar in datos["lugares"]}
     assert main(["cambios", str(juego), "--motor", "lmstudio", "--lotes"]) == 1  # --lotes solo con Gemini
+
+
+def test_el_texto_del_codigo_no_se_pierde_sin_java(tmp_path: Path, memoria: Memoria) -> None:
+    """Traducir o analizar sin `--java` no borra del índice el texto del código ni lo cuenta como borrado."""
+    from .test_cobertura import _clase  # pyright: ignore[reportPrivateUsage]
+
+    juego = _modpack(tmp_path)
+    fabrica.jar(juego / "mods" / "c.jar", {"com/c/Chat.class": _clase("literal", "You have been muted by an admin!")})
+    with Proceso(juego, Simulador(), memoria=memoria, texto_java=True) as p:
+        p.ejecutar(activar=False)
+    with Proceso(juego, Simulador(), memoria=memoria) as p:
+        sin_java = p.analizar()
+        p.ejecutar(activar=False)
+    assert sin_java.cambios is not None and sin_java.cambios.lugares == []
+    with Proceso(juego, Simulador(), memoria=memoria, texto_java=True) as p:
+        con_java = p.analizar()
+    assert con_java.cambios is not None and con_java.cambios.lugares == []
+    marca = json.loads((juego / "resourcepacks" / "Traduccion_ES" / MARCA).read_text("utf-8"))
+    leido = leer_indice(marca)
+    assert leido is not None and leido[0]["Texto del código de los mods"]["grupo"] == "java"

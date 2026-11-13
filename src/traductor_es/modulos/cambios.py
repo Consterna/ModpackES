@@ -23,7 +23,7 @@ from typing import Any, cast
 #: Versión del formato del índice. Si cambia, un índice viejo se ignora (se compara con la memoria).
 VERSION_INDICE = 1
 #: Orden de los grupos en el informe: el mismo que en el resto de la app.
-_ORDEN_GRUPOS = {"mods": 0, "libros": 1, "misiones": 2, "scripts": 3}
+_ORDEN_GRUPOS = {"mods": 0, "java": 1, "libros": 2, "misiones": 3, "scripts": 4}
 #: Cuántas claves o textos de ejemplo se muestran por lugar.
 MAX_EJEMPLOS = 5
 
