@@ -123,11 +123,15 @@ def terminos_faltantes(original: str, traduccion: str, glosario: Mapping[str, st
     """
     minusculas = original.casefold()
     faltan: dict[str, str] = {}
-    for ingles, esperado in glosario.items():
+    # Los más largos primero: lo que ya cubrió un término largo («Item Frame») no se exige otra vez como
+    # término corto («Item»), porque su traducción («Marco») no tiene por qué contener la del corto.
+    for ingles, esperado in sorted(glosario.items(), key=lambda par: -len(par[0])):
         if not esperado.strip():
             continue
-        if not _patron_palabra(ingles.casefold()).search(minusculas):
+        patron = _patron_palabra(ingles.casefold())
+        if not patron.search(minusculas):
             continue
+        minusculas = patron.sub(lambda m: " " * len(m.group(0)), minusculas)
         if _sin_tildes(ingles) == _sin_tildes(esperado) and not es_nombre_propio_en(ingles, original):
             continue
         if not sale_el_termino(esperado, traduccion):

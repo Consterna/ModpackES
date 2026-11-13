@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
@@ -26,6 +26,7 @@ from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import Traductor
+from .nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
 from .salida.resource_pack import NOMBRE, PackSalida
@@ -61,6 +62,8 @@ class Informe:
     fallidos: list[str] = field(default_factory=list[str])  #: grupos que el análisis no pudo leer
     #: Lo que queda en inglés aunque se traduzca todo, y por qué (ver `modulos/cobertura.py`)
     cobertura: list[Hallazgo] = field(default_factory=list[Hallazgo])
+    #: Lo que se aceptó sin cumplir todas las reglas tras el reintento: original → (traducción, motivo)
+    dudosos: dict[str, tuple[str, str]] = field(default_factory=dict[str, tuple[str, str]])
 
     @property
     def a_traducir(self) -> int:
@@ -88,6 +91,22 @@ class Informe:
             total += (tokens * 2.4 * precio[0] + textos * 12 * precio[1]) / 1e6
             total += 0.15 * _costo_traduccion(caracteres, textos, precio)
         return total
+
+
+#: Cuántos ejemplos de lo aceptado con dudas se muestran en el aviso.
+_EJEMPLOS_DUDOSOS = 3
+
+
+def aviso_de_dudosos(dudosos: Mapping[str, tuple[str, str]]) -> str:
+    """Resumen de lo que se aceptó con dudas, con unos ejemplos para revisar a mano."""
+    ejemplos = "; ".join(
+        f"«{original}» → «{traduccion}» ({motivo.split(':')[0]})"
+        for original, (traduccion, motivo) in sorted(dudosos.items())[:_EJEMPLOS_DUDOSOS]
+    )
+    return (
+        f"{len(dudosos)} textos se aceptaron con dudas (un término del glosario que no salió o una palabra repetida); "
+        f"conviene revisarlos en «Más ▸ Correcciones…». Por ejemplo: {ejemplos}"
+    )
 
 
 def _costo_traduccion(caracteres: int, textos: int, precio: tuple[float, float]) -> float:
@@ -152,9 +171,14 @@ class Proceso:
         if self._glosario_listo:
             return
         self.glosario.fijar(configuracion.leer_glosario_usuario())
+        preparar_sustituciones(self.glosario)
         tabla = self.instancia.tabla_idiomas()
         orden = [self.ctx.dialecto, *(v for v in ("es_mx", "es_es", *VARIANTES) if v != self.ctx.dialecto)]
+        vocabulario_listo = False
         for ns in ["minecraft", *sorted(n for n in tabla.datos if n != "minecraft")]:
+            if ns != "minecraft" and not vocabulario_listo:  # lo del juego primero: el vocabulario no lo pisa
+                agregar_vocabulario(self.glosario)
+                vocabulario_listo = True
             ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
             todo_ingles = tabla.textos(ns, "en_us")
             for variante in dict.fromkeys(orden):
@@ -163,6 +187,8 @@ class Proceso:
                     ingles, tabla.textos(ns, variante), fuente=ns, oficial=oficial, proteger_iguales=oficial
                 )
                 self.ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
+        if not vocabulario_listo:  # un modpack sin mods con textos
+            agregar_vocabulario(self.glosario)
         self.ejemplos.agregar_pares(self.memoria.recientes(self.ctx.dialecto))
         self._glosario_listo = True
         self.registro(f"Glosario: {len(self.glosario)} términos oficiales")
@@ -263,6 +289,9 @@ class Proceso:
                 informe.revision_automatica.sumar(hecha)
                 if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
                     resultado.traducciones = self.traductor.conocidas(textos, modulo.ambito)
+            informe.dudosos.update(
+                {n: (resultado.nuevas[n], motivo) for n, motivo in resultado.dudosos.items() if n in resultado.nuevas}
+            )
             resumen = modulo.escribir(resultado.traducciones)
             self.registro(f"   {resumen}")
             informe.modulos.append(
@@ -281,6 +310,8 @@ class Proceso:
                 self.glosario.agregar_pares({en: en for en in iguales}, iguales, proteger_iguales=True)
         relevantes = self.glosario.relevantes(todas, maximo=500)
         informe.revision = revisar_glosario(todas, relevantes, relevantes)
+        if informe.dudosos:
+            informe.avisos.append(aviso_de_dudosos(informe.dudosos))
         informe.avisos.extend(self._avisos())
         if activar and (self.ctx.pack is not None and (self.ctx.pack.raiz / "pack.mcmeta").is_file()):
             try:
