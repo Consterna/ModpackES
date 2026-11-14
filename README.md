@@ -137,7 +137,25 @@ modpack grande supera enseguida. Con la facturación activada (nivel 1) se tradu
 
 Las misiones y los scripts de servidor los lee el servidor. «Más ▸ Kit de servidor…» arma un `.zip` con esos
 archivos ya traducidos, el resource pack para los jugadores y las instrucciones. «Exportar pack…» saca solo el
-resource pack, para compartirlo con quien juegue el mismo modpack.
+resource pack, listo para publicar: con `pack.png`, un `LEEME.txt` (aviso de traducción automática, si una persona
+la revisó, motores usados y créditos), la versión del modpack en el nombre del archivo y `supported_formats` en el
+`pack.mcmeta` cuando la versión lo usa (de 1.20.2 a 1.21.8).
+
+## Compartir una traducción
+
+Una persona traduce y paga; las demás la aplican gratis.
+
+- **«Más ▸ Exportar paquete de traducción…»** guarda un `.modpackes.zip` con la parte de tu memoria que usa ese
+  modpack, tus correcciones de esos textos, tu glosario y los datos del pack (nombre, versión, Minecraft, dialecto,
+  modelos y si se revisó). No lleva nada de los mods ni del modpack.
+- **«Más ▸ Importar traducción…»** aplica un `.modpackes.zip` sin llamar a ningún motor: lo guarda en tu memoria y
+  escribe la traducción. Tus correcciones y tus términos del glosario no se pisan. Si el paquete es de otra versión
+  del modpack, avisa: lo que cambió queda en inglés hasta que lo traduzcas.
+- También importa un **resource pack en español** (`.zip` o carpeta), aunque no esté activo en el juego: sus textos se
+  emparejan con el inglés de tus mods y pasan a la memoria del mismo modo.
+
+El nombre y la versión del modpack se leen de BetterCompatibilityChecker (`config/bcc-common.json`, `bcc.json` o
+`bcc-common.toml`), de Prism, de CurseForge o de `modrinth.index.json`; si no hay nada, se usa el nombre de la carpeta.
 
 ## Preguntas frecuentes
 
@@ -195,6 +213,9 @@ uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--
 uv run modpackes restaurar "RUTA"
 uv run modpackes cobertura "RUTA" [--java]   # qué queda en inglés y por qué (solo lee)
 uv run modpackes glosario listar | agregar "Death Knights" "Caballeros de la Muerte" | quitar "Fluix" | importar terminos.json
+uv run modpackes exportar "RUTA" [ARCHIVO.zip] [--revisado] [--kit]   # pack listo para publicar (o kit de servidor)
+uv run modpackes paquete exportar "RUTA" [ARCHIVO.modpackes.zip] [--revisado] [--dialecto es_es]
+uv run modpackes paquete importar "RUTA" ARCHIVO.modpackes.zip|PACK.zip|CARPETA [--no-activar]   # sin API
 uv run modpackes clave guardar [--motor openrouter]
 uv run modpackes modelos [--motor ollama]
 ```
