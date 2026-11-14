@@ -266,3 +266,11 @@ def test_una_palabra_que_no_es_del_juego_se_corrige_en_la_traduccion() -> None:
     motor = _Guion("Un peto de inframundita encantado")
     traducciones, _ = _traducir(motor, glosario, "An enchanted Netherite Chestplate")
     assert traducciones == {"An enchanted Netherite Chestplate": "Un peto de netherita encantado"}
+
+
+def test_no_mezcla_idiomas_si_el_resto_quedo_en_ingles() -> None:
+    faltan = {"Gear": "Engranaje"}
+    final, siguen = reemplazar_en_ingles("Iron Gear", faltan, "Iron Gear")
+    assert final == "Iron Gear" and siguen == faltan  # «Iron Engranaje» sería peor
+    final, siguen = reemplazar_en_ingles("Un Gear de hierro", faltan, "An Iron Gear")
+    assert final == "Un Engranaje de hierro" and not siguen

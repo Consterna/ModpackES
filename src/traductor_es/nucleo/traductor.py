@@ -384,7 +384,7 @@ class Traductor:
             return final, None
         if motivo.startswith(MOTIVO_TERMINOLOGIA) and glosario:
             faltan = terminos_faltantes(original, final, glosario)
-            final, siguen = reemplazar_en_ingles(final, faltan)
+            final, siguen = reemplazar_en_ingles(final, faltan, original)
             final = ajustar_mayusculas(original, final, self._con_mayusculas(glosario))
             if not siguen:
                 return final, None
