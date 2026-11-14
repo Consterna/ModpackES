@@ -58,6 +58,8 @@ def test_componente_snbt_conserva_el_formato() -> None:
         ("kubejs/assets/a/tips/t.json", "tip"),
         ("resourcepacks/p/assets/a/tips/t.json", "tip"),
         ("kubejs/data/tipsmod/tips/t.json", "tip"),
+        ("kubejs/data/a/loot_table/chests/x.json", "botín"),
+        ("datapacks/p/data/a/item_modifiers/x.json", "botín"),
         ("kubejs/data/a/recipes/x.json", None),
         ("kubejs/data/a/functions/x.txt", None),
         ("config/functions/x.mcfunction", None),  # sin «data»: no es un datapack
@@ -201,3 +203,45 @@ def test_mercado_de_farming_for_blockheads(tmp_path: Path, memoria: Memoria) -> 
         assert nuevo["customEntries"] == contenido["customEntries"] and nuevo["customCategories"]["kits"]["icon"]
         Datos(ctx).restaurar()
     assert json.loads(ruta.read_text("utf-8")) == contenido
+
+
+def test_traduce_los_textos_de_las_loot_tables(tmp_path: Path, memoria: Memoria) -> None:
+    juego = fabrica.prism(tmp_path, "1.21.1")
+    clasica = {
+        "pools": [{"entries": [{"type": "minecraft:item", "name": "minecraft:diamond_sword", "functions": [
+            {"function": "minecraft:set_name", "name": {"text": "Blade of the Fallen King", "color": "gold"}},
+            {"function": "set_lore", "lore": ["Forged in dragon fire", {"translate": "item.k.lore"}]},
+            {"function": "minecraft:set_count", "count": 1},
+        ]}]}],
+    }  # fmt: skip
+    moderna = {
+        "pools": [{"entries": [{"type": "item", "name": "minecraft:written_book", "functions": [{
+            "function": "minecraft:set_components",
+            "components": {
+                "minecraft:custom_name": '{"text":"Ancient Tome","italic":false}',
+                "minecraft:lore": ['"Smells of old paper"'],
+                "minecraft:written_book_content": {
+                    "title": "Tome", "author": "Sage",
+                    "pages": [{"raw": '"The first page tells a story."'}, '"The second page is torn."'],
+                },
+            },
+        }]}]}],
+    }  # fmt: skip
+    a = _escribir(juego, "kubejs/data/a/loot_table/chests/tesoro.json", json.dumps(clasica))
+    b = _escribir(juego, "datapacks/p/data/a/loot_tables/boss.json", json.dumps(moderna))
+    receta = _escribir(juego, "kubejs/data/a/recipe/r.json", json.dumps({"result": {"name": "Ancient Tome"}}))
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego))
+        resumen = traducir_modulo(Datos(ctx), Traductor(Simulador(), memoria, Glosario()))
+        assert resumen.pendientes == 0
+    funciones = json.loads(a.read_text("utf-8"))["pools"][0]["entries"][0]["functions"]
+    assert funciones[0]["name"] == {"text": "«ES» Blade of the Fallen King", "color": "gold"}
+    assert funciones[1]["lore"] == ["«ES» Forged in dragon fire", {"translate": "item.k.lore"}]
+    assert funciones[2] == {"function": "minecraft:set_count", "count": 1}
+    comp = json.loads(b.read_text("utf-8"))["pools"][0]["entries"][0]["functions"][0]["components"]
+    # El JSON que va dentro de una cadena sigue siendo una cadena, con el texto traducido adentro
+    assert json.loads(comp["minecraft:custom_name"]) == {"text": "«ES» Ancient Tome", "italic": False}
+    assert comp["minecraft:lore"] == ['"«ES» Smells of old paper"']
+    paginas = comp["minecraft:written_book_content"]["pages"]
+    assert paginas == [{"raw": '"«ES» The first page tells a story."'}, '"«ES» The second page is torn."']
+    assert "«ES»" not in receta.read_text("utf-8")
