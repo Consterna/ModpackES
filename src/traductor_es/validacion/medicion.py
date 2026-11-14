@@ -27,6 +27,7 @@ from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import Traductor
+from ..nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from ..proceso import Informe, InformeModulo
 from . import revision
 from .calidad import sale_el_termino, validar
@@ -314,10 +315,12 @@ def medir(
 ) -> list[Medicion]:
     """Traduce el banco con el motor (memoria vacía) y devuelve la medición; con `revisar`, también la de después."""
     glosario = Glosario()
+    preparar_sustituciones(glosario)
     if banco.juego:  # como la app: el juego primero, oficial y con sus nombres que no se traducen
         glosario.agregar_pares(
             {k: k for k in banco.juego}, banco.juego, fuente="minecraft", oficial=True, proteger_iguales=True
         )
+    agregar_vocabulario(glosario)
     glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario, fuente="banco")
     with Memoria(":memory:") as memoria:
         ejemplos = Ejemplos(cantidad=cantidad_ejemplos)

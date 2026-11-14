@@ -27,6 +27,9 @@ class Glosario:
         self._fuente: dict[str, str] = {}  #: de quién salió cada término (un mod, el juego…)
         self._oficiales: set[str] = set()  #: términos del propio juego: no se discuten
         self._en_conflicto: set[str] = set()  #: dos mods lo traducen distinto: no se usa ninguno
+        #: Palabras del español que se cambian en lo que traen el juego y los mods («ítems» → «objetos»);
+        #: el glosario del usuario no se toca
+        self._sustituciones: list[tuple[re.Pattern[str], str]] = []
 
     def __len__(self) -> int:
         return len(self._terminos) + len(self._fijos)
@@ -61,7 +64,18 @@ class Glosario:
                 self._agregar(en, es, fuente, oficial)
         self._orden = None
 
+    def sustituir(self, palabras: Mapping[str, str]) -> None:
+        """Cambia esas palabras (sin distinguir mayúsculas) en lo que se agregue después, salvo lo del usuario."""
+        for vieja, nueva in palabras.items():
+            self._sustituciones.append((re.compile(r"(?<![^\W_])" + re.escape(vieja) + r"(?![^\W_])", re.I), nueva))
+
+    def _normalizar(self, es: str) -> str:
+        for patron, nueva in self._sustituciones:
+            es = patron.sub(lambda m, n=nueva: n[0].upper() + n[1:] if m.group(0)[0].isupper() else n, es)
+        return es
+
     def _agregar(self, en: str, es: str, fuente: str, oficial: bool) -> None:
+        es = self._normalizar(es)
         if en in self._en_conflicto:
             return
         actual = self._terminos.get(en)
