@@ -260,6 +260,14 @@ def test_las_sustituciones_no_tocan_lo_del_juego_ni_lo_del_usuario() -> None:
     assert todos["Hell Ore"] == "Mena de inframundita"  # lo del usuario no se toca
 
 
+def test_una_palabra_que_no_es_del_juego_se_corrige_en_la_traduccion() -> None:
+    glosario = Glosario()
+    preparar_sustituciones(glosario)
+    motor = _Guion("Un peto de inframundita encantado")
+    traducciones, _ = _traducir(motor, glosario, "An enchanted Netherite Chestplate")
+    assert traducciones == {"An enchanted Netherite Chestplate": "Un peto de netherita encantado"}
+
+
 def test_no_mezcla_idiomas_si_el_resto_quedo_en_ingles() -> None:
     faltan = {"Gear": "Engranaje"}
     final, siguen = reemplazar_en_ingles("Iron Gear", faltan, "Iron Gear")

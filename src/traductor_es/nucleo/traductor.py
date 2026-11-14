@@ -331,6 +331,8 @@ class Traductor:
             if motivo:
                 rechazados[n] = motivo
                 continue
+            if self.controles_de_forma:  # determinista: palabras que no son del juego («inframundita»)
+                final = self.glosario.corregir(final)
             if glosario and self.controles_de_forma:  # determinista: mayúsculas de los nombres propios del glosario
                 final = ajustar_mayusculas(n, final, self._con_mayusculas(glosario))
             motivo = self._motivo_de_forma(n, final, glosario)

@@ -126,6 +126,8 @@ class FTBQuests(_Base):
         return "snbt"
 
     def detectar(self) -> bool:
+        if self.ctx.solo_por_idioma:
+            return any(self.formato(r) == "lang" for r in self.raices())
         return bool(self.raices())
 
     def describir(self) -> str:
@@ -138,6 +140,8 @@ class FTBQuests(_Base):
     def _preparar(self) -> Iterator[_Trabajo]:
         for raiz in self.raices():
             formato = self.formato(raiz)
+            if self.ctx.solo_por_idioma and formato != "lang":
+                continue  # los capítulos tienen un solo idioma: ya los tradujo la pasada principal
             if formato == "lang":
                 yield from self._lang(raiz)
             elif formato == "nbt":

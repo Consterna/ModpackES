@@ -69,6 +69,10 @@ class Glosario:
         for vieja, nueva in palabras.items():
             self._sustituciones.append((re.compile(r"(?<![^\W_])" + re.escape(vieja) + r"(?![^\W_])", re.I), nueva))
 
+    def corregir(self, texto: str) -> str:
+        """Cambia en una traducción las palabras que no son del juego («inframundita» → «netherita»)."""
+        return self._normalizar(texto)
+
     def _normalizar(self, es: str) -> str:
         for patron, nueva in self._sustituciones:
             es = patron.sub(lambda m, n=nueva: n[0].upper() + n[1:] if m.group(0)[0].isupper() else n, es)

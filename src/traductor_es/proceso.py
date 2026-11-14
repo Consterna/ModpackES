@@ -150,6 +150,25 @@ def lugares_de(modulo: Modulo, piezas: list[Pieza]) -> list[Lugar]:
     return [Lugar(modulo.nombre, [p.texto for p in piezas])]
 
 
+#: El dialecto que se traduce aparte con `tambien_es_es`.
+DIALECTO_ESPANA = "es_es"
+#: Lo que se agrega al nombre de un módulo en la segunda pasada.
+ETIQUETA_ESPANA = " (España)"
+#: Largo máximo de la traducción principal que acompaña a cada texto en la versión de España.
+LARGO_VERSION_PRINCIPAL = 400
+
+
+@dataclass(slots=True)
+class _Pasada:
+    """Lo que necesita una traducción a un dialecto: dónde escribe, con qué glosario y con qué traductor."""
+
+    ctx: Contexto
+    glosario: Glosario
+    ejemplos: Ejemplos
+    traductor: Traductor
+    listo: bool = False  #: el glosario ya se cargó
+
+
 class Proceso:
     def __init__(
         self,
@@ -167,6 +186,7 @@ class Proceso:
         revisar: bool = False,
         texto_java: bool = False,
         scripts_exhaustivo: bool = False,
+        tambien_es_es: bool = False,
     ) -> None:
         self.instancia = Instancia(carpeta)
         self.revisar = revisar
@@ -178,8 +198,11 @@ class Proceso:
         self.memoria = memoria or self._abrir_memoria()
         self.glosario = Glosario()
         self.ejemplos = Ejemplos(cantidad=CANTIDAD_EN_LA_APP)
+        #: Traducir también una versión aparte en español de España (solo si el dialecto base es otro)
+        self.tambien_es_es = tambien_es_es and dialecto != DIALECTO_ESPANA
+        variantes = tuple(v for v in VARIANTES if v != DIALECTO_ESPANA) if self.tambien_es_es else VARIANTES
         self.ctx = Contexto(
-            self.instancia, Respaldo(self.instancia.juego), dialecto, VARIANTES, registro, PackSalida(self.instancia)
+            self.instancia, Respaldo(self.instancia.juego), dialecto, variantes, registro, PackSalida(self.instancia)
         )
         limites = fabrica.limites_de_lote(motor)
         self.traductor = Traductor(
@@ -195,39 +218,77 @@ class Proceso:
             motor.al_esperar = lambda estado: registro(
                 f"Esperando a Google (Batch API): {_ESTADOS.get(estado, estado)}"
             )
-        self._glosario_listo = False
+        self._principal = _Pasada(self.ctx, self.glosario, self.ejemplos, self.traductor)
+        self._espana: _Pasada | None = None
+        if self.tambien_es_es:
+            # La misma memoria, motor, copias y pack; su propio glosario (el juego en es_es primero) y traductor
+            ctx_es = Contexto(
+                self.instancia, self.ctx.respaldo, DIALECTO_ESPANA, (DIALECTO_ESPANA,), registro, self.ctx.pack,
+                solo_por_idioma=True,
+            )  # fmt: skip
+            glosario_es = Glosario()
+            ejemplos_es = Ejemplos(cantidad=CANTIDAD_EN_LA_APP)
+            traductor_es = Traductor(
+                motor, self.memoria, glosario_es, DIALECTO_ESPANA, hilos, progreso, registro, self.traductor.cancelar,
+                validar, usar_lotes=usar_lotes, contexto=contexto, ejemplos=ejemplos_es,
+                limite_caracteres=limites[0], limite_entradas=limites[1],
+            )  # fmt: skip
+            self._espana = _Pasada(ctx_es, glosario_es, ejemplos_es, traductor_es)
 
     # ------------------------------------------------------------------ preparación
+    @property
+    def _glosario_listo(self) -> bool:
+        return self._principal.listo
+
     def _preparar_glosario(self) -> None:
-        if self._glosario_listo:
+        self._preparar(self._principal)
+
+    def _preparar(self, pasada: _Pasada) -> None:
+        """Carga el glosario de una pasada: el usuario, el juego en su dialecto primero, el vocabulario y los mods."""
+        if pasada.listo:
             return
-        self.glosario.fijar(configuracion.leer_glosario_usuario())
-        preparar_sustituciones(self.glosario)
+        glosario, ejemplos, dialecto = pasada.glosario, pasada.ejemplos, pasada.ctx.dialecto
+        glosario.fijar(configuracion.leer_glosario_usuario())
+        preparar_sustituciones(glosario)
         tabla = self.instancia.tabla_idiomas()
-        orden = [self.ctx.dialecto, *(v for v in ("es_mx", "es_es", *VARIANTES) if v != self.ctx.dialecto)]
+        orden = [dialecto, *(v for v in ("es_mx", "es_es", *VARIANTES) if v != dialecto)]
         vocabulario_listo = False
         for ns in ["minecraft", *sorted(n for n in tabla.datos if n != "minecraft")]:
             if ns != "minecraft" and not vocabulario_listo:  # lo del juego primero: el vocabulario no lo pisa
-                agregar_vocabulario(self.glosario)
+                agregar_vocabulario(glosario)
                 vocabulario_listo = True
             ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
             todo_ingles = tabla.textos(ns, "en_us")
             for variante in dict.fromkeys(orden):
                 oficial = ns == "minecraft"  # los nombres del juego que no se traducen («Creeper») se protegen
-                self.glosario.agregar_pares(
+                glosario.agregar_pares(
                     ingles, tabla.textos(ns, variante), fuente=ns, oficial=oficial, proteger_iguales=oficial
                 )
-                self.ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
+                ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
         if not vocabulario_listo:  # un modpack sin mods con textos
-            agregar_vocabulario(self.glosario)
-        self.ejemplos.agregar_pares(self.memoria.recientes(self.ctx.dialecto))
-        self._glosario_listo = True
-        self.registro(f"Glosario: {len(self.glosario)} términos oficiales")
-        if len(self.ejemplos):
-            self.registro(f"Ejemplos para guiar al motor: {len(self.ejemplos)} textos ya traducidos")
+            agregar_vocabulario(glosario)
+        ejemplos.agregar_pares(self.memoria.recientes(dialecto))
+        pasada.listo = True
+        if pasada is self._principal:
+            self.registro(f"Glosario: {len(glosario)} términos oficiales")
+            if len(ejemplos):
+                self.registro(f"Ejemplos para guiar al motor: {len(ejemplos)} textos ya traducidos")
 
-    def modulos(self) -> list[tuple[str, Modulo]]:
-        """Módulos elegidos, en el orden en que se traducen (mods primero: sus nombres alimentan el glosario)."""
+    def modulos(self, ctx: Contexto | None = None) -> list[tuple[str, Modulo]]:
+        """Módulos elegidos, en el orden en que se traducen (mods primero: sus nombres alimentan el glosario).
+
+        Con un contexto `solo_por_idioma` (la versión de España), solo los que escriben un archivo por idioma.
+        """
+        ctx = ctx or self.ctx
+        if ctx.solo_por_idioma:
+            por_idioma: list[tuple[str, Modulo]] = []
+            if "mods" in self.grupos:
+                por_idioma.append(("mods", mods.Mods(ctx)))
+            if "libros" in self.grupos:
+                por_idioma.append(("libros", libros.Libros(ctx)))
+            if "misiones" in self.grupos:
+                por_idioma.append(("misiones", misiones.FTBQuests(ctx)))
+            return [(g, m) for g, m in por_idioma if m.detectar()]
         lista: list[tuple[str, Modulo]] = []
         if "mods" in self.grupos:
             lista.append(("mods", mods.Mods(self.ctx)))
@@ -284,7 +345,25 @@ class Proceso:
             )  # fmt: skip
         informe.avisos.extend(self._avisos_de_cobertura(informe, scripts_leidos))
         self._comparar_con_la_ultima(informe, leidos)
+        self._analizar_espana(informe)
         return informe
+
+    def _analizar_espana(self, informe: Informe) -> None:
+        """Suma al informe lo que costaría la versión de España (solo lo que tiene un archivo por idioma)."""
+        if self._espana is None:
+            return
+        self._preparar(self._espana)
+        for grupo, modulo in self.modulos(self._espana.ctx):
+            try:
+                piezas = modulo.recolectar()
+            except (ValueError, OSError):  # ya se avisó en la pasada principal
+                continue
+            pendientes = self._espana.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
+            # Sin contar los textos otra vez: son los mismos de la pasada principal
+            informe.modulos.append(
+                InformeModulo(grupo, modulo.nombre + ETIQUETA_ESPANA, "versión de España", 0, len(pendientes),
+                              sum(len(t) for t in pendientes))
+            )  # fmt: skip
 
     def _comparar_con_la_ultima(self, informe: Informe, leidos: list[tuple[str, Modulo, list[Lugar]]]) -> None:
         """Llena `informe.cambios`: qué cambió desde la última traducción y cuánto cuesta traducir solo eso.
@@ -340,49 +419,12 @@ class Proceso:
         self._preparar_glosario()
         informe = Informe()
         todas: dict[str, str] = {}
-        tradujo_el_motor = False
         traducidos: list[tuple[str, str, list[Lugar]]] = []
-        for grupo, modulo in self.modulos():
-            self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
-            piezas = modulo.recolectar()
-            traducidos.append((_grupo_del_indice(grupo, modulo), modulo.nombre, lugares_de(modulo, piezas)))
-            textos = [p.texto for p in piezas]
-            pendientes = self.traductor.pendientes(textos, modulo.ambito)
-            pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
-            if solo_memoria:
-                resultado = Resultado(traducciones=self.traductor.conocidas(textos, modulo.ambito))
-            else:
-                resultado = self.traductor.traducir(textos, modulo.ambito, pistas)
-                tradujo_el_motor = tradujo_el_motor or bool(resultado.nuevas)
-            if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
-                self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
-                por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
-                hecha = revision.revisar_y_corregir(self.traductor, resultado.nuevas, modulo.ambito, por_nucleo)
-                self.registro(f"   {hecha}")
-                if informe.revision_automatica is None:
-                    informe.revision_automatica = revision.ResumenRevision()
-                informe.revision_automatica.sumar(hecha)
-                if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
-                    resultado.traducciones = self.traductor.conocidas(textos, modulo.ambito)
-            informe.dudosos.update(
-                {n: (resultado.nuevas[n], motivo) for n, motivo in resultado.dudosos.items() if n in resultado.nuevas}
-            )
-            resumen = modulo.escribir(resultado.traducciones)
-            self.registro(f"   {resumen}")
-            informe.modulos.append(
-                InformeModulo(grupo, modulo.nombre, modulo.describir(), len(set(textos)), len(pendientes),
-                              sum(len(t) for t in pendientes), resumen)
-            )  # fmt: skip
-            if grupo != "mods":  # la revisión del glosario mira textos largos (misiones, libros, scripts)
-                todas.update(resultado.traducciones)
-            if isinstance(modulo, mods.Mods):
-                # Los nombres recién traducidos pasan al glosario: libros, misiones y scripts los usarán igual
-                nuevos = modulo.nombres(resultado.traducciones)
-                self.glosario.agregar_pares({en: en for en in nuevos}, nuevos)
-                # Un nombre de una sola palabra que el modelo dejó igual es un nombre propio («Arachnarch»): se
-                # protege para que las misiones no lo traduzcan. Con varias palabras suele ser un olvido.
-                iguales = {en: es for en, es in nuevos.items() if en == es and " " not in en}
-                self.glosario.agregar_pares({en: en for en in iguales}, iguales, proteger_iguales=True)
+        tradujo_el_motor = self._traducir_pasada(self._principal, informe, todas, traducidos, solo_memoria)
+        if self._espana is not None and not self.traductor.cancelar.is_set():
+            self.registro("▶ Español de España: se traduce aparte lo que tiene un archivo por idioma")
+            self._preparar(self._espana)
+            tradujo_el_motor |= self._traducir_pasada(self._espana, informe, {}, None, solo_memoria)
         if tradujo_el_motor and self.motor.nombre not in _SIN_CREDITO and self.ctx.pack is not None:
             self.ctx.pack.anotar_motores([self.motor.nombre])
         relevantes = self.glosario.relevantes(todas, maximo=500)
@@ -400,6 +442,87 @@ class Proceso:
             except ValueError as e:
                 informe.avisos.append(str(e))
         return informe
+
+    def _traducir_pasada(
+        self,
+        pasada: _Pasada,
+        informe: Informe,
+        todas: dict[str, str],
+        traducidos: list[tuple[str, str, list[Lugar]]] | None,
+        solo_memoria: bool = False,
+    ) -> bool:
+        """Traduce y escribe los módulos de una pasada (la principal, o la versión de España).
+
+        Devuelve si el motor tradujo algo (para los créditos del pack).
+        """
+        traductor = pasada.traductor
+        tradujo_el_motor = False
+        etiqueta = ETIQUETA_ESPANA if pasada is self._espana else ""
+        for grupo, modulo in self.modulos(pasada.ctx):
+            self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
+            piezas = modulo.recolectar()
+            if traducidos is not None:  # el índice de cambios mira el inglés: basta con la pasada principal
+                traducidos.append((_grupo_del_indice(grupo, modulo), modulo.nombre, lugares_de(modulo, piezas)))
+            textos = [p.texto for p in piezas]
+            pendientes = traductor.pendientes(textos, modulo.ambito)
+            pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
+            if pasada is self._espana:
+                pistas = self._con_version_principal(pistas, textos, modulo.ambito)
+            if solo_memoria:
+                resultado = Resultado(traducciones=traductor.conocidas(textos, modulo.ambito))
+            else:
+                resultado = traductor.traducir(textos, modulo.ambito, pistas)
+                tradujo_el_motor = tradujo_el_motor or bool(resultado.nuevas)
+            if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
+                self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
+                por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
+                hecha = revision.revisar_y_corregir(traductor, resultado.nuevas, modulo.ambito, por_nucleo)
+                self.registro(f"   {hecha}")
+                if informe.revision_automatica is None:
+                    informe.revision_automatica = revision.ResumenRevision()
+                informe.revision_automatica.sumar(hecha)
+                if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
+                    resultado.traducciones = traductor.conocidas(textos, modulo.ambito)
+            informe.dudosos.update(
+                {n: (resultado.nuevas[n], motivo) for n, motivo in resultado.dudosos.items() if n in resultado.nuevas}
+            )
+            resumen = modulo.escribir(resultado.traducciones)
+            self.registro(f"   {resumen}")
+            informe.modulos.append(
+                InformeModulo(grupo, modulo.nombre + etiqueta, modulo.describir(), len(set(textos)), len(pendientes),
+                              sum(len(t) for t in pendientes), resumen)
+            )  # fmt: skip
+            if grupo != "mods":  # la revisión del glosario mira textos largos (misiones, libros, scripts)
+                todas.update(resultado.traducciones)
+            if isinstance(modulo, mods.Mods):
+                # Los nombres recién traducidos pasan al glosario: libros, misiones y scripts los usarán igual
+                nuevos = modulo.nombres(resultado.traducciones)
+                pasada.glosario.agregar_pares({en: en for en in nuevos}, nuevos)
+                # Un nombre de una sola palabra que el modelo dejó igual es un nombre propio («Arachnarch»): se
+                # protege para que las misiones no lo traduzcan. Con varias palabras suele ser un olvido.
+                iguales = {en: es for en, es in nuevos.items() if en == es and " " not in en}
+                pasada.glosario.agregar_pares({en: en for en in iguales}, iguales, proteger_iguales=True)
+        return tradujo_el_motor
+
+    def _con_version_principal(self, pistas: Mapping[str, str], textos: list[str], ambito: str) -> dict[str, str]:
+        """Pistas de la versión de España con la traducción ya hecha en el dialecto principal.
+
+        Así las dos versiones toman las mismas decisiones (qué nombre propio queda sin traducir, qué término se usa
+        para un objeto del mod) y la de España solo cambia lo que se dice distinto allí. Sin esto, dos traducciones
+        independientes difieren en nombres por la variación propia del modelo («Arachnarch» y «Aracnarca»).
+        """
+        hechas = self.traductor.conocidas(textos, ambito)
+        salida = dict(pistas)
+        for texto, principal in hechas.items():
+            if principal == texto:
+                aviso = "en Latinoamérica quedó igual al original: déjalo igual"
+            else:
+                aviso = (
+                    f"en Latinoamérica: «{principal[:LARGO_VERSION_PRINCIPAL]}». Conserva sus decisiones (qué nombres "
+                    "quedan sin traducir, qué término usa) y cambia solo lo que en España se dice distinto"
+                )
+            salida[texto] = f"{pistas[texto]} · {aviso}" if pistas.get(texto) else aviso
+        return salida
 
     def _alcance(self) -> list[str]:
         """Los grupos del índice que esta ejecución lee: los elegidos, y «java» solo si se pidió el texto del código."""

@@ -50,6 +50,12 @@ Lo que el mod ya trae en español no se toca, y si existe una variante (por ejem
 demás sin gastar. Los libros antiguos de Patchouli que guardan el texto dentro del jar no se pueden traducir
 sin modificar el mod: la app avisa cuáles son.
 
+El español elegido (Latinoamérica por defecto) va a todos los archivos de español del juego. Con **«Traducir también
+una versión aparte para España»** (`--tambien-es-es`), `es_es` recibe su propia traducción, con los nombres del juego
+en España («Roca», «objeto»…). Cuesta otra traducción la primera vez; después sale de la memoria. Solo se hace con lo
+que tiene un archivo por idioma (mods, libros y la carpeta `lang/` de FTB Quests). Los scripts y las misiones escritas
+dentro de los capítulos tienen un solo idioma y quedan con el español elegido.
+
 ## Cómo se usa
 
 1. Descarga e instala
@@ -209,7 +215,7 @@ Desde el código fuente (ver [Desarrollo](#desarrollo)):
 uv run modpackes instancias
 uv run modpackes analizar "RUTA DE LA INSTANCIA"
 uv run modpackes cambios "RUTA" [--json]   # qué cambió desde la última traducción y cuánto cuesta (solo lee)
-uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar]
+uv run modpackes traducir "RUTA" [--dialecto es_es | --tambien-es-es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar]
 uv run modpackes restaurar "RUTA"
 uv run modpackes cobertura "RUTA" [--java]   # qué queda en inglés y por qué (solo lee)
 uv run modpackes glosario listar | agregar "Death Knights" "Caballeros de la Muerte" | quitar "Fluix" | importar terminos.json

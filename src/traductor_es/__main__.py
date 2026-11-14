@@ -82,6 +82,11 @@ def _argumentos() -> argparse.ArgumentParser:
     def comunes(p: argparse.ArgumentParser) -> None:
         p.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
         p.add_argument("--dialecto", choices=list(DIALECTOS), default="es_mx")
+        p.add_argument(
+            "--tambien-es-es",
+            action="store_true",
+            help="traducir además una versión aparte en español de España (solo va a es_es; cuesta otra traducción)",
+        )
         p.add_argument("--solo", default=",".join(GRUPOS), help="grupos separados por comas: " + ",".join(GRUPOS))
         _opciones_de_motor(p)
         p.add_argument("--modelo", default="", help=f"modelo (con Gemini, por defecto {MODELO_POR_DEFECTO})")
@@ -173,7 +178,7 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
             args.carpeta, motor, args.dialecto, grupos, memoria=memoria, registro=_escribir,
             hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
             texto_java=args.java,
-            scripts_exhaustivo=args.exhaustivo,
+            scripts_exhaustivo=args.exhaustivo, tambien_es_es=args.tambien_es_es,
         ) as p,
     ):  # fmt: skip
         if simular:
@@ -283,7 +288,7 @@ def _cambios(args: argparse.Namespace) -> None:
     grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
     with Proceso(
         args.carpeta, Simulador(), args.dialecto, grupos, registro=(lambda _m: None) if args.json else _escribir,
-        texto_java=args.java, scripts_exhaustivo=args.exhaustivo,
+        texto_java=args.java, scripts_exhaustivo=args.exhaustivo, tambien_es_es=args.tambien_es_es,
     ) as p:  # fmt: skip
         if not args.json:
             _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
