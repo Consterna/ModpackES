@@ -1,4 +1,5 @@
-"""Textos de datapacks y packs de recursos que el jugador ve en el chat o en pantalla: funciones, logros y tips.
+"""Textos de datapacks y packs de recursos que el jugador ve en el chat o en pantalla: funciones, logros, tips y
+los nombres y descripciones de los objetos que dan las loot tables.
 
 Los archivos se buscan por su **estructura** y no por la carpeta de un modpack concreto: cualquier ruta que
 contenga `data/<espacio>/function(s)/…`, `data/<espacio>/advancement(s)/…` o `assets/<espacio>/tips/…` cuenta,
@@ -115,6 +116,93 @@ def _reescribir_json(
     return json.dumps(datos, indent=2, ensure_ascii=False) + "\n"
 
 
+# ---------------------------------------------------------------- loot tables e item modifiers
+#: Un lugar con un componente de texto: (diccionario o lista que lo contiene, clave o posición).
+Nodo = tuple[Any, Any]
+_COMPONENTES_CON_NOMBRE = ("minecraft:custom_name", "minecraft:item_name")
+
+
+def _nodos_botin(datos: Any) -> list[Nodo]:
+    """Lo que el jugador ve de un objeto que sale de una loot table o un item modifier.
+
+    `set_name` (`name`), `set_lore` (cada línea de `lore`) y, desde 1.20.5, `set_components` con `custom_name`,
+    `item_name`, `lore` y las páginas y el título de `written_book_content`. Se buscan en cualquier parte del archivo
+    (pools, entradas, funciones anidadas).
+    """
+    nodos: list[Nodo] = []
+
+    def lineas(lista: Any) -> None:
+        if isinstance(lista, list):
+            elementos = cast("list[Any]", lista)
+            nodos.extend((elementos, i) for i in range(len(elementos)))
+
+    def visitar(x: Any) -> None:
+        if isinstance(x, list):
+            for v in cast("list[Any]", x):
+                visitar(v)
+            return
+        if not isinstance(x, dict):
+            return
+        d = cast("dict[str, Any]", x)
+        funcion = str(d.get("function", "")).removeprefix("minecraft:")
+        if funcion == "set_name" and "name" in d:
+            nodos.append((d, "name"))
+        elif funcion == "set_lore":
+            lineas(d.get("lore"))
+        elif funcion == "set_components" and isinstance(d.get("components"), dict):
+            comp = cast("dict[str, Any]", d["components"])
+            nodos.extend((comp, k) for k in _COMPONENTES_CON_NOMBRE if k in comp)
+            lineas(comp.get("minecraft:lore"))
+            libro = comp.get("minecraft:written_book_content")
+            if isinstance(libro, dict):
+                crudo = cast("dict[str, Any]", libro).get("pages")
+                paginas: list[Any] = cast("list[Any]", crudo) if isinstance(crudo, list) else []
+                for i, p in enumerate(paginas):
+                    pagina = cast("dict[str, Any]", p) if isinstance(p, dict) and "raw" in p else None
+                    nodo: Nodo = (pagina, "raw") if pagina is not None else (paginas, i)
+                    nodos.append(nodo)
+        for v in d.values():
+            if isinstance(v, dict | list):
+                visitar(v)
+
+    visitar(datos)
+    return nodos
+
+
+def _cuerpo(valor: Any) -> tuple[str, bool]:
+    """(el componente como texto, si va guardado dentro de una cadena).
+
+    Desde 1.20.5 un nombre puede venir como cadena con JSON o SNBT adentro («"{\"text\":\"Excalibur\"}"»): se
+    traduce lo de adentro, no la cadena entera como si fuera texto.
+    """
+    if isinstance(valor, str):
+        limpio = valor.strip()
+        if limpio.startswith(("{", "[")) or (len(limpio) >= 2 and limpio[0] == limpio[-1] == '"' and _es_json(limpio)):
+            return valor, True
+    return _componente(valor), False
+
+
+def _es_json(texto: str) -> bool:
+    try:
+        json.loads(texto)
+    except ValueError:
+        return False
+    return True
+
+
+def _unidades_botin(texto: str) -> list[str]:
+    return [u for c, k in _nodos_botin(json.loads(texto)) for u in _traducibles(componente.unidades(_cuerpo(c[k])[0]))]
+
+
+def _reescribir_botin(texto: str, traducciones: Mapping[str, str]) -> str:
+    datos = json.loads(texto)
+    for c, k in _nodos_botin(datos):
+        cuerpo, en_cadena = _cuerpo(c[k])
+        nuevo = componente.reconstruir(cuerpo, traducciones)
+        c[k] = nuevo if en_cadena else json.loads(nuevo)
+    return json.dumps(datos, indent=2, ensure_ascii=False) + "\n"
+
+
 @dataclass(frozen=True, slots=True)
 class Formato:
     nombre: str
@@ -143,6 +231,11 @@ FORMATOS: tuple[Formato, ...] = (
         "mercado", "pestaña de un mercado",
         lambda r: _es(r, "data", ("farmingforblockheads_compat",), ".json"),
         lambda t: _unidades_json(t, _nodos_mercado), lambda t, tr: _reescribir_json(t, tr, _nodos_mercado),
+    ),
+    Formato(
+        "botín", "nombre o descripción de un objeto que da un cofre o un jefe",
+        lambda r: _es(r, "data", ("loot_table", "loot_tables", "item_modifier", "item_modifiers"), ".json"),
+        _unidades_botin, _reescribir_botin,
     ),
     Formato(
         "tip", "consejo de las pantallas de carga",
