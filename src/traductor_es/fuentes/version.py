@@ -105,3 +105,25 @@ def mcmeta(formato: tuple[int, int], descripcion: str, tipo: str = "resource") -
     else:
         pack["pack_format"] = mayor
     return {"pack": pack}
+
+
+#: `supported_formats` existe desde 1.20.2 (formato 18) y se reemplazó por min_format/max_format en 1.21.9 (65).
+_PRIMERO_CON_RANGO = 18
+
+
+def rango_publicable(formato: int) -> tuple[int, int] | None:
+    """Rango de `supported_formats` para un pack que solo trae textos, o None si a ese formato no le corresponde.
+
+    Abarca los formatos de la misma línea de versiones (1.20.x, 1.21.x…): un pack de idiomas no depende del
+    formato, y así el juego no lo marca como «hecho para otra versión» si el modpack sube de versión menor.
+    """
+    if not _PRIMERO_CON_RANGO <= formato < _NUEVO_RECURSOS:
+        return None
+    propias = [Version.de(v) for v, (f, _) in _RECURSOS if f <= formato]
+    if not propias:
+        return None
+    linea = max(propias).partes[:2]  # la versión más nueva con ese formato o uno anterior
+    formatos = [f for v, (f, _) in _RECURSOS if Version.de(v).partes[:2] == linea]
+    desde = max(min(formatos), _PRIMERO_CON_RANGO)
+    hasta = min(max(formatos), _NUEVO_RECURSOS - 1)
+    return min(desde, formato), max(hasta, formato)

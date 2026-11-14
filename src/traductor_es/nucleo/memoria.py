@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +21,16 @@ class Coincidencia:
     ambito: str  #: «*» si es una corrección sin traducción previa en la memoria
     traduccion: str
     corregida: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class Fila:
+    """Una traducción de la memoria tal como se comparte en un paquete."""
+
+    origen: str
+    ambito: str
+    traduccion: str
+    motor: str
 
 
 def codigos_iguales(original: str, traduccion: str) -> bool:
@@ -95,6 +106,28 @@ class Memoria:
         salida = {str(o): str(t) for o, t in filas}
         salida.update(self.correcciones(dialecto))
         return salida
+
+    def filas(self, buscadas: Iterable[tuple[str, str]], dialecto: str) -> list[Fila]:
+        """Las traducciones guardadas de esos pares (original, ámbito), con el motor que las hizo."""
+        salida: list[Fila] = []
+        with self._lock:
+            for origen, ambito in sorted(set(buscadas)):
+                fila = self._db.execute(
+                    "SELECT traduccion, motor FROM traducciones WHERE origen=? AND dialecto=? AND ambito=?",
+                    (origen, dialecto, ambito),
+                ).fetchone()
+                if fila is not None:
+                    salida.append(Fila(origen, ambito, str(fila[0]), str(fila[1])))
+        return salida
+
+    def importar(self, filas: Iterable[Fila], dialecto: str) -> int:
+        """Guarda traducciones de otra memoria (reemplaza las que ya hubiera). Devuelve cuántas guardó."""
+        fecha = datetime.now(UTC).isoformat(timespec="seconds")
+        lista = [(f.origen, dialecto, f.ambito, f.traduccion, f.motor, fecha) for f in filas]
+        with self._lock:
+            self._db.executemany("INSERT OR REPLACE INTO traducciones VALUES (?, ?, ?, ?, ?, ?)", lista)
+            self._db.commit()
+        return len(lista)
 
     def olvidar(self, origen: str, dialecto: str, ambito: str) -> None:
         with self._lock:
