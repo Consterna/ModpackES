@@ -61,6 +61,9 @@ referencia también baja el puntaje, así que revisa los ejemplos que lista el s
 - Mensajes de commit con [Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/)
   (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`, `ci:`, `chore:`…), un cambio lógico por commit y
   explicando el porqué. El CI lo comprueba en cada pull request.
+- Cada commit va a nombre del autor del repositorio, sin `Co-authored-by` ni firmas añadidas; el CI también lo
+  comprueba. Para traer cambios de `main` a una rama, usa `git rebase origin/main`, no un merge: así no vuelven
+  commits que ya se reescribieron en `main`.
 - El código, los nombres, los comentarios y los mensajes de commit van **en español**, como el resto del
   proyecto.
 - Tipado completo: `pyright` en modo estricto no debe dar errores.
