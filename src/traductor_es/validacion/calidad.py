@@ -168,12 +168,24 @@ def ajustar_mayusculas(original: str, traduccion: str, glosario: Mapping[str, st
     return traduccion
 
 
-def reemplazar_en_ingles(traduccion: str, faltan: Mapping[str, str]) -> tuple[str, dict[str, str]]:
+def _sigue_en_ingles(original: str, traduccion: str, terminos: Iterable[str]) -> bool:
+    """¿Lo que rodea a los términos sigue en inglés? Más de la mitad de sus palabras de 3 letras o más son las del
+    original («Iron Gear» → «Iron Gear»). Entonces cambiar solo el término daría una mezcla («Iron Engranaje»)."""
+    propias = {p for t in terminos for p in _palabras(t)}
+    del_original = set(_palabras(original))
+    resto = [p for p in _palabras(traduccion) if len(p) >= 3 and p not in propias]
+    return bool(resto) and sum(1 for p in resto if p in del_original) > len(resto) / 2
+
+
+def reemplazar_en_ingles(traduccion: str, faltan: Mapping[str, str], original: str = "") -> tuple[str, dict[str, str]]:
     """Cambia por su traducción los términos que el modelo dejó tal cual en inglés.
 
     Devuelve la traducción y los términos que siguen faltando (los que no aparecían en inglés: esos no se pueden
-    arreglar sin entender la frase).
+    arreglar sin entender la frase). Si con `original` se ve que el resto del texto también quedó en inglés, no se
+    cambia nada: una traducción a medias es peor que avisar.
     """
+    if original and _sigue_en_ingles(original, traduccion, faltan):
+        return traduccion, dict(faltan)
     siguen: dict[str, str] = {}
     for ingles, esperado in faltan.items():
         patron = _patron_palabra(ingles, re.IGNORECASE)
