@@ -630,3 +630,16 @@ def test_informe_en_cuadro_y_guardado_en_archivo(qtbot: QtBot, tmp_path: Path, m
     assert "This sentence looks like a message" in destino.read_text("utf-8")
     v.a_comprobar_apoyo.trigger()
     assert "mod de apoyo" in v.aviso.e_texto.text().lower() or "mod de apoyo" in v.log.toPlainText().lower()
+
+
+def test_analizar_otra_vez_muestra_que_cambio(qtbot: QtBot, tmp_path: Path) -> None:
+    """Tras una traducción, el análisis dice qué cambió en el modpack desde entonces (sin rediseñar la pantalla)."""
+    juego = _modpack(tmp_path)
+    v = _ventana(qtbot, juego)
+    _analizar(qtbot, v)
+    assert "Desde la última traducción" not in v.costo.text()  # nunca se tradujo: no hay con qué comparar
+    v.b_principal.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench", "item.m.x": "Drill"}))
+    _analizar(qtbot, v)
+    assert "Desde la última traducción" in v.costo.text() and "1 nuevas, 0 cambiadas, 0 borradas" in v.costo.text()

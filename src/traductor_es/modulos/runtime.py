@@ -14,6 +14,7 @@ from pathlib import Path
 from ..formatos import lang_json
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, contar
+from .cambios import Lugar
 from .cobertura import frases_por_mod
 
 AMBITO = "ui"
@@ -48,6 +49,10 @@ class TextoDeJava:
     def recolectar(self) -> list[Pieza]:
         self._frases = frases_por_mod(self.ctx.instancia)
         return [Pieza(f, self._pista(jar.name, f)) for jar, frases in self._frases for f in frases]
+
+    def lugares(self) -> list[Lugar]:
+        """Por mod (su .jar), las frases del código que se traducen (tras `recolectar`)."""
+        return [Lugar(jar.name, frases) for jar, frases in self._frases]
 
     @staticmethod
     def _pista(mod: str, frase: str) -> str:

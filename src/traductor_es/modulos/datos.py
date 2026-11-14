@@ -22,6 +22,7 @@ from ..formatos import comandos, componente
 from ..nucleo.mascara import es_traducible
 from ..salida.resource_pack import NOMBRE as NOMBRE_PACK_SALIDA
 from .base import Contexto, Pieza, Resumen, contar, parece_clave
+from .cambios import Lugar
 from .scripts import AMBITO, aplicar_comando, unidades_comando
 
 #: Carpetas que nunca se recorren: cachés, registros, mods (sus jars se leen en otro sitio) y lo que genera la app.
@@ -275,6 +276,14 @@ class Datos:
             for nombre, formato, datos in contenidos:
                 piezas += self._leer(ruta, formato, datos, nombre)
         return piezas
+
+    def lugares(self) -> list[Lugar]:
+        """Por archivo (o por archivo dentro de un .zip), sus textos en orden (tras `recolectar`)."""
+        juego = self.ctx.instancia.juego
+        return [
+            Lugar(a.ruta.relative_to(juego).as_posix() + (f"!{a.entrada}" if a.entrada else ""), list(a.piezas))
+            for a in self._leidos
+        ]
 
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
         resumen = Resumen()
