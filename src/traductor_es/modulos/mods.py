@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..fuentes.recursos import Pendiente
 from .base import Contexto, Pieza, Resumen, contar
+from .cambios import Lugar
 
 AMBITO = "ui"
 #: Solo los nombres de cosas van al glosario. Textos de controles o menús («Right», «All») no son términos:
@@ -101,6 +102,14 @@ class Mods:
         if copiados:
             self.ctx.registro(f"{copiados} textos se copian de otra variante de español, sin gastar")
         return [Pieza(p.ingles, self.pista(p.namespace, p.clave)) for p in self._pendientes if p.existente is None]
+
+    def lugares(self) -> list[Lugar]:
+        """Por mod (espacio de nombres), {clave: inglés} de lo que la app traduce (tras `recolectar`)."""
+        por_mod: dict[str, dict[str, str]] = {}
+        for p in self._pendientes:
+            if p.existente is None:
+                por_mod.setdefault(p.namespace, {})[p.clave] = p.ingles
+        return [Lugar(ns, textos) for ns, textos in sorted(por_mod.items())]
 
     @staticmethod
     def pista(namespace: str, clave: str) -> str:

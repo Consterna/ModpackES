@@ -8,6 +8,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Qué cambió desde la última traducción** (`modpackes cambios RUTA [--json]`; solo lee). Al actualizar un modpack, lista por mod y por archivo de misiones, libro o script las claves nuevas, las que cambiaron y las borradas, y estima el costo de traducir solo esa diferencia (lo que ya está en la memoria no cuenta). Al volver a analizar, la ventana muestra un resumen debajo del costo y `analizar` lo muestra en la consola. Cada traducción guarda en la marca del pack un índice con un hash corto de cada texto en inglés. Si el pack es de una versión anterior y no tiene índice, se compara con la memoria. Sigue la idea del `update` de [UpLang](https://github.com/QianFuv/UpLang), que compara el `en_us` viejo con el nuevo; aquí la comparación solo informa y «Traducir» aplica la diferencia.
+
 - **Glosario del usuario desde la línea de comandos:** `modpackes glosario listar | agregar INGLÉS ESPAÑOL | quitar INGLÉS | importar ARCHIVO.json`. Son los términos (y los nombres que no se traducen) que quieres que salgan siempre igual; mandan sobre todo lo demás y, si faltan en una traducción, el texto se reintenta.
 
 - **Texto escrito en el código de los mods** (opcional, apagado por defecto): la app traduce las frases que encuentra en el código Java de los
