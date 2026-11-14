@@ -9,7 +9,12 @@ import pytest
 from google.genai import errors, types
 
 from traductor_es.motores.base import Entrada, ErrorFatal, Lote
-from traductor_es.motores.gemini import Gemini, _esquema  # pyright: ignore[reportPrivateUsage]
+from traductor_es.motores.gemini import (
+    Gemini,
+    _esquema,  # pyright: ignore[reportPrivateUsage]
+    admite_temperatura,
+    nivel_de_razonamiento,
+)
 from traductor_es.motores.instrucciones import sistema, usuario
 
 
@@ -90,6 +95,33 @@ def test_429_persistente_termina_en_error_claro() -> None:
     g, _, _ = motor(*[error(429, "Too many requests")] * 7)
     with pytest.raises(ErrorFatal, match="429"):
         g.traducir_lote(lote("Hello"))
+
+
+def test_no_manda_temperatura_a_los_modelos_que_la_ignoran() -> None:
+    g, modelos, _ = motor('{"0": "Hola"}')
+    g.traducir_lote(lote("Hello"))
+    assert modelos.llamadas[0]["config"].temperature is None  # 3.8 Flash: Google la ignora y luego la rechazará
+    for nombre, admite in [
+        ("gemini-3.8-flash", False),
+        ("gemini-3.6-flash", False),
+        ("gemini-3.5-flash-lite", False),
+        ("gemini-4-carbon", False),
+        ("gemini-3.1-flash-lite", True),
+        ("gemini-3-flash-preview", True),
+        ("gemini-2.5-flash-lite", True),
+        ("modelo-raro", False),
+    ]:
+        assert admite_temperatura(nombre) is admite, nombre
+
+
+def test_nivel_de_razonamiento_valido_por_modelo() -> None:
+    assert nivel_de_razonamiento("gemini-3.8-flash") == "LOW"
+    assert nivel_de_razonamiento("gemini-4-hydrogen") == "LOW"  # la familia 4 no admite «minimal»
+    assert nivel_de_razonamiento("gemini-3.6-flash") == "MINIMAL"
+    assert nivel_de_razonamiento("gemini-3.5-flash-lite") == "MINIMAL"
+    assert nivel_de_razonamiento("gemini-2.5-flash-lite") is None  # no piensa si no se le pide
+    g = Gemini("clave", modelo="gemini-2.5-flash-lite", cliente=SimpleNamespace(models=Modelos(['{"0": "Hola"}'])))
+    assert g._config(lote("Hello")).thinking_config is None  # pyright: ignore[reportPrivateUsage]
 
 
 def test_si_no_acepta_el_razonamiento_lo_quita() -> None:
