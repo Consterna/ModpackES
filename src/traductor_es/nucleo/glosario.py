@@ -8,6 +8,15 @@ from collections.abc import Iterable, Mapping
 from .mascara import es_traducible
 
 _MAX_LARGO = 48
+#: Un nombre propio que no se traduce tiene pocas palabras, y todas las largas empiezan con mayúscula.
+_MAX_PALABRAS_NOMBRE = 3
+
+
+def _parece_nombre_propio(texto: str) -> bool:
+    palabras = texto.split()
+    if not palabras or len(palabras) > _MAX_PALABRAS_NOMBRE or not any(c.isalpha() for c in texto):
+        return False
+    return all(p[0].isupper() or len(p) <= 3 for p in palabras) and palabras[0][0].isupper()
 
 
 class Glosario:
@@ -28,6 +37,7 @@ class Glosario:
         traducido: Mapping[str, object],
         fuente: str = "",
         oficial: bool = False,
+        proteger_iguales: bool = False,
     ) -> None:
         """Toma las claves que existen en ambos idiomas.
 
@@ -35,13 +45,19 @@ class Glosario:
         Entre fuentes distintas: lo `oficial` (el propio juego) gana a un mod, y si dos mods traducen
         distinto el mismo término, no se usa ninguno de los dos: una traducción ajena que no encaja
         (el «Cow» de un mod que lo llama «Acechador de medianoche») se impondría a todo el modpack.
+
+        Un nombre que queda igual en los dos idiomas («Creeper», «Redstone») solo entra con `proteger_iguales`:
+        sirve para fuentes de fiar (el juego, lo ya traducido en esta ejecución). En el español de un mod, un
+        texto igual al inglés suele ser una traducción a medias, y protegerlo dejaría ese texto en inglés.
         """
         for clave, valor_en in ingles.items():
             valor_es = traducido.get(clave)
             if not isinstance(valor_en, str) or not isinstance(valor_es, str):
                 continue
             en, es = valor_en.strip(), valor_es.strip()
-            if 3 <= len(en) <= _MAX_LARGO and en != es and es and es_traducible(en) and "%" not in en:
+            if not (3 <= len(en) <= _MAX_LARGO and es and es_traducible(en) and "%" not in en):
+                continue
+            if en != es or (proteger_iguales and _parece_nombre_propio(en)):
                 self._agregar(en, es, fuente, oficial)
         self._orden = None
 
@@ -83,6 +99,10 @@ class Glosario:
         """Términos del usuario: mandan sobre todo lo demás."""
         self._fijos.update({k.strip(): v.strip() for k, v in terminos.items() if k.strip() and v.strip()})
         self._orden = None
+
+    def del_juego(self, termino: str) -> bool:
+        """¿El término sale del propio juego (y el usuario no lo cambió)?"""
+        return termino in self._oficiales and termino not in self._fijos
 
     def exacto(self, texto: str) -> str | None:
         t = texto.strip()

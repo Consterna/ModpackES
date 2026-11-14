@@ -220,6 +220,43 @@ solo cuenta si el juez elige lo mismo en los dos órdenes. Banco local: misiones
   texto de entrada. Se mantiene porque no empeora y es barata, y se vuelve a medir con otros motores.
 - El juez es el mismo modelo que tradujo, así que puede preferir su propio estilo; conviene repetirlo con otro.
 
+## 13 de noviembre de 2026 · controles de forma y la temperatura que Gemini ignora
+
+**La temperatura no estabiliza nada porque Gemini ya no la usa.** Google documenta que desde 3.5 Flash-Lite y
+3.6 Flash la API ignora `temperature`, `top_p` y `top_k`, y que las próximas generaciones los rechazarán con un
+error 400. Eso explica que antes «temperatura 0» no subiera la coincidencia entre corridas. La app ya no la manda a
+esos modelos. Sin ella, la coincidencia sigue igual: en el banco de interfaz de 399 textos, dos corridas idénticas dan
+el mismo texto en un 66–72 % de los casos, y las tres a la vez en ~59 %. Lo que fija un término es el glosario y la
+memoria, no un parámetro.
+
+**Controles de forma deterministas** para los «Leve» de la revisión humana (mayúsculas de términos del universo,
+nombres que no se traducen, palabras duplicadas):
+- un término del glosario que el original escribe como nombre propio dentro de una frase en minúscula sale con las
+  mayúsculas del glosario (no los nombres del juego, que en español van en minúscula en medio de una frase);
+- los nombres del juego que no se traducen («Creeper») y los de una palabra que el modelo dejó igual se protegen;
+- un nombre corto que repite una palabra que el original no repite se reintenta;
+- el reintento recibe la primera traducción y se le pide corregir solo lo que falló. Si el término sigue en inglés se
+  cambia por el del glosario, y lo que no se arregla se acepta como «aceptado con dudas».
+
+`medir_calidad.py --sin-controles` mide sin ellos y `--vanilla .descargas/vanilla` carga los nombres del juego como
+oficiales, igual que la app. Gemini 3.8 Flash, tres corridas por condición:
+
+| Banco | Comparación | Resultado |
+|---|---|---|
+| Interfaz (399 textos) | Primera versión: mayúsculas aunque el original pusiera mayúscula a todo | **−0,92 de chrF (IC −1,67 a −0,14), empeora** |
+| Interfaz (399 textos) | Versión final: solo dentro de frases en minúscula | +0,24 (IC −0,26 a +0,81), no se distingue del ruido |
+| Misiones (200 textos), juez Gemini 3.6 Flash | Con controles contra sin ellos, 137 textos distintos | 44 a 35 a favor de los controles (p = 0,37) |
+
+- La primera versión estaba mal: en inglés los nombres de objetos ponen mayúscula a cada palabra («Speed Upgrade
+  Module»), así que la regla creía que «Upgrade» era un nombre propio y escribía «Módulo de Mejora de velocidad».
+  Ahora una mayúscula solo cuenta si la frase tiene alguna palabra larga en minúscula.
+- Términos del glosario respetados: 221–228 de 244 con controles y 222–227 sin ellos. Contando plurales y otras
+  formas (la exactitud de términos de WMT25, nueva en `medir_calidad.py`): 234–239 contra 236–239.
+- En misiones la tendencia es positiva pero no concluyente. Ese banco no trae glosario del pack, así que ahí solo
+  actúan los nombres del juego y las repeticiones; la mayor parte de los 137 cambios es la variación normal de Gemini.
+- Se mantienen porque no empeoran y cubren casos concretos que el modelo falla una y otra vez. Las pruebas de
+  `tests/test_controles_de_forma.py` reproducen los casos de la revisión humana.
+
 ## Cómo repetirlo
 
 ```
@@ -234,6 +271,7 @@ uv run python scripts/armar_banco_misiones.py --textos 400
 uv run python scripts/medir_calidad.py --sin-vecindad --banco .descargas/banco/misiones.json --salida build/base.json
 uv run python scripts/medir_calidad.py --banco .descargas/banco/misiones.json --salida build/mejora.json
 uv run python scripts/preferencia_pareada.py --a build/base.json --b build/mejora.json
+uv run python scripts/medir_calidad.py --banco .descargas/banco/ui_final.json --vanilla .descargas/vanilla --sin-controles
 ```
 
 El costo es una estimación con los precios de Google de noviembre de 2026, no lo que cobró la API.

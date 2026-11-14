@@ -29,7 +29,7 @@ from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import Traductor
 from ..proceso import Informe, InformeModulo
 from . import revision
-from .calidad import validar
+from .calidad import sale_el_termino, validar
 
 _N_MAXIMO, _BETA = 6, 2.0
 
@@ -49,6 +49,9 @@ class Banco:
     casos: list[Caso]
     #: Traducciones ya hechas de otros textos del mismo modpack ({inglés: español}); guían al motor
     ejemplos: dict[str, str] = field(default_factory=dict[str, str])
+    #: Nombres del propio juego ({inglés: español}, también los que no se traducen): entran como oficiales,
+    #: igual que en la app. Vacío en los bancos viejos.
+    juego: dict[str, str] = field(default_factory=dict[str, str])
 
     @classmethod
     def leer(cls, ruta: Path) -> Banco:
@@ -58,8 +61,13 @@ class Banco:
             for t in datos["textos"]
         ]
         ejemplos = {str(k): str(v) for k, v in datos.get("ejemplos", {}).items()}
+        juego = {str(k): str(v) for k, v in datos.get("juego", {}).items()}
         return cls(
-            str(datos.get("dialecto", "es_mx")), {str(k): str(v) for k, v in datos["glosario"].items()}, casos, ejemplos
+            str(datos.get("dialecto", "es_mx")),
+            {str(k): str(v) for k, v in datos["glosario"].items()},
+            casos,
+            ejemplos,
+            juego,
         )
 
 
@@ -94,14 +102,26 @@ def _sin_tildes(texto: str) -> str:
 
 def terminos(casos: Iterable[tuple[str, str]], glosario: Mapping[str, str]) -> tuple[int, int]:
     """(términos que aparecen en los originales, cuántos de ellos se tradujeron como dice el glosario)."""
-    presentes = respetados = 0
+    presentes, respetados, _ = terminos_con_lema(casos, glosario)
+    return presentes, respetados
+
+
+def terminos_con_lema(casos: Iterable[tuple[str, str]], glosario: Mapping[str, str]) -> tuple[int, int, int]:
+    """(presentes, respetados con la forma exacta, respetados con la forma exacta o una flexión).
+
+    Es la exactitud de términos de la tarea de terminología de WMT25: cuenta como acierto la forma exacta o la
+    misma palabra en otra forma («lingotes de hierro» por «lingote de hierro»), y se informan las dos.
+    """
+    presentes = exactos = flexibles = 0
     patrones = {en: re.compile(r"(?<![^\W_])" + re.escape(en.casefold()) + r"(?![^\W_])") for en in glosario}
     for original, traduccion in casos:
         for en, patron in patrones.items():
             if patron.search(original.casefold()):
                 presentes += 1
-                respetados += _sin_tildes(glosario[en]) in _sin_tildes(traduccion)
-    return presentes, respetados
+                exacto = _sin_tildes(glosario[en]) in _sin_tildes(traduccion)
+                exactos += exacto
+                flexibles += exacto or sale_el_termino(glosario[en], traduccion)
+    return presentes, exactos, flexibles
 
 
 def intervalo(puntajes: list[float], remuestreos: int = 1000, semilla: int = 0) -> tuple[float, float] | None:
@@ -181,6 +201,7 @@ class Medicion:
     rechazos: dict[str, int] = field(default_factory=dict[str, int])  #: motivo → textos que no pasaron las reglas
     descanso: float = 0.0  #: segundos de pausa de la carga segura (motores locales)
     traducciones: list[dict[str, str]] = field(default_factory=list[dict[str, str]])  #: todas, para juzgarlas
+    terminos_respetados_lema: int = 0  #: como `terminos_respetados`, aceptando plurales y otras formas (WMT25)
 
     @property
     def porcentaje(self) -> float:
@@ -202,7 +223,15 @@ class Medicion:
                 ),
             ),
             *((f"  chrF {a}", f"{v:.1f}") for a, v in sorted(self.por_ambito.items())),
-            ("Términos del glosario", f"{self.terminos_respetados} de {self.terminos_presentes}"),
+            (
+                "Términos del glosario",
+                f"{self.terminos_respetados} de {self.terminos_presentes}"
+                + (
+                    f" ({self.terminos_respetados_lema} contando plurales y otras formas)"
+                    if self.terminos_respetados_lema
+                    else ""
+                ),
+            ),
             *(
                 [("Consistencia de términos", f"{self.consistencia:.2f} ({self.terminos_evaluados} términos)")]
                 if self.consistencia is not None
@@ -243,7 +272,7 @@ def _medir(
             puntajes.setdefault(caso.ambito, []).append(puntaje)
         filas.append((puntaje, caso, hecha))
     todos = [p for lista in puntajes.values() for p in lista]
-    presentes, respetados = terminos(((c.original, t) for _, c, t in filas), banco.glosario)
+    presentes, respetados, con_lema = terminos_con_lema(((c.original, t) for _, c, t in filas), banco.glosario)
     nivel, evaluados = consistencia((c.original, t) for _, c, t in filas)
     peores = sorted(filas, key=lambda f: f[0])[:8]
     return Medicion(
@@ -253,6 +282,7 @@ def _medir(
         chrf=sum(todos) / len(todos) if todos else 0.0,
         terminos_presentes=presentes,
         terminos_respetados=respetados,
+        terminos_respetados_lema=con_lema,
         costo_estimado=costo,
         segundos=segundos,
         por_ambito={a: sum(v) / len(v) for a, v in puntajes.items()},
@@ -280,10 +310,15 @@ def medir(
     glosario_estricto: bool = True,
     hilos: int = 4,
     cantidad_ejemplos: int = CANTIDAD_EN_LA_APP,
+    controles_de_forma: bool = True,
 ) -> list[Medicion]:
     """Traduce el banco con el motor (memoria vacía) y devuelve la medición; con `revisar`, también la de después."""
     glosario = Glosario()
-    glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario)
+    if banco.juego:  # como la app: el juego primero, oficial y con sus nombres que no se traducen
+        glosario.agregar_pares(
+            {k: k for k in banco.juego}, banco.juego, fuente="minecraft", oficial=True, proteger_iguales=True
+        )
+    glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario, fuente="banco")
     with Memoria(":memory:") as memoria:
         ejemplos = Ejemplos(cantidad=cantidad_ejemplos)
         ejemplos.agregar_pares(banco.ejemplos)
@@ -291,6 +326,7 @@ def medir(
         traductor = Traductor(
             motor, memoria, glosario, banco.dialecto, hilos, validador=validar, ejemplos=ejemplos,
             glosario_estricto=glosario_estricto, limite_caracteres=limites[0], limite_entradas=limites[1],
+            controles_de_forma=controles_de_forma,
         )  # fmt: skip
         por_ambito: dict[str, list[str]] = {}
         pistas: dict[str, str] = {}

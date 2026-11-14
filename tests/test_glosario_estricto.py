@@ -30,8 +30,15 @@ def test_un_termino_que_no_esta_en_el_original_no_se_exige() -> None:
     assert terminos_faltantes("Hello there", "Hola", GLOSARIO) == {}
 
 
-def test_un_termino_igual_en_los_dos_idiomas_no_se_exige() -> None:
-    assert terminos_faltantes("A Creeper", "Una criatura verde", {"Creeper": "Creeper"}) == {}
+def test_un_termino_igual_en_los_dos_idiomas_solo_se_exige_como_nombre_propio() -> None:
+    # Escrito como nombre propio en medio de la frase: no se traduce y debe seguir ahí
+    original = "Beware: a Creeper is near your house"
+    assert terminos_faltantes(
+        original, "Cuidado: una criatura verde está cerca de tu casa", {"Creeper": "Creeper"}
+    ) == {"Creeper": "Creeper"}
+    assert terminos_faltantes(original, "Cuidado: un Creeper está cerca de tu casa", {"Creeper": "Creeper"}) == {}
+    # En minúscula es una palabra común: no se obliga a dejarla en inglés
+    assert terminos_faltantes("a normal mode", "un modo corriente", {"Normal": "Normal"}) == {}
 
 
 def test_solo_cuenta_la_palabra_completa() -> None:
@@ -62,6 +69,7 @@ def test_el_texto_sin_el_termino_se_reintenta_con_el_aviso() -> None:
     motor = _Olvidadizo()
     with Memoria(":memory:") as mem:
         r = Traductor(motor, mem, glosario).traducir(["Put the Iron Ingot in the Chest"], "ui")
+    # El original pone mayúscula a todo, así que «Chest» no dice que sea un nombre propio: «cofre» en minúscula
     assert r.traducciones == {"Put the Iron Ingot in the Chest": "Pon el lingote de hierro en el cofre"}
     pista = motor.lotes[-1].entradas[0].pista
     assert "«Iron Ingot» = «Lingote de hierro»" in pista and "«Chest» = «Cofre»" in pista

@@ -2,6 +2,8 @@
 
 - Respuesta con esquema JSON exacto: el modelo debe devolver una clave por cada texto recibido.
 - Razonamiento («thinking») al mínimo que admite el modelo: para traducir no hace falta y se paga.
+- Sin `temperature` en los modelos que la ignoran (3.5 Flash-Lite, 3.6 Flash y posteriores): la estabilidad no
+  sale de ahí, sino de la memoria y del glosario.
 - Reintentos con espera ante cuota (429) y fallos del servidor; errores claros para la clave o el modelo.
 - Modo por lotes (Batch API): la mitad de precio, a cambio de esperar a que Google lo procese.
 """
@@ -9,6 +11,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -32,8 +35,36 @@ PRECIOS: dict[str, tuple[float, float]] = {
     "gemini-3-flash-preview": (0.50, 3.00),
     "gemini-2.5-flash-lite": (0.10, 0.40),
 }
-#: Nivel de razonamiento más bajo que acepta cada familia (3.8 Flash no admite «minimal»).
-_RAZONAMIENTO_MINIMO = {"gemini-3.8-flash": "LOW"}
+#: Nivel de razonamiento más bajo que acepta cada modelo, según la documentación de Google (noviembre de 2026):
+#: 3.8 Flash y la familia 4 no admiten «minimal»; 2.5 Flash-Lite piensa solo si se le pide, así que no se configura.
+_RAZONAMIENTO_MINIMO: dict[str, str | None] = {"gemini-3.8-flash": "LOW", "gemini-2.5-flash-lite": None}
+#: Desde Gemini 3.5 Flash-Lite y 3.6 Flash la API ignora `temperature` (y las generaciones siguientes la rechazarán
+#: con un error 400): solo se manda a los modelos anteriores.
+_ULTIMA_VERSION_CON_TEMPERATURA = 3.5
+
+
+def _version(modelo: str) -> float | None:
+    """Versión de un modelo «gemini-X.Y-…» (3.8, 4.0…); None si el nombre no la trae."""
+    coincidencia = re.match(r"gemini-(\d+)(?:\.(\d+))?\b", modelo)
+    if coincidencia is None:
+        return None
+    return float(f"{coincidencia.group(1)}.{coincidencia.group(2) or 0}")
+
+
+def nivel_de_razonamiento(modelo: str) -> str | None:
+    """Nivel de razonamiento más bajo que admite el modelo, o None si conviene no configurarlo."""
+    if modelo in _RAZONAMIENTO_MINIMO:
+        return _RAZONAMIENTO_MINIMO[modelo]
+    version = _version(modelo)
+    return "LOW" if version is not None and version >= 4 else "MINIMAL"
+
+
+def admite_temperatura(modelo: str) -> bool:
+    """Si el modelo todavía usa `temperature`; ante un nombre desconocido no se manda (es lo que no falla)."""
+    version = _version(modelo)
+    return version is not None and version < _ULTIMA_VERSION_CON_TEMPERATURA
+
+
 _ESPERA_INICIAL, _ESPERA_MAXIMA, _SONDEO_LOTES = 4.0, 90.0, 30.0
 _MAXIMO_POR_TRABAJO = 15 * 1024 * 1024  #: margen bajo el límite de 20 MB de la Batch API
 
@@ -115,12 +146,12 @@ class Gemini:
 
     def _config(self, lote: Lote) -> types.GenerateContentConfig:
         razonamiento = None
-        if self._con_razonamiento:
-            nivel = _RAZONAMIENTO_MINIMO.get(self.modelo, "MINIMAL")
+        nivel = nivel_de_razonamiento(self.modelo)
+        if self._con_razonamiento and nivel is not None:
             razonamiento = types.ThinkingConfig(thinking_level=types.ThinkingLevel(nivel))
         return types.GenerateContentConfig(
             system_instruction=sistema(lote),
-            temperature=self._temperatura,
+            temperature=self._temperatura if admite_temperatura(self.modelo) else None,
             response_mime_type="application/json",
             response_schema=_esquema(lote),
             thinking_config=razonamiento,
