@@ -25,6 +25,7 @@ from ..motores.base import Motor
 from ..nucleo import terminos as terminos_repetidos
 from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
+from ..nucleo.mascara import sin_formato
 from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import Traductor
 from ..nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
@@ -117,7 +118,7 @@ def terminos_con_lema(casos: Iterable[tuple[str, str]], glosario: Mapping[str, s
     patrones = {en: re.compile(r"(?<![^\W_])" + re.escape(en.casefold()) + r"(?![^\W_])") for en in glosario}
     for original, traduccion in casos:
         for en, patron in patrones.items():
-            if patron.search(original.casefold()):
+            if patron.search(sin_formato(original).casefold()):
                 presentes += 1
                 exacto = _sin_tildes(glosario[en]) in _sin_tildes(traduccion)
                 exactos += exacto

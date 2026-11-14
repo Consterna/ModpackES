@@ -130,3 +130,27 @@ def test_la_version_de_espana_recibe_la_latinoamericana_como_referencia(tmp_path
     # La pasada principal no recibe nada de esto
     principales = [e.pista for lote in motor.lotes_recibidos if "España" not in lote.dialecto for e in lote.entradas]
     assert not any("en Latinoamérica" in pista for pista in principales)
+
+
+def test_los_nombres_que_quedan_igual_pasan_a_la_version_de_espana(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _modpack(tmp_path)
+    lang = juego / "config" / "ftbquests" / "quests" / "lang" / "en_us.snbt"
+    lang.write_text(
+        '{\n\tquest.A.title: "Find the hidden cave"\n'
+        '\tquest.B.quest_desc: ["The Arachnarch lunges at you from above."]\n'
+        '\tquest.C.quest_desc: ["You must defeat the Arachnarch in its lair."]\n}\n',
+        encoding="utf-8",
+    )
+
+    class Deja(PorDialecto):
+        def traducir_lote(self, lote: Lote) -> dict[str, str]:
+            salida = super().traducir_lote(lote)
+            return {e.id: "Arachnarch" if e.texto == "Arachnarch" else salida[e.id] for e in lote.entradas}
+
+    motor = Deja()
+    with Proceso(juego, motor, memoria=memoria, tambien_es_es=True) as p:
+        p.ejecutar()
+        assert p._espana is not None  # pyright: ignore[reportPrivateUsage]
+        assert p._espana.glosario.todos()["Arachnarch"] == "Arachnarch"  # pyright: ignore[reportPrivateUsage]
+    sueltos = [lote for lote in motor.lotes_recibidos for e in lote.entradas if e.texto == "Arachnarch"]
+    assert len(sueltos) == 1  # se decidió una vez, en la pasada principal

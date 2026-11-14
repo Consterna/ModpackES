@@ -76,3 +76,15 @@ def separar_bordes(texto: str) -> tuple[str, str, str]:
         return texto, "", ""
     inicio = len(texto) - len(texto.lstrip())
     return texto[:inicio], nucleo, texto[inicio + len(nucleo) :]
+
+
+#: Códigos de color y formato de Minecraft («&4», «§l»), pegados al texto que colorean.
+_CODIGO_DE_FORMATO = re.compile(r"[&§][0-9a-fk-orA-FK-OR]")
+
+
+def sin_formato(texto: str) -> str:
+    """El texto sin códigos de color ni de formato, para buscar palabras en él.
+
+    «Defeat the &4Arachnarch»: con el código, el «4» va pegado al nombre y «Arachnarch» no es una palabra completa.
+    """
+    return _CODIGO_DE_FORMATO.sub("", texto)

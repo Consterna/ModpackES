@@ -38,6 +38,14 @@ MOTIVO_TERMINOLOGIA = "terminología: "
 #: Prefijo del motivo de rechazo cuando la traducción repite una palabra que el original no repite.
 MOTIVO_REPETIDA = "palabra repetida: "
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
+#: Lo que se le dice al motor de un nombre propio que se repite en las misiones o los libros.
+AVISO_NOMBRE = (
+    "Nombre propio que se repite en los textos de este modpack: decide una sola traducción para todos. El nombre "
+    "de un jefe, una criatura única, una dimensión o un mod se deja igual; un lugar, objeto o grupo con nombre "
+    "común (mazmorras, llaves…) se traduce."
+)
+#: Ámbitos de frases largas donde se buscan nombres propios que se repiten.
+_AMBITOS_CON_NOMBRES = frozenset({"mision", "libro"})
 
 
 def _nada(*_: object) -> None:
@@ -147,6 +155,8 @@ class Traductor:
         faltan = self.pendientes(unicos, ambito)
         if faltan and ambito == "ui" and self._unificar_terminos(faltan, ambito):
             faltan = self.pendientes(unicos, ambito)
+        elif faltan and ambito in _AMBITOS_CON_NOMBRES and self.controles_de_forma:
+            self._unificar_nombres(faltan, ambito)
         if faltan:
             nucleos = self._ronda(faltan, ambito, pistas, (self.limite_caracteres, self.limite_entradas), resultado)
             if nucleos and not self.cancelar.is_set():
@@ -209,6 +219,28 @@ class Traductor:
             self.glosario.descubrir(hallados)
             self.registro(f"{len(hallados)} términos que se repiten se tradujeron primero, para que todo use el mismo")
         return bool(hallados)
+
+    def _unificar_nombres(self, faltan: list[str], ambito: str) -> None:
+        """Decide una vez cómo se escribe cada nombre propio que se repite en las frases y lo fija en el glosario.
+
+        Sin esto, el modelo deja «Arachnarch» en un texto y escribe «Aracnarca» en otro. Los nombres que ya están en
+        el glosario (del juego, de los mods o del usuario) no se vuelven a pedir.
+        """
+        conocidos = self.glosario.todos()
+        candidatos = [n for n in terminos.nombres_propios(faltan) if n not in conocidos]
+        if not candidatos or self.cancelar.is_set():
+            return
+        parcial = Resultado()
+        pistas = dict.fromkeys(candidatos, AVISO_NOMBRE)
+        self._ronda(candidatos, ambito, pistas, (1500, 40), parcial, informar=False, por_lotes=False, tolerante=True)
+        hallados = {n: parcial.nuevas[n] for n in candidatos if n in parcial.nuevas}
+        if hallados:
+            self.glosario.descubrir(hallados)
+            iguales = sum(1 for en, es in hallados.items() if en == es)
+            self.registro(
+                f"{len(hallados)} nombres propios que se repiten se decidieron primero "
+                f"({iguales} quedan sin traducir), para que todos los textos los escriban igual"
+            )
 
     def _lotes(self, nucleos: list[str], lim_chars: int, lim_items: int) -> list[list[str]]:
         lotes: list[list[str]] = []
