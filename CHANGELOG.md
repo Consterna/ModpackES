@@ -8,6 +8,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Importar un resource pack también trae sus libros de Patchouli:** cada archivo del libro en español se empareja con el mismo archivo en inglés del mod, campo por campo, y solo si los dos tienen la misma forma.
+- **Pista para las escenas de Ponder** (Create): las claves `*.ponder.*` llegan al motor como «texto de una escena de Ponder», para que traduzca frases cortas que explican lo que se ve.
 - **Scripts de CraftTweaker** (`scripts/*.zs`): tooltips (`addTooltip`, `addShiftTooltip`), nombres (`displayName`, `setDisplayName`), descripciones de JEI (`addDescription` en 1.12, `addInfo` desde 1.16) y el texto de `game.setLocalization`. Ids, claves, comparaciones y comentarios no se tocan; queda copia de seguridad.
 - **Loot tables e item modifiers:** el nombre (`set_name`), las líneas de descripción (`set_lore`) y, desde 1.20.5, `custom_name`, `item_name`, `lore` y las páginas de los libros escritos de `set_components`, en cualquier datapack. Lo que va como JSON dentro de una cadena se traduce por dentro y sigue siendo una cadena.
 - **Nombres propios coherentes en misiones y libros:** los nombres con mayúscula que se repiten en varias frases («Arachnarch», «Bronze Dungeons») se deciden una sola vez antes de traducir y se fijan en el glosario del pack. El nombre de un jefe, una criatura única, una dimensión o un mod se deja igual. Antes un texto decía «Arachnarch» y otro «Aracnarca».

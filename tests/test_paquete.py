@@ -380,3 +380,36 @@ def test_un_paquete_sin_version_de_espana_sigue_como_antes(tmp_path: Path) -> No
         importado, _ = paquete.aplicar(p, destino)
     assert importado.espana == 0
     assert _lang_escrito(otra, "es_es")["item.m.wrench"] == "«MX» Wrench"
+
+
+def test_importar_un_resource_pack_trae_tambien_sus_libros(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path / "a", "1.20.1", nombre="Pack")
+    entrada = "assets/m/patchouli_books/guia/{}/entries/inicio.json"
+    ingles = {"name": "Getting Started", "pages": [{"type": "text", "text": "Welcome to the mod."}], "icon": "m:x"}
+    espanol = {"name": "Primeros pasos", "pages": [{"type": "text", "text": "Bienvenido al mod."}], "icon": "m:x"}
+    rara: dict[str, object] = {"name": "Otro", "pages": []}  # otra forma: no se empareja
+    fabrica.jar(
+        juego / "mods" / "m.jar",
+        {
+            **fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench"}),
+            entrada.format("en_us"): ingles,
+            "assets/m/patchouli_books/guia/en_us/entries/raro.json": {"name": "Odd", "pages": [{"text": "Hm."}]},
+        },
+    )
+    fabrica.opciones(juego, ["vanilla"], "en_us")
+    zip_pack = fabrica.jar(
+        tmp_path / "descargas" / "Libros.zip",
+        {
+            "pack.mcmeta": {"pack": {"pack_format": 15, "description": "es"}},
+            entrada.format("es_es"): espanol,
+            "assets/m/patchouli_books/guia/es_es/entries/raro.json": rara,
+        },
+    )
+    with Memoria(":memory:") as memoria, Proceso(juego, SinLlamadas(), grupos=["libros"], memoria=memoria) as p:
+        resumen, _informe = paquete.aplicar(p, zip_pack)
+        assert memoria.obtener("Getting Started", "es_mx", "libro") == "Primeros pasos"
+        assert memoria.obtener("Welcome to the mod.", "es_mx", "libro") == "Bienvenido al mod."
+        assert memoria.obtener("Odd", "es_mx", "libro") is None
+    assert resumen.memoria == 2
+    escrito = juego / "resourcepacks" / "Traduccion_ES" / entrada.format("es_mx")
+    assert json.loads(escrito.read_text("utf-8"))["pages"][0]["text"] == "Bienvenido al mod."
