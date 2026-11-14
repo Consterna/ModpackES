@@ -336,6 +336,79 @@ los nombres que se repiten y que es_mx unas veces deja en inglés y otras traduc
 - Ahora «Arachnarch» queda igual en todos los textos y «Summoner» es «Invocador» en todos («mazmorra del Invocador»).
 - Es una sola corrida en un solo modpack: la tendencia es clara, pero conviene confirmarla en otros.
 
+## 14 de noviembre de 2026 · modelos locales solo con CPU (tope de 6 GB por modelo)
+
+Tres modelos locales con `llama.cpp` compilado **solo para CPU** (sin GPU; commit `9183a55`), en un Xeon de 4 núcleos
+a 2,1 GHz (AVX2 y AVX-512) con 15 GB de RAM. El usuario tiene un **tope de 6 GB de memoria por modelo**, así que la RAM
+cuenta tanto como la calidad. Banco de interfaz armado de nuevo con `armar_banco_local.py` sobre los 24 packs del corpus
+(553 jars): **400 textos**, glosario de 10.732 términos y los nombres del juego de vanilla 26.3 (`--vanilla`). Como en CPU
+cada corrida tardó menos de 20 minutos, se midió el banco entero y no hizo falta la muestra de 100 textos. Mismos ajustes
+para todos: `-c 4096 -np 1 -t 4 --reasoning off --cache-ram 0`, un pedido a la vez (`--hilos 1`), lotes locales de 12
+textos o 1.800 caracteres, sin ejemplos (lo que usa la app).
+
+| | Gemma 4 E2B | Gemma 4 E4B | Qwen3.5 4B |
+|---|---|---|---|
+| Archivo (Hugging Face, Apache 2.0) | QAT Q4_0 de Google, 3,35 GB | QAT Q4_0 de Google, 5,15 GB | Q4_K_M de unsloth, 2,74 GB |
+| Textos aceptados | 397 de 400 (2 corridas iguales) | 399 de 400 | 399 de 400 |
+| chrF (IC 95 %) | 73,7 (71,2 a 76,3); 2.ª corrida 73,6 | **74,6 (72,1 a 77,1)** | 70,7 (67,8 a 73,3) |
+| Términos del glosario respetados | 532 de 612 (568 con plurales y otras formas) | **544 de 612** (569) | 522 de 612 (568) |
+| Rechazos por motivo | códigos dañados 3 | códigos dañados 1 | códigos dañados 1 |
+| Tiempo (400 textos) | **456 s** (1,1 s por texto) | 850 s (2,1 s) | 1.127 s (2,8 s) |
+| Velocidad (lectura / escritura) | ~300 / ~16 tokens por segundo | ~86 / ~10 | ~80 / ~7 |
+| RAM pico sin mmap (`--load-mode none`) | **3,7 GiB** | 5,7 GiB | 3,5 GiB |
+| RAM pico con mmap (lo normal de `llama.cpp`) | 4,7 GiB | 7,9 GiB | 5,7 GiB |
+
+Comparaciones pareadas (`comparar_mediciones.py`, mismos textos):
+
+| Comparación | Diferencia de chrF (IC 95 %) |
+|---|---|
+| Gemma 4 E2B (2 corridas) → Gemma 4 E4B | +0,96 (−0,17 a +2,16), no se distingue del ruido |
+| Qwen3.5 4B → Gemma 4 E2B (2 corridas) | **+2,90 (+1,39 a +4,36), Gemma mejor** |
+| Qwen3.5 4B → Gemma 4 E4B | **+3,95 (+2,35 a +5,59), Gemma mejor** |
+| Gemma 4 E4B sin ejemplos → con `--n-ejemplos 8` | −0,12 (−1,02 a +0,73), no se distingue del ruido |
+
+Con 8 ejemplos, E4B aceptó los 400 textos (sin rechazos), pero respetó menos términos (530 de 613 contra 544 de 612) y
+tardó 884 s. Tampoco ayuda en el modelo local: **se mantiene `CANTIDAD_EN_LA_APP = 0`**.
+
+- **Cómo leer la RAM.** Con mmap (lo que hace `llama.cpp` por defecto), el archivo del modelo cuenta en la RAM del
+  proceso y, además, en CPU los pesos Q4 se reordenan en una copia aparte para ir más rápido: una parte se cuenta dos
+  veces. Sin mmap (`--load-mode none`) se carga una sola copia: es la memoria que el modelo necesita de verdad. Esa cifra
+  se midió aparte, con un pedido de ~700 tokens (los búferes se reservan al cargar según `-c 4096`, así que el pico no
+  cambia con más pedidos). Son GiB (lo que Windows muestra como «GB»): E4B sin mmap ocupa 5,7 GiB (6,1 GB decimales),
+  **justo en el tope**, y con mmap lo pasa (7,9 GiB). E2B y Qwen caben con margen.
+- **Dos ajustes que importan en CPU.** Sin `--reasoning off`, Gemma 4 «piensa» antes de responder: un pedido de dos textos
+  tardó 34 s (568 tokens) en vez de 2,4 s (41 tokens). Sin `--cache-ram 0`, `llama-server` guarda prompts viejos en RAM
+  (hasta 8 GB por defecto) y la RAM de E2B subió de 4,7 a 5,5 GiB en una corrida; no cambia la calidad (73,7 y 73,6).
+- Dos corridas de E2B con los mismos ajustes dieron el mismo texto en 339 de 395 casos (86 %); Gemini daba 66–72 % en el
+  banco anterior. En cada modelo solo un texto salió idéntico al inglés («Icon» en Gemma, «Chest Slayer» en Qwen), y no apareció
+  ningún regionalismo de España («vosotros», «ordenador», «coger», «-áis/-éis»). La consistencia de términos dio
+  0,78–0,81 en los cuatro casos, sin diferencias claras.
+- Las corridas se hicieron con el código anterior a los nombres propios coherentes y los códigos de color (sección de
+  arriba). Repetí E2B con el código que ya los incluye: 397 de 400, chrF 73,7 (IC 71,1 a 76,2; diferencia pareada
+  +0,03, IC −0,32 a +0,44), 530 de 610 términos (el total cambia porque
+  ahora se ven los términos pegados a un código de color, que salen en 5 de los 400 textos), 443 s y la misma RAM. En la
+  interfaz esos cambios no mueven el resultado, porque los nombres propios solo se unifican en misiones y libros.
+- **No es comparable con la referencia anterior** (Gemma 4 E2B, chrF 64,1 en 100 textos, 12 de noviembre): aquel banco
+  era otro, de antes de limpiar las referencias a medias, y se midió con GPU y carga segura. Gemini no se midió en este
+  banco (sin clave de API), así que tampoco hay una comparación directa con él.
+
+**Recomendación:** con CPU y 6 GB por modelo, **Gemma 4 E2B (QAT Q4_0)** como modelo local por defecto. E4B da +1 punto
+de chrF y 12 términos más, pero la mejora no se distingue del ruido, tarda casi el doble y solo cabe en 6 GB si se carga
+sin mmap y sin caché de prompts. Queda como opción para quien prefiera algo más de calidad y tenga RAM de sobra. Qwen3.5
+4B no se recomienda: es claramente peor que los dos Gemma y el más lento. En cualquier caso, `--reasoning off`.
+
+Cómo repetirlo (comprobando antes que el puerto esté libre y apagando el servidor al terminar):
+
+```
+llama-server -m gemma-4-E2B_q4_0-it.gguf --alias gemma-4-e2b --host 127.0.0.1 --port PUERTO -c 4096 -np 1 -t 4 --reasoning off --cache-ram 0 --no-webui
+uv run python scripts/medir_calidad.py --motor personalizado --direccion http://127.0.0.1:PUERTO/v1 --modelo gemma-4-e2b --banco .descargas/banco/ui_final.json --vanilla .descargas/vanilla --hilos 1 --salida build/gemma-4-e2b.json
+uv run python scripts/comparar_mediciones.py --a build/qwen3.5-4b.json --b build/gemma-4-e2b.json
+```
+
+`.descargas/vanilla/` (en_us, es_mx y es_es de la última versión) se armó a mano desde los servidores de Mojang: en_us
+del jar del cliente, leído por rangos, y es_mx y es_es del índice de assets. `descargar_lang.py` baja solo los idiomas
+de los mods.
+
 ## Cómo repetirlo
 
 ```
