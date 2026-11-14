@@ -826,6 +826,9 @@ class Ventana(QMainWindow):
             texto += f" Costo estimado con {o['modelo']}{' por lotes' if o['lotes'] else ''}: {_dinero(costo)}."
         elif o["motor"] != fabrica.GEMINI:
             texto += " El costo depende del proveedor y del modelo: revisa sus precios."
+        cambios = self.ultimo_informe.cambios if self.ultimo_informe is not None else None
+        if cambios is not None and cambios.base == "indice":  # ya se tradujo antes: qué cambió desde entonces
+            texto += "\n" + cambios.resumen()
         return texto
 
     def _texto_traducir(self) -> str:
