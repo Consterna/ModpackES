@@ -6,6 +6,7 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 
 from .. import NOMBRE as NOMBRE_APP
 from .. import __version__
@@ -51,12 +52,38 @@ class PackSalida:
         self.raiz.mkdir(parents=True, exist_ok=True)
         meta = mcmeta(self.instancia.formato_recursos(), "§eTraducción al español del modpack")
         self.escribir("pack.mcmeta", (json.dumps(meta, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-        marca = {
+        marca: dict[str, Any] = {
             "app": NOMBRE_APP,
             "version": __version__,
             "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
         }
-        self.escribir(MARCA, (json.dumps(marca, indent=2) + "\n").encode("utf-8"))
+        if "indice" in (previa := self.leer_marca()):  # el índice de la última traducción no se pierde
+            marca["indice"] = previa["indice"]
+        self._escribir_marca(marca)
+
+    def leer_marca(self) -> dict[str, Any]:
+        """El contenido de la marca del pack, o {} si no hay pack o no se puede leer."""
+        try:
+            datos: object = json.loads((self.raiz / MARCA).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return cast(dict[str, Any], datos) if isinstance(datos, dict) else {}
+
+    def guardar_indice(self, indice: dict[str, Any]) -> None:
+        """Guarda en la marca el índice de los textos en inglés de esta traducción (ver `modulos/cambios.py`).
+
+        Si el pack todavía no existe se crea solo la carpeta con la marca: sin pack.mcmeta el juego no la usa.
+        """
+        marca = self.leer_marca() or {"app": NOMBRE_APP, "version": __version__}
+        marca["indice"] = indice
+        self._escribir_marca(marca)
+
+    def _escribir_marca(self, marca: dict[str, Any]) -> None:
+        if "indice" in marca:  # puede tener decenas de miles de claves: sin sangría ocupa la mitad
+            texto = json.dumps(marca, ensure_ascii=False, separators=(",", ":"))
+        else:
+            texto = json.dumps(marca, indent=2)
+        self.escribir(MARCA, (texto + "\n").encode("utf-8"))
 
     def escribir(self, relativa: str, datos: bytes) -> Path:
         ruta = self._ruta(relativa)
