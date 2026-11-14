@@ -221,19 +221,37 @@ class Proceso:
         self._principal = _Pasada(self.ctx, self.glosario, self.ejemplos, self.traductor)
         self._espana: _Pasada | None = None
         if self.tambien_es_es:
-            # La misma memoria, motor, copias y pack; su propio glosario (el juego en es_es primero) y traductor
-            ctx_es = Contexto(
-                self.instancia, self.ctx.respaldo, DIALECTO_ESPANA, (DIALECTO_ESPANA,), registro, self.ctx.pack,
-                solo_por_idioma=True,
-            )  # fmt: skip
-            glosario_es = Glosario()
-            ejemplos_es = Ejemplos(cantidad=CANTIDAD_EN_LA_APP)
-            traductor_es = Traductor(
-                motor, self.memoria, glosario_es, DIALECTO_ESPANA, hilos, progreso, registro, self.traductor.cancelar,
-                validar, usar_lotes=usar_lotes, contexto=contexto, ejemplos=ejemplos_es,
-                limite_caracteres=limites[0], limite_entradas=limites[1],
-            )  # fmt: skip
-            self._espana = _Pasada(ctx_es, glosario_es, ejemplos_es, traductor_es)
+            self._crear_espana()
+
+    def activar_version_espana(self) -> bool:
+        """Activa la versión aparte para España si el dialecto base es otro (lo pide un paquete que la trae).
+
+        Devuelve si quedó activa. Hay que llamarlo antes de `analizar` o `ejecutar`.
+        """
+        if self.ctx.dialecto == DIALECTO_ESPANA:
+            return False
+        if self._espana is None:
+            self.tambien_es_es = True
+            self.ctx.variantes = tuple(v for v in VARIANTES if v != DIALECTO_ESPANA)
+            self._crear_espana()
+        return True
+
+    def _crear_espana(self) -> None:
+        """La pasada de España: la misma memoria, motor, copias y pack; su propio glosario (el juego en es_es
+        primero) y su propio traductor, con los mismos ajustes que el principal."""
+        t = self.traductor
+        ctx_es = Contexto(
+            self.instancia, self.ctx.respaldo, DIALECTO_ESPANA, (DIALECTO_ESPANA,), self.registro, self.ctx.pack,
+            solo_por_idioma=True,
+        )  # fmt: skip
+        glosario_es = Glosario()
+        ejemplos_es = Ejemplos(cantidad=CANTIDAD_EN_LA_APP)
+        traductor_es = Traductor(
+            self.motor, self.memoria, glosario_es, DIALECTO_ESPANA, t.hilos, t.progreso, t.registro, t.cancelar,
+            validar, usar_lotes=t.usar_lotes, contexto=t.contexto, ejemplos=ejemplos_es,
+            limite_caracteres=t.limite_caracteres, limite_entradas=t.limite_entradas,
+        )  # fmt: skip
+        self._espana = _Pasada(ctx_es, glosario_es, ejemplos_es, traductor_es)
 
     # ------------------------------------------------------------------ preparación
     @property

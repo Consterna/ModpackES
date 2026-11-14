@@ -34,6 +34,9 @@ EXTENSION = ".modpackes.zip"
 #: Versión del formato del paquete. Un paquete de un formato más nuevo no se importa (pide actualizar la app).
 FORMATO = 1
 _META, _MEMORIA, _CORRECCIONES, _GLOSARIO = "modpackes.json", "memoria.json", "correcciones.json", "glosario.json"
+#: La versión aparte para España, si se tradujo: archivos extra que una app vieja ignora (el formato no cambia).
+_MEMORIA_ES, _CORRECCIONES_ES = "memoria_es_es.json", "correcciones_es_es.json"
+_ESPANA = "es_es"
 _AMBITOS = frozenset({"ui", "mision", "libro", "script"})
 #: Topes al leer un paquete ajeno: nadie debería poder llenar la memoria o la RAM con un archivo preparado.
 _MAX_ARCHIVO, _MAX_META, _MAX_TEXTO, _MAX_TERMINO = 128 * 1024 * 1024, 1024 * 1024, 20_000, 200
@@ -49,6 +52,7 @@ class ResumenExportacion:
     glosario: int = 0
     modelos: list[str] = field(default_factory=list[str])
     avisos: list[str] = field(default_factory=list[str])
+    espana: int = 0  #: traducciones de la versión aparte para España
 
     def __str__(self) -> str:
         partes = [
@@ -56,6 +60,8 @@ class ResumenExportacion:
             contar(self.correcciones, "corrección", "correcciones"),
             contar(self.glosario, "término del glosario", "términos del glosario"),
         ]
+        if self.espana:
+            partes.append(contar(self.espana, "traducción", "traducciones") + " de la versión de España")
         return f"Paquete guardado en {self.ruta}: " + ", ".join(partes) + "."
 
 
@@ -69,9 +75,12 @@ class ResumenImportacion:
     conservados: int = 0  #: correcciones y términos tuyos que se dejaron como estaban
     modelos: list[str] = field(default_factory=list[str])
     avisos: list[str] = field(default_factory=list[str])
+    espana: int = 0  #: traducciones de la versión aparte para España que se guardaron
 
     def __str__(self) -> str:
         partes = [contar(self.memoria, "traducción", "traducciones")]
+        if self.espana:
+            partes.append(contar(self.espana, "traducción", "traducciones") + " de la versión de España")
         if self.origen == "paquete":
             partes += [
                 contar(self.correcciones, "corrección", "correcciones"),
@@ -121,7 +130,12 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
     if not filas and not correcciones:
         raise ValueError("La memoria no tiene traducciones de este modpack en ese dialecto: traduce primero.")
     datos = datos_del_modpack(proceso.instancia.juego)
-    modelos = sorted({f.motor for f in filas})
+    filas_es: list[Fila] = []
+    correcciones_es: dict[str, str] = {}
+    if dialecto != _ESPANA:  # la versión de España, si se tradujo con «Traducir también… para España»
+        filas_es = [f for f in proceso.memoria.filas(textos, _ESPANA) if f.motor not in _NO_SE_COMPARTE]
+        correcciones_es = {o: t for o, t in proceso.memoria.correcciones(_ESPANA).items() if o in nucleos}
+    modelos = sorted({f.motor for f in (*filas, *filas_es)})
     meta: dict[str, Any] = {
         "formato": FORMATO,
         "app": NOMBRE_APP,
@@ -135,17 +149,24 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
         "modelos": modelos,
         "cantidades": {"memoria": len(filas), "correcciones": len(correcciones), "glosario": len(glosario)},
     }
+    if filas_es or correcciones_es:
+        meta["version_espana"] = {"memoria": len(filas_es), "correcciones": len(correcciones_es)}
     destino.parent.mkdir(parents=True, exist_ok=True)
     temporal = destino.with_name(destino.name + ".tmp")
     with zipfile.ZipFile(temporal, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(_META, _json(meta))
-        filas_json = [{"origen": f.origen, "ambito": f.ambito, "traduccion": f.traduccion, "motor": f.motor}
-                      for f in filas]  # fmt: skip
-        zf.writestr(_MEMORIA, _json(filas_json))
+        zf.writestr(_MEMORIA, _json([_fila_json(f) for f in filas]))
         zf.writestr(_CORRECCIONES, _json(dict(sorted(correcciones.items()))))
         zf.writestr(_GLOSARIO, _json(dict(sorted(glosario.items()))))
+        if filas_es or correcciones_es:
+            zf.writestr(_MEMORIA_ES, _json([_fila_json(f) for f in filas_es]))
+            zf.writestr(_CORRECCIONES_ES, _json(dict(sorted(correcciones_es.items()))))
     temporal.replace(destino)
-    return ResumenExportacion(destino, len(filas), len(correcciones), len(glosario), modelos, avisos)
+    return ResumenExportacion(destino, len(filas), len(correcciones), len(glosario), modelos, avisos, len(filas_es))
+
+
+def _fila_json(f: Fila) -> dict[str, str]:
+    return {"origen": f.origen, "ambito": f.ambito, "traduccion": f.traduccion, "motor": f.motor}
 
 
 def _json(datos: object) -> bytes:
@@ -257,21 +278,12 @@ def _avisos_de_version(proceso: Proceso, meta: dict[str, Any]) -> list[str]:
     return avisos
 
 
-def importar_paquete(proceso: Proceso, ruta: Path) -> ResumenImportacion:
-    """Guarda el paquete en la memoria local y en el glosario. Tus correcciones y términos no se pisan."""
-    meta = leer_metadatos(ruta)
-    dialecto = str(meta["dialecto"])
-    if dialecto != proceso.ctx.dialecto:
-        raise ValueError(f"El paquete está en {dialecto}: elige ese dialecto para importarlo.")
-    resumen = ResumenImportacion("paquete")
-    with zipfile.ZipFile(ruta) as zf:
-        filas = _filas_validas(_leer(zf, _MEMORIA), resumen)
-        correcciones = _pares_validos(_leer(zf, _CORRECCIONES), _MAX_TEXTO, resumen)
-        glosario = _pares_validos(_leer(zf, _GLOSARIO), _MAX_TERMINO, resumen)
-    resumen.avisos = _avisos_de_version(proceso, meta)
-    resumen.modelos = sorted({f.motor for f in filas})
-    resumen.memoria = proceso.memoria.importar(filas, dialecto)
+def _importar_correcciones(
+    proceso: Proceso, correcciones: dict[str, str], dialecto: str, resumen: ResumenImportacion
+) -> int:
+    """Guarda las correcciones del paquete que no choquen con las tuyas. Devuelve cuántas se guardaron."""
     mias = proceso.memoria.correcciones(dialecto)
+    guardadas = 0
     for origen, traduccion in correcciones.items():
         if origen in mias:
             resumen.conservados += mias[origen] != traduccion
@@ -280,7 +292,31 @@ def importar_paquete(proceso: Proceso, ruta: Path) -> ResumenImportacion:
             resumen.descartados += 1
             continue
         proceso.memoria.corregir(origen, dialecto, traduccion)
-        resumen.correcciones += 1
+        guardadas += 1
+    return guardadas
+
+
+def importar_paquete(proceso: Proceso, ruta: Path) -> ResumenImportacion:
+    """Guarda el paquete en la memoria local y en el glosario. Tus correcciones y términos no se pisan."""
+    meta = leer_metadatos(ruta)
+    dialecto = str(meta["dialecto"])
+    if dialecto != proceso.ctx.dialecto:
+        raise ValueError(f"El paquete está en {dialecto}: elige ese dialecto para importarlo.")
+    resumen = ResumenImportacion("paquete")
+    con_espana = dialecto != _ESPANA
+    with zipfile.ZipFile(ruta) as zf:
+        filas = _filas_validas(_leer(zf, _MEMORIA), resumen)
+        correcciones = _pares_validos(_leer(zf, _CORRECCIONES), _MAX_TEXTO, resumen)
+        glosario = _pares_validos(_leer(zf, _GLOSARIO), _MAX_TERMINO, resumen)
+        filas_es = _filas_validas(_leer(zf, _MEMORIA_ES), resumen) if con_espana else []
+        correcciones_es = _pares_validos(_leer(zf, _CORRECCIONES_ES), _MAX_TEXTO, resumen) if con_espana else {}
+    resumen.avisos = _avisos_de_version(proceso, meta)
+    resumen.modelos = sorted({f.motor for f in (*filas, *filas_es)})
+    resumen.memoria = proceso.memoria.importar(filas, dialecto)
+    resumen.correcciones = _importar_correcciones(proceso, correcciones, dialecto, resumen)
+    if filas_es or correcciones_es:
+        resumen.espana = proceso.memoria.importar(filas_es, _ESPANA)
+        resumen.correcciones += _importar_correcciones(proceso, correcciones_es, _ESPANA, resumen)
     terminos = configuracion.leer_glosario_usuario()
     nuevos = {en: es for en, es in glosario.items() if en not in terminos}
     resumen.conservados += sum(1 for en, es in glosario.items() if en in terminos and terminos[en] != es)
@@ -346,6 +382,8 @@ def aplicar(
     """Importa y escribe la traducción sin llamar a ningún motor. Lo que no traiga queda en inglés."""
     resumen = importar(proceso, ruta)
     proceso.registro(str(resumen))
+    if resumen.espana and proceso.activar_version_espana():  # que es_es reciba la suya, no la copia del principal
+        proceso.registro("El paquete trae la versión de España: es_es recibe la suya.")
     informe = proceso.ejecutar(activar=activar, poner_idioma=poner_idioma, solo_memoria=True)
     if proceso.ctx.pack is not None:
         proceso.ctx.pack.anotar_motores(resumen.modelos)
