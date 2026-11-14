@@ -442,6 +442,9 @@ class Proceso:
         if self._espana is not None and not self.traductor.cancelar.is_set():
             self.registro("▶ Español de España: se traduce aparte lo que tiene un archivo por idioma")
             self._preparar(self._espana)
+            # Los nombres que la versión principal decidió dejar sin traducir valen igual en España
+            iguales = {en: es for en, es in self.glosario.descubiertos().items() if en == es}
+            self._espana.glosario.descubrir(iguales)
             tradujo_el_motor |= self._traducir_pasada(self._espana, informe, {}, None, solo_memoria)
         if tradujo_el_motor and self.motor.nombre not in _SIN_CREDITO and self.ctx.pack is not None:
             self.ctx.pack.anotar_motores([self.motor.nombre])

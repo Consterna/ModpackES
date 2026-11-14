@@ -305,6 +305,37 @@ corpus (FTB Quests con carpeta `lang/`), US$ 0,09 las dos versiones.
   «Arachnarch» y en otro escribe «Aracnarca»; deja «Summoner» y en otro pone «Convocador». La solución de hoy es el
   glosario del usuario (`"Arachnarch": "Arachnarch"`); lo siguiente es fijar esas decisiones dentro de cada modpack.
 
+## 14 de noviembre de 2026 · nombres propios coherentes y códigos de color que escondían términos
+
+En la prueba anterior, la versión es_mx no era coherente consigo misma: dejaba «Arachnarch» en un texto y escribía
+«Aracnarca» en otro, o «Summoner» y «Convocador». Hubo dos cambios:
+
+- **Nombres propios que se repiten, decididos una vez.** Antes de traducir misiones y libros, la app busca los nombres
+  con mayúscula que salen en dos o más frases («Arachnarch», «Bronze Dungeons», «Starlit Crusher»), los traduce
+  primero (el nombre de un jefe, una criatura única, una dimensión o un mod se deja igual) y fija esa decisión en el
+  glosario del pack. La versión de España recibe los que quedaron sin traducir.
+- **Códigos de color pegados a un término.** En «Defeat the &4Arachnarch» el «4» del código va pegado al nombre, y la
+  búsqueda de palabras completas del glosario no lo veía: el término no se mandaba al modelo y la comprobación no lo
+  exigía. En la traducción pasaba igual («&emazmorras» no se leía como «mazmorras»). Las misiones usan estos códigos
+  todo el tiempo, así que el glosario fallaba en silencio en buena parte del texto. Ahora los códigos se quitan antes
+  de buscar términos (`mascara.sin_formato`).
+
+Prueba real (Gemini 3.8 Flash, 339 misiones de un modpack libre, una corrida por versión, US$ 0,09 cada una), contando
+los nombres que se repiten y que es_mx unas veces deja en inglés y otras traduce:
+
+| Versión | Nombres con decisiones distintas |
+|---|---|
+| Sin estos cambios | 13 |
+| Nombres decididos una vez (primera prueba) | 7 |
+| Lo mismo, repetido | 13 |
+| **Con los códigos de color arreglados** | **1** («Wither») |
+
+- Las dos corridas intermedias muestran cuánto varía Gemini: 7 y 13 con el mismo código. El arreglo de los códigos
+  es lo que cambió el resultado: el nombre fijado ya se exigía en todas las frases, también en «Defeat the
+  &4Arachnarch».
+- Ahora «Arachnarch» queda igual en todos los textos y «Summoner» es «Invocador» en todos («mazmorra del Invocador»).
+- Es una sola corrida en un solo modpack: la tendencia es clara, pero conviene confirmarla en otros.
+
 ## Cómo repetirlo
 
 ```

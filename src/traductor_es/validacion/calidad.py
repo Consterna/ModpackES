@@ -9,6 +9,8 @@ import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 
+from ..nucleo.mascara import sin_formato
+
 _PALABRA = re.compile(r"[^\W\d_]+")
 #: Palabras muy comunes del inglés que casi nunca aparecen en un texto en español.
 _INGLES = frozenset({
@@ -67,7 +69,7 @@ def _raiz(palabra: str) -> str:
 
 def sale_el_termino(esperado: str, traduccion: str) -> bool:
     """¿Aparece `esperado` en `traduccion`? Tolera tildes, mayúsculas y plurales o formas cercanas."""
-    destino = _sin_tildes(traduccion)
+    destino = _sin_tildes(sin_formato(traduccion))  # «&emazmorras» no es una palabra
     if _sin_tildes(esperado) in destino:
         return True
     palabras_destino = _PALABRA.findall(destino)
@@ -114,6 +116,16 @@ def es_nombre_propio_en(termino: str, original: str) -> bool:
     return False
 
 
+def _con_mayuscula(termino: str, original: str) -> bool:
+    """¿El original escribe el término con mayúscula en alguna parte («Defeat the Arachnarch»)? Para un nombre que
+    no se traduce basta con eso, también en un título: en minúscula («a normal mode») es una palabra común."""
+    for m in _patron_palabra(termino, re.IGNORECASE).finditer(original):
+        palabras = [p for p in _PALABRA.findall(m.group(0)) if len(p) >= 3]
+        if palabras and all(p[0].isupper() for p in palabras):
+            return True
+    return False
+
+
 def terminos_faltantes(original: str, traduccion: str, glosario: Mapping[str, str]) -> dict[str, str]:
     """{inglés: traducción esperada} de los términos del glosario que salen en el original y no en la traducción.
 
@@ -121,6 +133,7 @@ def terminos_faltantes(original: str, traduccion: str, glosario: Mapping[str, st
     de estilo. Un término que queda igual en los dos idiomas («Creeper», un jefe, un mod) solo se exige cuando
     el original lo escribe como nombre propio: así no se obliga a dejar en inglés una palabra común.
     """
+    original = sin_formato(original)  # «&4Arachnarch»: el código pegado no deja ver la palabra
     minusculas = original.casefold()
     faltan: dict[str, str] = {}
     # Los más largos primero: lo que ya cubrió un término largo («Item Frame») no se exige otra vez como
@@ -132,7 +145,7 @@ def terminos_faltantes(original: str, traduccion: str, glosario: Mapping[str, st
         if not patron.search(minusculas):
             continue
         minusculas = patron.sub(lambda m: " " * len(m.group(0)), minusculas)
-        if _sin_tildes(ingles) == _sin_tildes(esperado) and not es_nombre_propio_en(ingles, original):
+        if _sin_tildes(ingles) == _sin_tildes(esperado) and not _con_mayuscula(ingles, original):
             continue
         if not sale_el_termino(esperado, traduccion):
             faltan[ingles] = esperado
@@ -156,6 +169,7 @@ def ajustar_mayusculas(original: str, traduccion: str, glosario: Mapping[str, st
     («Lingote de hierro») tampoco: en medio de una frase en español va en minúscula; solo se respetan los que el
     glosario escribe como nombre propio («Caballeros de la Muerte», «Fluix»).
     """
+    original = sin_formato(original)
     for ingles, esperado in sorted(glosario.items(), key=lambda par: -len(par[1])):
         if not _escrito_como_nombre_propio(esperado) or not es_nombre_propio_en(ingles, original):
             continue
