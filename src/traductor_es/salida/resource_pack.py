@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -23,6 +24,22 @@ _PARTE_VALIDA = re.compile(r"[^\\/:*?\"<>|\x00-\x1f]+")
 _RESERVADOS = frozenset(
     {"CON", "PRN", "AUX", "NUL", *(f"COM{n}" for n in range(1, 10)), *(f"LPT{n}" for n in range(1, 10))}
 )
+
+
+def leer_marca(raiz: Path) -> dict[str, Any]:
+    """Lo que la app anotó en su pack (versión, fecha, motores); vacío si no hay marca o está dañada."""
+    try:
+        datos: Any = json.loads((raiz / MARCA).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return cast(dict[str, Any], datos) if isinstance(datos, dict) else {}
+
+
+def motores_de(marca: dict[str, Any]) -> list[str]:
+    lista: object = marca.get("motores")
+    if not isinstance(lista, list):
+        return []
+    return sorted({m for m in cast(list[object], lista) if isinstance(m, str)})
 
 
 def _parte_segura(parte: str) -> bool:
@@ -57,17 +74,16 @@ class PackSalida:
             "version": __version__,
             "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
         }
-        if "indice" in (previa := self.leer_marca()):  # el índice de la última traducción no se pierde
+        previa = self.leer_marca()
+        if "indice" in previa:  # el índice de la última traducción no se pierde
             marca["indice"] = previa["indice"]
+        if motores := motores_de(previa):  # ni los motores de los créditos del pack publicado
+            marca["motores"] = motores
         self._escribir_marca(marca)
 
     def leer_marca(self) -> dict[str, Any]:
         """El contenido de la marca del pack, o {} si no hay pack o no se puede leer."""
-        try:
-            datos: object = json.loads((self.raiz / MARCA).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
-        return cast(dict[str, Any], datos) if isinstance(datos, dict) else {}
+        return leer_marca(self.raiz)
 
     def guardar_indice(self, indice: dict[str, Any]) -> None:
         """Guarda en la marca el índice de los textos en inglés de esta traducción (ver `modulos/cambios.py`).
@@ -84,6 +100,17 @@ class PackSalida:
         else:
             texto = json.dumps(marca, indent=2)
         self.escribir(MARCA, (texto + "\n").encode("utf-8"))
+
+    def anotar_motores(self, motores: Iterable[str]) -> None:
+        """Suma a la marca los motores (y modelos) que tradujeron algo de este pack."""
+        nuevos = {m for m in motores if m}
+        if not nuevos or not (self.raiz / "pack.mcmeta").is_file():
+            return
+        marca = self.leer_marca()
+        previos = motores_de(marca)
+        if not nuevos <= set(previos):
+            marca["motores"] = sorted({*previos, *nuevos})
+            self._escribir_marca(marca)
 
     def escribir(self, relativa: str, datos: bytes) -> Path:
         ruta = self._ruta(relativa)
