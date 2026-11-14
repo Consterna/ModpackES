@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
-from .mascara import es_traducible
+from .mascara import es_traducible, sin_formato
 
 _MAX_LARGO = 48
 #: Un nombre propio que no se traduce tiene pocas palabras, y todas las largas empiezan con mayúscula.
@@ -30,6 +30,7 @@ class Glosario:
         #: Palabras del español que se cambian en lo que traen el juego y los mods («ítems» → «objetos»);
         #: el glosario del usuario no se toca
         self._sustituciones: list[tuple[re.Pattern[str], str]] = []
+        self._descubiertos: dict[str, str] = {}  #: lo que se decidió en esta ejecución (términos y nombres)
 
     def __len__(self) -> int:
         return len(self._terminos) + len(self._fijos)
@@ -111,7 +112,12 @@ class Glosario:
         for en, es in terminos.items():
             if en.strip() and es.strip():
                 self._terminos.setdefault(en.strip(), es.strip())
+                self._descubiertos.setdefault(en.strip(), self._terminos[en.strip()])
         self._orden = None
+
+    def descubiertos(self) -> dict[str, str]:
+        """Lo que se decidió en esta ejecución con `descubrir` ({inglés: español})."""
+        return dict(self._descubiertos)
 
     def fijar(self, terminos: Mapping[str, str]) -> None:
         """Términos del usuario: mandan sobre todo lo demás."""
@@ -144,7 +150,7 @@ class Glosario:
 
     def relevantes(self, textos: Iterable[str], maximo: int = 60) -> dict[str, str]:
         """Términos que aparecen como palabra completa en los textos, priorizando los más largos."""
-        bloque = "\n".join(textos).lower()
+        bloque = sin_formato("\n".join(textos)).lower()  # «&4Arachnarch» también cuenta
         elegidos: dict[str, str] = {}
         for bajo, original, patron in self._ordenados():
             if bajo in bloque and patron.search(bloque):
