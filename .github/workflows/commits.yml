@@ -34,3 +34,30 @@ jobs:
             exit 1
           fi
           echo "Todos los commits siguen Conventional Commits."
+
+      - name: Revisar autoría de cada commit
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CABEZA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Solo se aceptan estos autores; nada de coautores ni firmas añadidas.
+          permitidos='^(Cristian|Consterna|dependabot\[bot\])$'
+          malos=0
+          while IFS=$'\t' read -r sha autor emisor; do
+            for nombre in "$autor" "$emisor"; do
+              if [[ ! "$nombre" =~ $permitidos && "$nombre" != "GitHub" ]]; then
+                echo "::error::Commit ${sha:0:7} con autor no permitido: $nombre"
+                malos=1
+                break
+              fi
+            done
+            if git show -s --format=%B "$sha" | grep -qiE '^(co-authored-by|generated with)'; then
+              echo "::error::Commit ${sha:0:7} trae una firma o coautor que no va"
+              malos=1
+            fi
+          done < <(git log --format=$'%H\t%an\t%cn' "$BASE..$CABEZA")
+          if [ "$malos" -ne 0 ]; then
+            echo "Corrige el autor con: git rebase -r --exec 'git commit --amend --no-edit --reset-author' <rama base>"
+            exit 1
+          fi
+          echo "Todos los commits son del autor del repositorio."
