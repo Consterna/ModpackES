@@ -246,6 +246,9 @@ def test_el_pack_publicado_lleva_icono_leeme_y_formatos(tmp_path: Path) -> None:
         assert z.read("pack.png").startswith(b"\x89PNG")
         meta = json.loads(z.read("pack.mcmeta"))["pack"]
         leeme = z.read("LEEME.txt").decode("utf-8")
+        marca = json.loads(z.read("traductor_es.json"))
+    assert "indice" in leer_marca(juego / "resourcepacks" / "Traduccion_ES")  # el índice de cambios sí está en local
+    assert "indice" not in marca and marca["motores"] == ["prueba:modelo-1"]  # pero no viaja con el pack
     assert meta["pack_format"] == 22 and meta["supported_formats"] == [18, 32]
     assert "Mi Pack 2.1.0" in meta["description"]
     assert "traducción automática" in leeme and "Nadie la revisó" in leeme

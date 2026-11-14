@@ -1,4 +1,4 @@
-"""Línea de comandos: `modpackes instancias | analizar | traducir | exportar | paquete | restaurar | clave…`."""
+"""Línea de comandos: `modpackes instancias | analizar | cambios | traducir | exportar | paquete | …`."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from . import NOMBRE, __version__, configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.lanzadores import buscar
 from .fuentes.modpack import datos_del_modpack
+from .modulos.cambios import Cambios
 from .modulos.cobertura import informe_en_json
 from .motores import fabrica
 from .motores.base import Cancelado, ErrorFatal, Motor
@@ -57,6 +58,8 @@ def _mostrar(informe: Informe, args: argparse.Namespace) -> None:
         _escribir(f"Costo estimado con {modelo}{' (por lotes)' if lotes else ''}: US$ {costo:.2f}")
     for aviso in informe.avisos:
         _escribir(f"⚠ {aviso}")
+    if informe.cambios is not None and informe.cambios.base == "indice":
+        _escribir(informe.cambios.resumen() + " Detalle con «modpackes cambios».")
     if informe.revision_automatica is not None:
         _escribir(str(informe.revision_automatica))
     if informe.revision and informe.revision.inconsistentes:
@@ -97,6 +100,11 @@ def _argumentos() -> argparse.ArgumentParser:
         )
 
     comunes(sub.add_parser("analizar", help="cuenta lo que falta traducir y estima el costo (no escribe nada)"))
+    cambios = sub.add_parser(
+        "cambios", help="qué cambió desde la última traducción y cuánto cuesta traducir solo eso (no escribe nada)"
+    )
+    comunes(cambios)
+    cambios.add_argument("--json", action="store_true", help="escribe solo el informe, como JSON (UTF-8)")
     traducir = sub.add_parser("traducir", help="traduce y escribe el resultado")
     comunes(traducir)
     traducir.add_argument("--hilos", type=int, default=4)
@@ -268,9 +276,52 @@ def _cobertura(args: argparse.Namespace) -> None:
     _escribir(f"{len(hallazgos)} hallazgos." if hallazgos else "No encontré texto que quede en inglés.")
 
 
+def _cambios(args: argparse.Namespace) -> None:
+    """Qué cambió en el inglés del modpack desde la última traducción, por mod y por archivo. Solo lee."""
+    if args.lotes and args.motor != fabrica.GEMINI:
+        raise ErrorFatal("--lotes solo funciona con Gemini.")
+    grupos = [g.strip() for g in args.solo.split(",") if g.strip()]
+    with Proceso(
+        args.carpeta, Simulador(), args.dialecto, grupos, registro=(lambda _m: None) if args.json else _escribir,
+        texto_java=args.java, scripts_exhaustivo=args.exhaustivo,
+    ) as p:  # fmt: skip
+        if not args.json:
+            _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
+        informe = p.analizar()
+    cambios = informe.cambios or Cambios()
+    diferencia = informe.diferencia
+    modelo = _modelo(args)
+    costo = diferencia.costo(modelo, args.lotes, args.motor, args.revisar)
+    if args.json:
+        datos = {
+            "base": cambios.base, "fecha": cambios.fecha, "nuevas": cambios.nuevas, "cambiadas": cambios.cambiadas,
+            "borradas": cambios.borradas, "a_traducir": diferencia.a_traducir, "caracteres": diferencia.caracteres,
+            "costo": costo, "modelo": modelo, "lugares": cambios.en_json(),
+        }  # fmt: skip
+        _escribir(json.dumps(datos, ensure_ascii=False, indent=2))
+        return
+    if cambios.base == "memoria":
+        _escribir(
+            "No hay índice de una traducción anterior (nunca se tradujo con esta versión de la app): "
+            "cuento como nuevo lo que no está en la memoria. Tras la próxima traducción se compara clave por clave."
+        )
+    _escribir(cambios.texto())
+    if not cambios.lugares:
+        return
+    _escribir(
+        f"Para traducir solo lo nuevo y lo cambiado: {diferencia.a_traducir} textos para el motor, "
+        f"{diferencia.caracteres} caracteres (el resto sale de la memoria)"
+    )
+    if costo is not None:
+        _escribir(f"Costo estimado con {modelo}{' (por lotes)' if args.lotes else ''}: US$ {costo:.2f}")
+    _escribir("Para aplicarlo: «modpackes traducir» (lo que ya está en la memoria no se vuelve a pagar).")
+
+
+#: Órdenes que solo llaman a una función con los argumentos.
 _ORDENES: dict[str, Callable[[argparse.Namespace], None]] = {
     "instalar-runtime": _instalar_runtime,
     "cobertura": _cobertura,
+    "cambios": _cambios,
     "glosario": _glosario,
     "exportar": _exportar,
     "paquete": _paquete,

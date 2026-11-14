@@ -92,6 +92,8 @@ infalibles: sirven para decidir qué rehacer, no como nota de calidad.
 
 **Más ▸ Qué queda en inglés** (o `modpackes cobertura RUTA [--java]`) lista lo que no se traduce y por qué, sin cambiar nada: frases de scripts cuyo uso no se entiende, frases dentro de comandos de otros mods (p. ej. `emberstextapi queue`), cuyo formato la app no conoce y por eso no toca, y texto escrito en el código de los mods, que un resource pack no puede alcanzar. El análisis ya avisa de las frases de scripts.
 
+**Qué cambió desde la última traducción:** cuando sale una versión nueva del modpack, vuelve a pulsar «Analizar». Debajo del costo verás una línea como «Desde la última traducción (2026-11-12): 40 nuevas, 3 cambiadas, 5 borradas.». El detalle, por mod y por archivo de misiones, libro o script, sale con `modpackes cambios RUTA`, que no escribe nada. Ahí ves las claves nuevas, las que cambiaron y las borradas, y lo que costaría traducir solo esa diferencia. Para aplicarla basta con «Traducir»: lo que ya está en la memoria no se vuelve a pagar. Para comparar, cada traducción guarda en la marca del pack (`resourcepacks/Traduccion_ES/traductor_es.json`) un hash corto de cada texto en inglés, nunca el texto. Si el pack se tradujo con una versión anterior de la app y no tiene ese índice, se cuenta como nuevo lo que no está en la memoria.
+
 **Más ▸ Restaurar el original** devuelve misiones, scripts y libros propios al texto del modpack. Para quitar
 la traducción de los mods basta con desactivar el resource pack.
 
@@ -206,6 +208,7 @@ Desde el código fuente (ver [Desarrollo](#desarrollo)):
 ```
 uv run modpackes instancias
 uv run modpackes analizar "RUTA DE LA INSTANCIA"
+uv run modpackes cambios "RUTA" [--json]   # qué cambió desde la última traducción y cuánto cuesta (solo lee)
 uv run modpackes traducir "RUTA" [--dialecto es_es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar]
 uv run modpackes restaurar "RUTA"
 uv run modpackes cobertura "RUTA" [--java]   # qué queda en inglés y por qué (solo lee)
