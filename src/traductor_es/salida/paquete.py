@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import re
 import zipfile
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,9 +21,13 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .. import NOMBRE as NOMBRE_APP
 from .. import __version__, configuracion
+from ..formatos import json_cadenas
+from ..fuentes.contenedores import Contenedor
 from ..fuentes.modpack import DatosModpack, datos_del_modpack
 from ..fuentes.recursos import PRIORIDAD_PACKS, Fuente, abrir_pack, leer_idiomas
-from ..modulos.base import contar
+from ..modulos.base import contar, parece_clave, unidades
+from ..modulos.libros import AMBITO as AMBITO_LIBRO
+from ..modulos.libros import CAMPOS_PATCHOULI
 from ..nucleo.dialectos import DIALECTOS, VARIANTES
 from ..nucleo.mascara import es_traducible, separar_bordes
 from ..nucleo.memoria import Fila, codigos_iguales
@@ -38,6 +43,8 @@ _META, _MEMORIA, _CORRECCIONES, _GLOSARIO = "modpackes.json", "memoria.json", "c
 _MEMORIA_ES, _CORRECCIONES_ES = "memoria_es_es.json", "correcciones_es_es.json"
 _ESPANA = "es_es"
 _AMBITOS = frozenset({"ui", "mision", "libro", "script"})
+#: Un archivo de un libro de Patchouli: assets/<espacio>/patchouli_books/<libro>/<idioma>/<resto>.json
+_LIBRO = re.compile(r"assets/([^/]+)/patchouli_books/([^/]+)/([^/]+)/(.+\.json)")
 #: Topes al leer un paquete ajeno: nadie debería poder llenar la memoria o la RAM con un archivo preparado.
 _MAX_ARCHIVO, _MAX_META, _MAX_TEXTO, _MAX_TERMINO = 128 * 1024 * 1024, 1024 * 1024, 20_000, 200
 #: Motores cuyo resultado no es una traducción de verdad: no se comparten.
@@ -334,15 +341,16 @@ def importar_resource_pack(proceso: Proceso, ruta: Path) -> ResumenImportacion:
         contenedor = None
     if contenedor is None:
         raise ValueError(f"{ruta.name} no es un resource pack (le falta la carpeta assets).")
+    dialecto = proceso.ctx.dialecto
+    orden = list(dict.fromkeys((dialecto, "es_mx", "es_es", *VARIANTES)))
     try:
         externo = leer_idiomas(
             [Fuente(contenedor, PRIORIDAD_PACKS, "pack")], ("en_us", *VARIANTES), proceso.instancia.legacy
         )
         nombre = contenedor.nombre
+        libros = pares_de_libros(contenedor, proceso.instancia.contenedores_mods(), orden)
     finally:
         contenedor.cerrar()
-    dialecto = proceso.ctx.dialecto
-    orden = list(dict.fromkeys((dialecto, "es_mx", "es_es", *VARIANTES)))
     juego = proceso.instancia.tabla_idiomas()
     resumen = ResumenImportacion("resource pack")
     pares: dict[str, str] = {}
@@ -359,12 +367,62 @@ def importar_resource_pack(proceso: Proceso, ruta: Path) -> ResumenImportacion:
                 resumen.descartados += 1
                 continue
             pares[original] = traduccion
-    if not pares:
+    if not pares and not libros:
         raise ValueError(f"{ruta.name} no tiene textos en español de los mods de esta instancia.")
     motor = f"pack:{nombre}"
     proceso.memoria.guardar(pares, dialecto, "ui", motor)
-    resumen.memoria, resumen.modelos = len(pares), [motor]
+    proceso.memoria.guardar(libros, dialecto, AMBITO_LIBRO, motor)
+    resumen.memoria, resumen.modelos = len(pares) + len(libros), [motor]
     return resumen
+
+
+def _textos_de_libro(datos: bytes) -> list[tuple[str, str]] | None:
+    """(campo, texto) de los campos que se traducen de un archivo de un libro, en orden; None si no se entiende."""
+    try:
+        cadenas = json_cadenas.escanear(datos.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return [
+        (c.campo, c.texto)
+        for c in cadenas
+        if c.campo in CAMPOS_PATCHOULI and not c.texto.strip().startswith("#") and not parece_clave(c.texto)
+    ]
+
+
+def pares_de_libros(pack: Contenedor, mods: Sequence[Contenedor], orden: Sequence[str]) -> dict[str, str]:
+    """{inglés: español} de los libros de Patchouli que el pack trae en español, emparejados con el inglés de los
+    mods de la instancia. Se empareja campo por campo y solo si los dos archivos tienen la misma forma; si no, ese
+    archivo no se usa (mejor no importar que importar mal)."""
+    en_ingles: dict[tuple[str, str, str], tuple[Contenedor, str]] = {}
+    for c in mods:
+        for n in c.nombres():
+            m = _LIBRO.fullmatch(n)
+            if m and m.group(3) == "en_us":
+                en_ingles.setdefault((m.group(1), m.group(2), m.group(4)), (c, n))
+    en_espanol: dict[tuple[str, str, str], tuple[int, str]] = {}
+    for n in pack.nombres():
+        m = _LIBRO.fullmatch(n)
+        if m and m.group(3) in orden:
+            clave, prioridad = (m.group(1), m.group(2), m.group(4)), list(orden).index(m.group(3))
+            if clave not in en_espanol or prioridad < en_espanol[clave][0]:
+                en_espanol[clave] = (prioridad, n)
+    pares: dict[str, str] = {}
+    for clave, (_prioridad, nombre_es) in sorted(en_espanol.items()):
+        if clave not in en_ingles:
+            continue
+        contenedor, nombre_en = en_ingles[clave]
+        ingles, espanol = _textos_de_libro(contenedor.leer(nombre_en)), _textos_de_libro(pack.leer(nombre_es))
+        if ingles is None or espanol is None or [c for c, _ in ingles] != [c for c, _ in espanol]:
+            continue
+        for (_campo, en), (_c, es) in zip(ingles, espanol, strict=True):
+            partes_en, partes_es = unidades(en), unidades(es)
+            if len(partes_en) != len(partes_es):
+                continue
+            for a, b in zip(partes_en, partes_es, strict=True):
+                original, traduccion = separar_bordes(a)[1], separar_bordes(b)[1]
+                if es_traducible(original) and traduccion != original and _texto_valido(original, traduccion):
+                    pares[original] = traduccion
+    return pares
 
 
 def importar(proceso: Proceso, ruta: Path) -> ResumenImportacion:

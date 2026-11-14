@@ -185,3 +185,9 @@ def test_la_app_manda_las_pistas_de_todas_las_claves(tmp_path: Path) -> None:
         p.ejecutar(activar=False)
     pista = next(e.pista for lote in motor.lotes_recibidos for e in lote.entradas if e.texto == "Open the gate")
     assert "gui.m.open" in pista and "key.m.open" in pista
+
+
+def test_las_claves_de_ponder_llevan_su_pista() -> None:
+    assert tipo_de_clave("create.ponder.fan_direction.text_1").startswith("texto de una escena de Ponder")
+    assert tipo_de_clave("ponder.create.tag.kinetic_sources").startswith("texto de una escena de Ponder")
+    assert tipo_de_clave("item.create.ponder_tool") == "nombre de un objeto"  # «ponder» dentro de otra palabra
