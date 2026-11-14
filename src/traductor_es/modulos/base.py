@@ -52,6 +52,9 @@ class Contexto:
     variantes: tuple[str, ...] = VARIANTES
     registro: Callable[[str], None] = field(default=lambda _m: None)
     pack: PackSalida | None = None  #: resource pack de salida (libros y mods)
+    #: Solo lo que tiene un archivo por idioma (mods, libros, la carpeta lang de FTB Quests): para traducir un
+    #: dialecto aparte sin tocar lo que se traduce dentro del mismo archivo (scripts, misiones en los capítulos)
+    solo_por_idioma: bool = False
 
     def pack_listo(self) -> PackSalida:
         """El pack de salida, preparado (pack.mcmeta y marca) la primera vez que se pide."""

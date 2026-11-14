@@ -56,7 +56,7 @@ from ..motores.compatible import Compatible
 from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
 from ..nucleo.traductor import LARGO_CONTEXTO
-from ..proceso import GRUPOS, Informe, Proceso
+from ..proceso import DIALECTO_ESPANA, ETIQUETA_ESPANA, GRUPOS, Informe, Proceso
 from ..salida import exportar, mod_apoyo
 from . import correcciones, iconos, tema
 from .bienvenida import TarjetaBienvenida
@@ -173,6 +173,7 @@ class Trabajador(QObject):
                 revisar=self.opciones["revisar"],
                 texto_java=self.opciones["texto_java"],
                 scripts_exhaustivo=self.opciones["exhaustivo"],
+                tambien_es_es=self.opciones["tambien_es_es"],
             ) as p:
                 self.registro.emit(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'}")
                 if self.accion == "analizar":
@@ -287,6 +288,7 @@ class Ventana(QMainWindow):
             self.c_activar.toggled,
             self.c_java.toggled,
             self.c_exhaustivo.toggled,
+            self.c_espana.toggled,
         ):
             senal.connect(self._al_cambiar_opciones)
         self.c_hilos.valueChanged.connect(self._al_cambiar_opciones)
@@ -468,6 +470,15 @@ class Ventana(QMainWindow):
         self.c_dialecto.setToolTip("La variante de la que parte la traducción; las demás variantes se copian de ella")
         self.c_dialecto.setCurrentIndex(max(0, self.c_dialecto.findData(self._preferencias.get("dialecto", "es_mx"))))
         formulario.addRow("Español de:", self.c_dialecto)
+        self.c_espana = QCheckBox("Traducir también una versión aparte para España (es_es)")
+        self.c_espana.setToolTip(
+            "El español elegido arriba va a todos los archivos de español salvo es_es. Con esto, es_es recibe "
+            "su propia traducción con los nombres del juego en España («Roca», «objeto»…). Cuesta otra "
+            "traducción la primera vez; después sale de la memoria. Los scripts y las misiones escritas en los "
+            "capítulos tienen un solo idioma: quedan con el español elegido arriba."
+        )
+        self.c_espana.setChecked(bool(self._preferencias.get("tambien_es_es", False)))
+        formulario.addRow("", self.c_espana)
         self.c_lotes = QCheckBox("Más barato, pero tarda más (la mitad de precio; de minutos a horas)")
         self.c_lotes.setToolTip("Usa la Batch API de Google: solo con Gemini")
         self.c_lotes.setChecked(bool(self._preferencias.get("lotes", False)))
@@ -799,9 +810,13 @@ class Ventana(QMainWindow):
         return Informe(modulos=[m for m in self.ultimo_informe.modulos if m.grupo in elegidos])
 
     def _al_cambiar_opciones(self, *_args: object) -> None:
+        # Si el español elegido ya es el de España, no hay versión aparte que hacer
+        self.c_espana.setEnabled(self.c_dialecto.currentData() != DIALECTO_ESPANA)
         o = self.opciones()
         partes = [f"Español de {'España' if o['dialecto'] == 'es_es' else 'Latinoamérica'}",
                   f"velocidad {o['hilos']}"]  # fmt: skip
+        if o["tambien_es_es"]:
+            partes.append("y España aparte")
         if o["lotes"]:
             partes.append("más barato")
         if o["revisar"]:
@@ -819,6 +834,9 @@ class Ventana(QMainWindow):
             return ""
         o = self.opciones()
         texto = f"Para el motor: {_miles(informe.a_traducir)} textos, {_miles(informe.caracteres)} caracteres."
+        con_espana = any(m.nombre.endswith(ETIQUETA_ESPANA) for m in informe.modulos)
+        if o["tambien_es_es"] and not con_espana:
+            texto += " Vuelve a analizar para sumar la versión de España."
         costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"])
         if fabrica.es_local(o["motor"]):
             texto += " Sin costo: el modelo corre en tu PC."
@@ -892,6 +910,7 @@ class Ventana(QMainWindow):
             "revisar": self.c_revisar.isChecked(),
             "texto_java": self.c_java.isChecked(),
             "exhaustivo": self.c_exhaustivo.isChecked(),
+            "tambien_es_es": self.c_espana.isChecked() and self.c_espana.isEnabled(),
         }
 
     def _confirmar_traducir(self) -> None:
@@ -1225,6 +1244,7 @@ class Ventana(QMainWindow):
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
             "revisar": o["revisar"], "texto_java": o["texto_java"], "exhaustivo": o["exhaustivo"],
+            "tambien_es_es": self.c_espana.isChecked(),
             "avisar_version": self.c_avisar.isChecked(),
             "tema": self._preferencias.get("tema", "sistema"),
             "bienvenida_vista": bool(self._preferencias.get("bienvenida_vista", False)),
