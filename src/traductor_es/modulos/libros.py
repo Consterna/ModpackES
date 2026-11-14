@@ -18,6 +18,7 @@ from ..fuentes.contenedores import Carpeta
 from ..fuentes.recursos import Fuente
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, parece_clave, unidades
+from .cambios import Lugar
 
 AMBITO = "libro"
 CAMPOS_PATCHOULI = frozenset(
@@ -261,6 +262,10 @@ class Libros:
             return markdown.reconstruir(lineas, segs, dict(trad)).encode("utf-8"), hechos, len(a.piezas) - hechos
 
         a.generar = generar
+
+    def lugares(self) -> list[Lugar]:
+        """Por archivo de libro en inglés, los textos que se traducen, en orden (tras `recolectar`)."""
+        return [Lugar(a.destino("en_us"), [p.texto for p in a.piezas]) for a in self._archivos if a.piezas]
 
     # ------------------------------------------------------------------ escritura
     def escribir(self, traducciones: Mapping[str, str]) -> Resumen:
