@@ -68,6 +68,8 @@ def tipo_de_clave(clave: str) -> str:
             return tipo
     if bajo.startswith("item.") and any(m in bajo for m in ("music_disc", "record")):
         return "nombre de un disco de música"
+    if ".ponder." in f".{bajo}":  # «create.ponder.fan_direction.text_1»: las escenas animadas de Create
+        return "texto de una escena de Ponder (tutorial animado de Create): frase corta que explica lo que se ve"
     return next((tipo for prefijo, tipo in _TIPOS_POR_PREFIJO if bajo.startswith(prefijo)), "")
 
 

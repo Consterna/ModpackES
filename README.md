@@ -160,8 +160,8 @@ Una persona traduce y paga; las demás la aplican gratis.
   escribe la traducción. Tus correcciones y tus términos del glosario no se pisan. Si el paquete es de otra versión
   del modpack, avisa: lo que cambió queda en inglés hasta que lo traduzcas. Si trae la versión de España, `es_es`
   recibe la suya aunque no hayas marcado esa opción.
-- También importa un **resource pack en español** (`.zip` o carpeta), aunque no esté activo en el juego: sus textos se
-  emparejan con el inglés de tus mods y pasan a la memoria del mismo modo.
+- También importa un **resource pack en español** (`.zip` o carpeta), aunque no esté activo en el juego, con sus
+  libros de Patchouli: sus textos se emparejan con el inglés de tus mods y pasan a la memoria del mismo modo.
 
 El nombre y la versión del modpack se leen de BetterCompatibilityChecker (`config/bcc-common.json`, `bcc.json` o
 `bcc-common.toml`), de Prism, de CurseForge o de `modrinth.index.json`; si no hay nada, se usa el nombre de la carpeta.

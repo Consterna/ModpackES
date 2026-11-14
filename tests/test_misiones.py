@@ -249,3 +249,22 @@ def test_capitulo_danado_no_frena_a_los_demas(tmp_path: Path, memoria: Memoria) 
     assert "«ES» Good" in (capitulos / "bueno.snbt").read_text(encoding="utf-8")
     assert (capitulos / "roto.snbt").read_text(encoding="utf-8") == '{ title: "Broken }'
     assert avisos == ["roto.snbt está dañado: se deja igual"]
+
+
+def test_ftbquests_lang_ignora_lo_que_quests_lang_splitter_ya_fusiono(tmp_path: Path, memoria: Memoria) -> None:
+    # Quests Lang Splitter junta los capítulos en en_us.snbt y renombra los originales a «.snbt_merged»
+    juego = fabrica.prism(tmp_path, "1.21.1", "neoforge")
+    lang = juego / "config" / "ftbquests" / "quests" / "lang"
+    (lang / "en_us" / "chapters").mkdir(parents=True)
+    (lang / "en_us.snbt").write_text('{\n\tquest.A.title: "Find Iron"\n}\n', encoding="utf-8")
+    fusionado = lang / "en_us" / "chapters" / "c.snbt_merged"
+    fusionado.write_text('{ quest.A.title: "Find Iron" }', encoding="utf-8")
+    inst, ctx = contexto(juego)
+    with inst:
+        motor = Simulador()
+        ejecutar(FTBQuests(ctx), memoria, motor)
+    enviados = [e.texto for lote in motor.lotes_recibidos for e in lote.entradas]
+    assert enviados == ["Find Iron"]  # una sola vez
+    assert not (lang / "es_mx" / "chapters").exists()  # el «.snbt_merged» no genera traducción aparte
+    assert "«ES» Find Iron" in (lang / "es_mx.snbt").read_text(encoding="utf-8")
+    assert fusionado.read_text(encoding="utf-8") == '{ quest.A.title: "Find Iron" }'
