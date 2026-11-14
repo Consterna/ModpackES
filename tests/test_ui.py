@@ -673,3 +673,16 @@ def test_paquete_e_importar_desde_el_menu(qtbot: QtBot, tmp_path: Path, monkeypa
         leeme = z.read("LEEME.txt").decode("utf-8")
         assert "pack.png" in z.namelist()
     assert "gemini (x)" in leeme and "Una persona la revisó" in leeme
+
+
+def test_analizar_otra_vez_muestra_que_cambio(qtbot: QtBot, tmp_path: Path) -> None:
+    """Tras una traducción, el análisis dice qué cambió en el modpack desde entonces (sin rediseñar la pantalla)."""
+    juego = _modpack(tmp_path)
+    v = _ventana(qtbot, juego)
+    _analizar(qtbot, v)
+    assert "Desde la última traducción" not in v.costo.text()  # nunca se tradujo: no hay con qué comparar
+    v.b_principal.click()
+    qtbot.waitUntil(lambda: v._hilo is None and "Listo" in v.estado.text(), timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench", "item.m.x": "Drill"}))
+    _analizar(qtbot, v)
+    assert "Desde la última traducción" in v.costo.text() and "1 nuevas, 0 cambiadas, 0 borradas" in v.costo.text()

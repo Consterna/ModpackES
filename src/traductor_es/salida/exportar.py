@@ -11,6 +11,7 @@ from typing import Any, cast
 from .. import NOMBRE as NOMBRE_APP
 from .. import REPOSITORIO, __version__
 from ..fuentes.modpack import DatosModpack, datos_del_modpack
+from ..fuentes.recursos import MARCA
 from ..fuentes.version import rango_publicable
 from ..modulos.datos import clasificar, entradas_del_zip
 from .copias import Respaldo
@@ -134,6 +135,9 @@ def _escribir_pack(zf: zipfile.ZipFile, juego: Path, revisado: bool) -> int:
         datos_archivo = ruta.read_bytes()
         if relativa == "pack.mcmeta":
             datos_archivo = mcmeta_publicable(datos_archivo, datos)
+        elif relativa == MARCA:  # el índice de cambios es interno y puede ser enorme: no viaja con el pack
+            marca = {k: v for k, v in leer_marca(pack).items() if k != "indice"}
+            datos_archivo = (json.dumps(marca, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         zf.writestr(relativa, datos_archivo)
         n += 1
     icono = pack / "pack.png" if (pack / "pack.png").is_file() else _ICONO
