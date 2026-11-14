@@ -6,9 +6,13 @@ con mayúsculas, «Arachnarch» sin traducir y «Mejora de Salud» sin repetir l
 
 from __future__ import annotations
 
+import json
+
 from traductor_es.motores.base import Lote
+from traductor_es.motores.simulador import Simulador
 from traductor_es.nucleo.glosario import Glosario
 from traductor_es.nucleo.memoria import Memoria
+from traductor_es.nucleo.terminos import nombres_propios
 from traductor_es.nucleo.traductor import MOTIVO_REPETIDA, MOTIVO_TERMINOLOGIA, Traductor
 from traductor_es.nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from traductor_es.proceso import aviso_de_dudosos
@@ -274,3 +278,64 @@ def test_no_mezcla_idiomas_si_el_resto_quedo_en_ingles() -> None:
     assert final == "Iron Gear" and siguen == faltan  # «Iron Engranaje» sería peor
     final, siguen = reemplazar_en_ingles("Un Gear de hierro", faltan, "An Iron Gear")
     assert final == "Un Engranaje de hierro" and not siguen
+
+
+# ------------------------------------------------------------------ nombres propios que se repiten en frases
+
+
+def test_encuentra_los_nombres_propios_que_se_repiten() -> None:
+    textos = [
+        "The Arachnarch lunges at targets from the ceiling.",
+        "Use the keys to open the gate to the &4Arachnarch&r dungeon.",
+        "Bronze Dungeons have entrances on the sides of islands.",
+        "Mimics are hostile mobs in &eBronze Dungeons&r.",
+        "Craft a table first.",  # «Craft» al empezar la frase no es un nombre
+        "Find the Keys here. Then use the Keys again.",  # mismo texto dos veces: cuenta una
+    ]
+    assert nombres_propios(textos) == ["Arachnarch", "Bronze Dungeons"]
+
+
+def test_los_nombres_se_deciden_una_vez_y_se_fijan() -> None:
+    class Decide(Simulador):
+        """Deja igual el nombre suelto; en las frases lo traduce salvo que el glosario se lo exija."""
+
+        def traducir_lote(self, lote: Lote) -> dict[str, str]:
+            self.lotes_recibidos.append(lote)
+            salida: dict[str, str] = {}
+            for e in lote.entradas:
+                if e.texto == "Arachnarch":
+                    salida[e.id] = "Arachnarch"
+                elif "Arachnarch" in json.dumps(lote.glosario):
+                    salida[e.id] = "La Arachnarch ataca"
+                else:
+                    salida[e.id] = "La Aracnarca ataca"
+            return salida
+
+    textos = ["The Arachnarch lunges at you from above.", "You must defeat the Arachnarch in its lair."]
+    motor = Decide()
+    with Memoria(":memory:") as mem:
+        glosario = Glosario()
+        r = Traductor(motor, mem, glosario).traducir(textos, "mision")
+    assert [e.texto for e in motor.lotes_recibidos[0].entradas] == ["Arachnarch"]  # primero se decide el nombre
+    assert glosario.todos()["Arachnarch"] == "Arachnarch"
+    assert set(r.traducciones.values()) == {"La Arachnarch ataca"}  # todas las frases lo escriben igual
+
+
+def test_un_nombre_que_no_se_traduce_se_exige_tambien_en_un_titulo() -> None:
+    glosario = {"Arachnarch": "Arachnarch"}
+    assert terminos_faltantes("Defeat the Arachnarch", "Derrota a la Aracnarca", glosario) == glosario
+    assert terminos_faltantes("Defeat the Arachnarch", "Derrota a la Arachnarch", glosario) == {}
+
+
+def test_los_codigos_de_color_pegados_no_esconden_un_termino() -> None:
+    # «&4Arachnarch»: el «4» va pegado al nombre; antes el término ni se veía
+    glosario = {"Arachnarch": "Arachnarch", "Bronze Dungeons": "Mazmorras de bronce"}
+    original = "Defeat the &4Arachnarch&r in the &eBronze Dungeons&r"
+    faltan = terminos_faltantes(original, "Derrota a la &4Aracnarca&r en los &ecalabozos de latón&r", glosario)
+    assert faltan == glosario
+    # Una variante cercana con el código pegado («&emazmorras del bronce») sí cuenta como el término
+    bien = "Derrota a la &4Arachnarch&r en las &emazmorras del bronce&r"
+    assert terminos_faltantes(original, bien, glosario) == {}
+    g = Glosario()
+    g.descubrir(glosario)
+    assert g.relevantes([original]) == glosario
