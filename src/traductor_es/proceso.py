@@ -27,7 +27,7 @@ from .nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
-from .nucleo.traductor import Traductor
+from .nucleo.traductor import Resultado, Traductor
 from .nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
@@ -41,6 +41,8 @@ GRUPOS_REVISADOS = ("misiones", "libros")
 _ESTADOS = {"JOB_STATE_PENDING": "en cola", "JOB_STATE_RUNNING": "procesando"}
 #: Tokens por carácter y sobrecarga por lote, medidos a ojo con textos de mods: solo para estimar.
 _CARACTERES_POR_TOKEN, _TOKENS_POR_LOTE = 3.5, 450
+#: Motores que no se anotan en los créditos del pack: no traducen de verdad.
+_SIN_CREDITO = frozenset({"simulador"})
 
 
 @dataclass(slots=True)
@@ -411,16 +413,20 @@ class Proceso:
             "Detalle con «modpackes cobertura»."
         ]
 
-    def ejecutar(self, activar: bool = True, poner_idioma: bool = True) -> Informe:
+    def ejecutar(self, activar: bool = True, poner_idioma: bool = True, solo_memoria: bool = False) -> Informe:
+        """Traduce y escribe. Con `solo_memoria` no se llama al motor: se escribe lo que ya está en la memoria,
+        las correcciones y el glosario (así se aplica un paquete importado), y lo demás queda en inglés."""
         self._preparar_glosario()
         informe = Informe()
         todas: dict[str, str] = {}
         traducidos: list[tuple[str, str, list[Lugar]]] = []
-        self._traducir_pasada(self._principal, informe, todas, traducidos)
+        tradujo_el_motor = self._traducir_pasada(self._principal, informe, todas, traducidos, solo_memoria)
         if self._espana is not None and not self.traductor.cancelar.is_set():
             self.registro("▶ Español de España: se traduce aparte lo que tiene un archivo por idioma")
             self._preparar(self._espana)
-            self._traducir_pasada(self._espana, informe, {}, None)
+            tradujo_el_motor |= self._traducir_pasada(self._espana, informe, {}, None, solo_memoria)
+        if tradujo_el_motor and self.motor.nombre not in _SIN_CREDITO and self.ctx.pack is not None:
+            self.ctx.pack.anotar_motores([self.motor.nombre])
         relevantes = self.glosario.relevantes(todas, maximo=500)
         informe.revision = revisar_glosario(todas, relevantes, relevantes)
         if informe.dudosos:
@@ -443,9 +449,14 @@ class Proceso:
         informe: Informe,
         todas: dict[str, str],
         traducidos: list[tuple[str, str, list[Lugar]]] | None,
-    ) -> None:
-        """Traduce y escribe los módulos de una pasada (la principal, o la versión de España)."""
+        solo_memoria: bool = False,
+    ) -> bool:
+        """Traduce y escribe los módulos de una pasada (la principal, o la versión de España).
+
+        Devuelve si el motor tradujo algo (para los créditos del pack).
+        """
         traductor = pasada.traductor
+        tradujo_el_motor = False
         etiqueta = ETIQUETA_ESPANA if pasada is self._espana else ""
         for grupo, modulo in self.modulos(pasada.ctx):
             self.registro(f"▶ {modulo.nombre}: {modulo.describir()}")
@@ -457,7 +468,11 @@ class Proceso:
             pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
             if pasada is self._espana:
                 pistas = self._con_version_principal(pistas, textos, modulo.ambito)
-            resultado = traductor.traducir(textos, modulo.ambito, pistas)
+            if solo_memoria:
+                resultado = Resultado(traducciones=traductor.conocidas(textos, modulo.ambito))
+            else:
+                resultado = traductor.traducir(textos, modulo.ambito, pistas)
+                tradujo_el_motor = tradujo_el_motor or bool(resultado.nuevas)
             if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
                 self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
                 por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
@@ -487,6 +502,7 @@ class Proceso:
                 # protege para que las misiones no lo traduzcan. Con varias palabras suele ser un olvido.
                 iguales = {en: es for en, es in nuevos.items() if en == es and " " not in en}
                 pasada.glosario.agregar_pares({en: en for en in iguales}, iguales, proteger_iguales=True)
+        return tradujo_el_motor
 
     def _con_version_principal(self, pistas: Mapping[str, str], textos: list[str], ambito: str) -> dict[str, str]:
         """Pistas de la versión de España con la traducción ya hecha en el dialecto principal.

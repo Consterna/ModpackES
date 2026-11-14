@@ -1,4 +1,4 @@
-"""Línea de comandos: `modpackes instancias | analizar | cambios | traducir | restaurar | modelos | clave`."""
+"""Línea de comandos: `modpackes instancias | analizar | cambios | traducir | exportar | paquete | …`."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from typing import Any, cast
 from . import NOMBRE, __version__, configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.lanzadores import buscar
+from .fuentes.modpack import datos_del_modpack
 from .modulos.cambios import Cambios
 from .modulos.cobertura import informe_en_json
 from .motores import fabrica
@@ -24,7 +25,7 @@ from .nucleo.dialectos import DIALECTOS
 from .nucleo.memoria import Memoria
 from .proceso import GRUPOS, Informe, Proceso
 from .registro import LOGGER, configurar
-from .salida import mod_apoyo
+from .salida import exportar, mod_apoyo, paquete
 
 
 def _escribir(texto: str) -> None:
@@ -126,6 +127,28 @@ def _argumentos() -> argparse.ArgumentParser:
     )
     rt.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
     rt.add_argument("--quitar", action="store_true", help="quita el mod de apoyo de mods/")
+    exp = sub.add_parser("exportar", help="guarda el resource pack listo para publicar, o el kit de servidor")
+    exp.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
+    exp.add_argument("archivo", nargs="?", default="", help="dónde guardarlo (por defecto, en la carpeta actual)")
+    exp.add_argument("--kit", action="store_true", help="kit para servidores en vez del pack para jugadores")
+    exp.add_argument("--revisado", action="store_true", help="avisa en el LEEME que una persona revisó la traducción")
+    paq = sub.add_parser(
+        "paquete", help=f"exporta o importa un paquete de traducción ({paquete.EXTENSION}) o un resource pack"
+    )
+    paq.add_argument("accion", choices=["exportar", "importar"])
+    paq.add_argument("carpeta", help="carpeta de la instancia (o su carpeta minecraft)")
+    paq.add_argument(
+        "archivo",
+        nargs="?",
+        default="",
+        help=f"exportar: dónde guardarlo (por defecto, en la carpeta actual) · importar: el {paquete.EXTENSION}, "
+        "o un resource pack en español (.zip o carpeta)",
+    )
+    paq.add_argument("--dialecto", choices=list(DIALECTOS), default=None, help="por defecto es_mx o el del paquete")
+    paq.add_argument("--revisado", action="store_true", help="exportar: anota que una persona revisó la traducción")
+    paq.add_argument("--java", action="store_true", help="exportar: incluye el texto escrito en el código de los mods")
+    paq.add_argument("--no-activar", action="store_true", help="importar: no tocar options.txt")
+    paq.add_argument("--no-idioma", action="store_true", help="importar: no cambiar el idioma del juego")
     restaurar = sub.add_parser("restaurar", help="devuelve misiones, scripts y libros propios a su original")
     restaurar.add_argument("carpeta")
     modelos = sub.add_parser("modelos", help="lista los modelos que ofrece el motor")
@@ -208,6 +231,43 @@ def _glosario(args: argparse.Namespace) -> None:
     _escribir(f"Glosario guardado: {len(terminos)} términos.")
 
 
+def _exportar(args: argparse.Namespace) -> None:
+    with Instancia(args.carpeta) as inst:
+        carpeta = inst.juego
+    if args.kit:
+        destino = Path(args.archivo or "Kit_servidor_traduccion.zip")
+        n = exportar.exportar_kit_servidor(carpeta, destino)
+    else:
+        destino = Path(args.archivo or exportar.nombre_sugerido(carpeta))
+        n = exportar.exportar_pack(carpeta, destino, revisado=args.revisado)
+    _escribir(f"Exportado: {destino.resolve()} ({n} archivos)")
+
+
+def _paquete(args: argparse.Namespace) -> None:
+    """Exporta lo traducido de un modpack, o importa un paquete o resource pack y lo aplica sin llamar a la API."""
+    archivo = Path(args.archivo) if args.archivo else None
+    if args.accion == "importar":
+        if archivo is None:
+            raise ValueError(f"Uso: paquete importar CARPETA ARCHIVO ({paquete.EXTENSION}, .zip o carpeta)")
+        dialecto = args.dialecto or (
+            str(paquete.leer_metadatos(archivo)["dialecto"]) if paquete.es_paquete(archivo) else "es_mx"
+        )
+        with Proceso(args.carpeta, Simulador(), dialecto, registro=_escribir) as p:
+            _escribir(f"Minecraft {p.instancia.version} · {p.instancia.loader or '¿loader?'} · {p.instancia.juego}")
+            _, informe = paquete.aplicar(p, archivo, activar=not args.no_activar, poner_idioma=not args.no_idioma)
+        args.motor, args.modelo, args.lotes, args.revisar = fabrica.GEMINI, "", False, False
+        _mostrar(informe, args)
+        return
+    with Proceso(
+        args.carpeta, Simulador(), args.dialecto or "es_mx", registro=_escribir, texto_java=args.java
+    ) as p:  # fmt: skip
+        destino = archivo or Path(paquete.nombre_de_archivo(datos_del_modpack(p.instancia.juego)))
+        resumen = paquete.exportar_paquete(p, destino, revisado=args.revisado)
+    for aviso in resumen.avisos:
+        _escribir(f"⚠ {aviso}")
+    _escribir(str(resumen))
+
+
 def _cobertura(args: argparse.Namespace) -> None:
     with Proceso(args.carpeta, Simulador(), registro=(lambda _m: None) if args.json else _escribir) as p:
         if not args.json:
@@ -268,6 +328,8 @@ _ORDENES: dict[str, Callable[[argparse.Namespace], None]] = {
     "cobertura": _cobertura,
     "cambios": _cambios,
     "glosario": _glosario,
+    "exportar": _exportar,
+    "paquete": _paquete,
 }
 
 
