@@ -258,3 +258,11 @@ def test_las_sustituciones_no_tocan_lo_del_juego_ni_lo_del_usuario() -> None:
     assert todos["Item Pipe"] == "Tubería de ítems"  # «ítem» es del juego (es_mx): se deja
     assert todos["Netherite Sword"] == "Espada de netherita"  # «inframundita» no es del juego
     assert todos["Hell Ore"] == "Mena de inframundita"  # lo del usuario no se toca
+
+
+def test_una_palabra_que_no_es_del_juego_se_corrige_en_la_traduccion() -> None:
+    glosario = Glosario()
+    preparar_sustituciones(glosario)
+    motor = _Guion("Un peto de inframundita encantado")
+    traducciones, _ = _traducir(motor, glosario, "An enchanted Netherite Chestplate")
+    assert traducciones == {"An enchanted Netherite Chestplate": "Un peto de netherita encantado"}

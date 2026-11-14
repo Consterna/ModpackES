@@ -282,6 +282,29 @@ Cómo queda:
 de sistema es mucho más corto, y alargarlo con el glosario entero en cada pedido costaría más de lo que ahorra la
 caché. No se hace.
 
+## 13 de noviembre de 2026 · versión aparte para España
+
+Con `--tambien-es-es`, `es_es` recibe su propia traducción (con los nombres del juego en España) y los demás archivos
+de español siguen al dialecto elegido. Prueba real con Gemini 3.8 Flash: las 339 misiones de un modpack libre del
+corpus (FTB Quests con carpeta `lang/`), US$ 0,09 las dos versiones.
+
+| | Primera prueba: dos traducciones independientes | Con la versión latinoamericana como referencia |
+|---|---|---|
+| Textos donde es_mx y es_es deciden distinto qué nombre dejar en inglés | 64 de 339 | **8 de 339** |
+| «inframundita» en es_es (el juego dice «netherita») | 2 | **0** |
+| Textos idénticos en los dos dialectos | 100 | 224 |
+
+- En la primera prueba cada dialecto decidía por su cuenta: es_mx dejaba «Arachnarch», «Summoner» y «Knight
+  Phantoms», y es_es los traducía («Aracnarca», «Invocador», «caballeros fantasma»). Era la variación propia del
+  modelo, no el dialecto. Ahora cada texto de España lleva la traducción latinoamericana con la instrucción de
+  conservar sus decisiones y cambiar solo lo que en España se dice distinto. es_es sigue adaptando el dialecto
+  («Entra en» por «Entra a», «lucha» por «pelea», «vigilarte la espalda»).
+- «inframundita» ya no puede salir: las palabras que no son del juego se corrigen también en la traducción final, no
+  solo en el glosario.
+- **Lo que queda:** la versión es_mx no es coherente consigo misma con los nombres de jefes: en un texto deja
+  «Arachnarch» y en otro escribe «Aracnarca»; deja «Summoner» y en otro pone «Convocador». La solución de hoy es el
+  glosario del usuario (`"Arachnarch": "Arachnarch"`); lo siguiente es fijar esas decisiones dentro de cada modpack.
+
 ## Cómo repetirlo
 
 ```
