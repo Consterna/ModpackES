@@ -153,10 +153,12 @@ Una persona traduce y paga; las demás la aplican gratis.
 
 - **«Más ▸ Exportar paquete de traducción…»** guarda un `.modpackes.zip` con la parte de tu memoria que usa ese
   modpack, tus correcciones de esos textos, tu glosario y los datos del pack (nombre, versión, Minecraft, dialecto,
-  modelos y si se revisó). No lleva nada de los mods ni del modpack.
+  modelos y si se revisó). Si tradujiste también la versión de España, la lleva aparte. No lleva nada de los mods
+  ni del modpack.
 - **«Más ▸ Importar traducción…»** aplica un `.modpackes.zip` sin llamar a ningún motor: lo guarda en tu memoria y
   escribe la traducción. Tus correcciones y tus términos del glosario no se pisan. Si el paquete es de otra versión
-  del modpack, avisa: lo que cambió queda en inglés hasta que lo traduzcas.
+  del modpack, avisa: lo que cambió queda en inglés hasta que lo traduzcas. Si trae la versión de España, `es_es`
+  recibe la suya aunque no hayas marcado esa opción.
 - También importa un **resource pack en español** (`.zip` o carpeta), aunque no esté activo en el juego: sus textos se
   emparejan con el inglés de tus mods y pasan a la memoria del mismo modo.
 

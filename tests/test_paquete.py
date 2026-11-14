@@ -333,3 +333,50 @@ def test_el_kit_de_servidor_lleva_el_pack_publicable(tmp_path: Path) -> None:
     with interno:
         assert {"pack.png", "LEEME.txt", "pack.mcmeta"} <= set(interno.namelist())
         assert "prueba (modelo-1)" in interno.read("LEEME.txt").decode("utf-8")
+
+
+class PorDialecto(MotorDePrueba):
+    """Marca cada traducción con el dialecto del pedido: «MX» o «ESP»."""
+
+    def traducir_lote(self, lote: Lote) -> dict[str, str]:
+        self.prefijo = "«ESP» " if "España" in lote.dialecto else "«MX» "
+        return super().traducir_lote(lote)
+
+
+def test_el_paquete_lleva_la_version_de_espana_y_aplicarlo_la_escribe(tmp_path: Path) -> None:
+    origen = _instancia(tmp_path / "a")
+    destino = tmp_path / "pack.modpackes.zip"
+    with Memoria(":memory:") as memoria:
+        with Proceso(origen, PorDialecto(), memoria=memoria, tambien_es_es=True) as p:
+            p.ejecutar()
+        with Proceso(origen, Simulador(), memoria=memoria) as p:
+            resumen = paquete.exportar_paquete(p, destino)
+    assert resumen.espana == len(TEXTOS) and "versión de España" in str(resumen)
+    with zipfile.ZipFile(destino) as zf:
+        meta = json.loads(zf.read("modpackes.json"))
+        assert meta["version_espana"]["memoria"] == len(TEXTOS)
+        assert "memoria_es_es.json" in zf.namelist()
+    # Otra persona, otra instancia, memoria vacía y sin pedir la versión de España: el paquete la trae
+    otra = _instancia(tmp_path / "b")
+    with Memoria(":memory:") as memoria, Proceso(otra, SinLlamadas(), memoria=memoria) as p:
+        importado, _ = paquete.aplicar(p, destino)
+    assert importado.espana == len(TEXTOS)
+    assert _lang_escrito(otra, "es_mx")["item.m.wrench"] == "«MX» Wrench"
+    assert _lang_escrito(otra, "es_ar")["item.m.wrench"] == "«MX» Wrench"
+    assert _lang_escrito(otra, "es_es")["item.m.wrench"] == "«ESP» Wrench"
+
+
+def test_un_paquete_sin_version_de_espana_sigue_como_antes(tmp_path: Path) -> None:
+    origen = _instancia(tmp_path / "a")
+    destino = tmp_path / "pack.modpackes.zip"
+    with Memoria(":memory:") as memoria, Proceso(origen, PorDialecto(), memoria=memoria) as p:
+        p.ejecutar()
+        paquete.exportar_paquete(p, destino)
+    with zipfile.ZipFile(destino) as zf:
+        assert "memoria_es_es.json" not in zf.namelist()
+        assert "version_espana" not in json.loads(zf.read("modpackes.json"))
+    otra = _instancia(tmp_path / "b")
+    with Memoria(":memory:") as memoria, Proceso(otra, SinLlamadas(), memoria=memoria) as p:
+        importado, _ = paquete.aplicar(p, destino)
+    assert importado.espana == 0
+    assert _lang_escrito(otra, "es_es")["item.m.wrench"] == "«MX» Wrench"
