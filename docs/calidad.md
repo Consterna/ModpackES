@@ -257,6 +257,31 @@ oficiales, igual que la app. Gemini 3.8 Flash, tres corridas por condición:
 - Se mantienen porque no empeoran y cubren casos concretos que el modelo falla una y otra vez. Las pruebas de
   `tests/test_controles_de_forma.py` reproducen los casos de la revisión humana.
 
+## 13 de noviembre de 2026 · lo que traduce el juego manda (y un intento que no sirvió)
+
+Primero probé un vocabulario base que imponía «item» → «objeto» por delante del juego, porque el es_mx de Minecraft
+dice «Ítem». Funcionó en lo que buscaba: los textos con «item» pasaron de 62 «ítem» a 63 «objeto» en tres corridas.
+Pero el chrF bajó **−1,07 (IC −1,76 a −0,42)** y los términos respetados del banco cayeron de ~225 a ~207: los
+términos de los mods («Tubería de ítems») chocaban con la regla. Además, la decisión fue no corregir al juego: **lo
+que el español del propio juego ya traduce se deja así, en cada dialecto**. El juego tampoco es uniforme: es_mx dice
+«ítem» (101 veces) y es_es «objeto» (96).
+
+Cómo queda:
+- los nombres del juego se cargan antes que todo lo demás (menos el glosario del usuario);
+- el vocabulario base solo completa lo que el juego no trae suelto («Netherite» → «Netherita») y se agrega después;
+- una palabra que no es del juego («inframundita») se corrige en los términos de los mods;
+- un término corto dentro de uno largo («Item» en «Item Frame») ya no se exige aparte;
+- lo aceptado con dudas en el reintento sale en el informe final, con ejemplos, para revisarlo a mano.
+
+| Comparación (interfaz, 399 textos, tres corridas) | Diferencia de chrF (IC 95 %) | Términos respetados |
+|---|---|---|
+| Vocabulario «objeto» por delante del juego | **−1,07 (−1,76 a −0,42), empeora** | 205–207 de 244 |
+| Versión final (el juego manda) | +0,26 (−0,30 a +0,78), no se distingue del ruido | 227–230 de 244 |
+
+**Caché de Gemini:** la caché implícita solo se activa con un prefijo idéntico de 4.096 tokens o más. Nuestro mensaje
+de sistema es mucho más corto, y alargarlo con el glosario entero en cada pedido costaría más de lo que ahorra la
+caché. No se hace.
+
 ## Cómo repetirlo
 
 ```

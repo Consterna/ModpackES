@@ -10,6 +10,8 @@ from traductor_es.motores.base import Lote
 from traductor_es.nucleo.glosario import Glosario
 from traductor_es.nucleo.memoria import Memoria
 from traductor_es.nucleo.traductor import MOTIVO_REPETIDA, MOTIVO_TERMINOLOGIA, Traductor
+from traductor_es.nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
+from traductor_es.proceso import aviso_de_dudosos
 from traductor_es.validacion.calidad import (
     ajustar_mayusculas,
     es_nombre_propio_en,
@@ -208,6 +210,54 @@ def test_la_repeticion_que_persiste_se_acepta_marcada() -> None:
     traducciones, dudosos = _traducir(motor, Glosario(), "Health Boost Augment")
     assert traducciones == {"Health Boost Augment": "Mejora de Salud mejorada"}
     assert dudosos == {"Health Boost Augment": MOTIVO_REPETIDA + "mejora"}
+
+
+# ------------------------------------------------------------------ vocabulario base y solapamientos
+
+
+def test_un_termino_corto_dentro_de_uno_largo_no_se_exige_aparte() -> None:
+    glosario = {"Item Frame": "Marco", "Item": "Objeto"}
+    assert terminos_faltantes("Place an Item Frame on the wall", "Pon un marco en la pared", glosario) == {}
+    # Fuera del término largo, el corto sí se exige
+    faltan = terminos_faltantes("Put the item in an Item Frame", "Pon el ítem en un marco", glosario)
+    assert faltan == {"Item": "Objeto"}
+
+
+def test_lo_que_traduce_el_juego_manda_sobre_el_vocabulario() -> None:
+    # es_mx dice «Ítem»: se respeta. El vocabulario solo completa lo que el juego no trae suelto
+    glosario = Glosario()
+    preparar_sustituciones(glosario)
+    glosario.agregar_pares(
+        {"k": "Item", "n": "Netherite"}, {"k": "Ítem", "n": "Netherite"}, fuente="minecraft", oficial=True
+    )
+    agregar_vocabulario(glosario)
+    assert glosario.todos()["Item"] == "Ítem"
+    glosario.fijar({"Netherite": "Netherite"})  # el usuario manda sobre todo
+    assert glosario.todos()["Netherite"] == "Netherite"
+
+
+def test_sin_el_juego_el_vocabulario_completa() -> None:
+    glosario = Glosario()
+    agregar_vocabulario(glosario)
+    assert glosario.todos() == {"Netherite": "Netherita"}
+
+
+def test_el_aviso_de_dudosos_muestra_ejemplos() -> None:
+    aviso = aviso_de_dudosos({"Health Boost Augment": ("Mejora de Salud mejorada", MOTIVO_REPETIDA + "mejora")})
+    assert aviso.startswith("1 textos se aceptaron con dudas")
+    assert "«Health Boost Augment» → «Mejora de Salud mejorada» (palabra repetida)" in aviso
+
+
+def test_las_sustituciones_no_tocan_lo_del_juego_ni_lo_del_usuario() -> None:
+    glosario = Glosario()
+    preparar_sustituciones(glosario)
+    glosario.agregar_pares({"k": "Item Pipe"}, {"k": "Tubería de ítems"}, fuente="unmod")
+    glosario.agregar_pares({"j": "Netherite Sword"}, {"j": "Espada de inframundita"}, fuente="otromod")
+    glosario.fijar({"Hell Ore": "Mena de inframundita"})
+    todos = glosario.todos()
+    assert todos["Item Pipe"] == "Tubería de ítems"  # «ítem» es del juego (es_mx): se deja
+    assert todos["Netherite Sword"] == "Espada de netherita"  # «inframundita» no es del juego
+    assert todos["Hell Ore"] == "Mena de inframundita"  # lo del usuario no se toca
 
 
 def test_no_mezcla_idiomas_si_el_resto_quedo_en_ingles() -> None:
