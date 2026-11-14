@@ -208,3 +208,11 @@ def test_la_repeticion_que_persiste_se_acepta_marcada() -> None:
     traducciones, dudosos = _traducir(motor, Glosario(), "Health Boost Augment")
     assert traducciones == {"Health Boost Augment": "Mejora de Salud mejorada"}
     assert dudosos == {"Health Boost Augment": MOTIVO_REPETIDA + "mejora"}
+
+
+def test_no_mezcla_idiomas_si_el_resto_quedo_en_ingles() -> None:
+    faltan = {"Gear": "Engranaje"}
+    final, siguen = reemplazar_en_ingles("Iron Gear", faltan, "Iron Gear")
+    assert final == "Iron Gear" and siguen == faltan  # «Iron Engranaje» sería peor
+    final, siguen = reemplazar_en_ingles("Un Gear de hierro", faltan, "An Iron Gear")
+    assert final == "Un Engranaje de hierro" and not siguen
