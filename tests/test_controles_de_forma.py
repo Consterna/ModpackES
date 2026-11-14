@@ -258,3 +258,11 @@ def test_las_sustituciones_no_tocan_lo_del_juego_ni_lo_del_usuario() -> None:
     assert todos["Item Pipe"] == "Tubería de ítems"  # «ítem» es del juego (es_mx): se deja
     assert todos["Netherite Sword"] == "Espada de netherita"  # «inframundita» no es del juego
     assert todos["Hell Ore"] == "Mena de inframundita"  # lo del usuario no se toca
+
+
+def test_no_mezcla_idiomas_si_el_resto_quedo_en_ingles() -> None:
+    faltan = {"Gear": "Engranaje"}
+    final, siguen = reemplazar_en_ingles("Iron Gear", faltan, "Iron Gear")
+    assert final == "Iron Gear" and siguen == faltan  # «Iron Engranaje» sería peor
+    final, siguen = reemplazar_en_ingles("Un Gear de hierro", faltan, "An Iron Gear")
+    assert final == "Un Engranaje de hierro" and not siguen
