@@ -686,3 +686,13 @@ def test_analizar_otra_vez_muestra_que_cambio(qtbot: QtBot, tmp_path: Path) -> N
     fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench", "item.m.x": "Drill"}))
     _analizar(qtbot, v)
     assert "Desde la última traducción" in v.costo.text() and "1 nuevas, 0 cambiadas, 0 borradas" in v.costo.text()
+
+
+def test_la_version_de_espana_solo_con_otro_dialecto(qtbot: QtBot) -> None:
+    v = Ventana(buscar_instancias=list)
+    qtbot.addWidget(v)
+    v.c_espana.setChecked(True)
+    v.c_dialecto.setCurrentIndex(v.c_dialecto.findData("es_mx"))
+    assert v.c_espana.isEnabled() and v.opciones()["tambien_es_es"]
+    v.c_dialecto.setCurrentIndex(v.c_dialecto.findData("es_es"))
+    assert not v.c_espana.isEnabled() and not v.opciones()["tambien_es_es"]
