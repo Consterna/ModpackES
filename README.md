@@ -130,6 +130,12 @@ código o vuelve en inglés se descarta. Con modelos locales pequeños (menos de
 parámetros) es más probable que fallen el formato JSON y que queden más textos en inglés; LM Studio advierte
 lo mismo en su documentación.
 
+**Modelo local recomendado: Gemma 4 E2B** (la versión QAT Q4_0 de Google, licencia Apache 2.0). En una medición con
+400 textos reales de mods, solo con CPU, tradujo 397, con un chrF de 73,7. Usó 3,7 GB de RAM y tardó
+unos 8 minutos. Gemma 4 E4B dio un punto más (la diferencia no se distingue del ruido), pero tarda el doble y necesita
+casi 6 GB; Qwen3.5 4B quedó claramente por debajo. Si usas `llama-server`, arráncalo con `--reasoning off`: sin eso,
+Gemma «piensa» antes de cada respuesta y va unas 14 veces más lento. Detalle en [docs/calidad.md](docs/calidad.md).
+
 ## Costo
 
 Con `gemini-3.8-flash` un modpack grande (unos 800 000 caracteres por traducir) cuesta alrededor de **1,5 a 2
