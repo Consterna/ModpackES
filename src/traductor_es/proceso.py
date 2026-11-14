@@ -13,7 +13,7 @@ from typing import Self, cast
 
 from . import configuracion
 from .fuentes.instancia import Instancia
-from .modulos import datos, libros, misiones, mods, runtime, scripts
+from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts
 from .modulos.base import Contexto, Modulo, Pieza, Resumen, reunir_pistas
 from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
@@ -320,6 +320,7 @@ class Proceso:
             lista += [
                 ("scripts", scripts.ScriptsKubeJS(self.ctx, self.scripts_exhaustivo)),
                 ("scripts", datos.Datos(self.ctx)),
+                ("scripts", crafttweaker.ScriptsCraftTweaker(self.ctx)),
             ]
         return [(g, m) for g, m in lista if m.detectar()]
 
