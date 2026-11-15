@@ -73,6 +73,9 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Argumentos al revés:** si el modelo cambiaba de orden dos `%s` («%s was slain by %s» → «… mató a …»), el juego ponía los valores al revés sin aviso. Ahora, en los archivos de idioma se numeran (`%2$s mató a %1$s`), como hace el propio español de Minecraft; en scripts, misiones y libros el texto se rechaza y se reintenta.
+- **Escapes `\uXXXX` en scripts de KubeJS y CraftTweaker:** el modelo veía «⟦0⟧00a7cWarning» y podía romper el escape. Ahora los de caracteres visibles se decodifican («§cWarning», «éxito») y los de control quedan protegidos enteros.
+- **Códigos que el modelo inventa o desordena:** se rechaza la traducción que trae un código que no estaba («§a», «%s») o que deja el cierre de un formato (`§r`, `$()`, `</b>`) antes de su apertura. Con argumentos, un «%» suelto que escribió el modelo pasa a «%%».
 - **Se colaba un ejemplo en cada pedido** aunque la app no manda ejemplos (`CANTIDAD_EN_LA_APP = 0`): el tope se miraba después de agregar el primero. Los ejemplos de otros textos empeoraban la calidad y, como salían de lo traducido en esa misma ejecución, el mismo pedido cambiaba según el orden en que terminaban los hilos.
 - **El glosario no veía los términos pegados a un código de color** («Defeat the &4Arachnarch», «&eBronze Dungeons»): no se mandaban al modelo ni se exigían. Ahora los códigos se quitan antes de buscar términos, en el original y en la traducción.
 - **El pack no se activaba en una instancia nueva.** Si en `options.txt` solo estaban los packs internos (`["vanilla"]` o `["vanilla","mod_resources"]`), se escribía `Traduccion_ES` sin el prefijo `file/` que usa Minecraft desde 1.13, y el juego lo ignoraba. Ahora el formato sale de la versión de la instancia (también en 1.12, que no usa el prefijo).
