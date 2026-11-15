@@ -99,3 +99,13 @@ def datos_del_modpack(juego: Path) -> DatosModpack:
     if not nombre:
         nombre = juego.parent.name if juego.name in (".minecraft", "minecraft") else juego.name
     return DatosModpack(nombre, version)
+
+
+def identificador(juego: Path) -> str:
+    """Con qué nombre se guarda el modpack en la memoria: el nombre del pack (sin la versión, para que una
+    actualización siga usando lo suyo) o, si no se sabe, el de su carpeta."""
+    nombre = datos_del_modpack(juego).nombre
+    if nombre:
+        return nombre
+    carpeta = juego.parent if juego.name.lower() in ("minecraft", ".minecraft") else juego
+    return carpeta.name or "instancia"

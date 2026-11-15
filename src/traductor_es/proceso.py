@@ -15,6 +15,7 @@ from typing import Self, cast
 
 from . import configuracion
 from .fuentes.instancia import Instancia
+from .fuentes.modpack import identificador
 from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts
 from .modulos.base import Contexto, Modulo, Pieza, Resumen, reunir_pistas
 from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
@@ -239,10 +240,12 @@ class Proceso:
             self.instancia, Respaldo(self.instancia.juego), dialecto, variantes, registro, PackSalida(self.instancia)
         )
         limites = fabrica.limites_de_lote(motor)
+        #: El modpack en la memoria: lo dudoso que se traduce aquí no se reutiliza en otros packs
+        self.pack = identificador(self.instancia.juego)
         self.traductor = Traductor(
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
             usar_lotes=usar_lotes, contexto=contexto, ejemplos=self.ejemplos,
-            limite_caracteres=limites[0], limite_entradas=limites[1],
+            limite_caracteres=limites[0], limite_entradas=limites[1], pack=self.pack,
         )  # fmt: skip
         self.motor = motor
         if isinstance(motor, Compatible):
@@ -283,7 +286,7 @@ class Proceso:
         traductor_es = Traductor(
             self.motor, self.memoria, glosario_es, DIALECTO_ESPANA, t.hilos, t.progreso, t.registro, t.cancelar,
             validar, usar_lotes=t.usar_lotes, contexto=t.contexto, ejemplos=ejemplos_es,
-            limite_caracteres=t.limite_caracteres, limite_entradas=t.limite_entradas,
+            limite_caracteres=t.limite_caracteres, limite_entradas=t.limite_entradas, pack=t.pack,
         )  # fmt: skip
         self._espana = _Pasada(ctx_es, glosario_es, ejemplos_es, traductor_es)
 
