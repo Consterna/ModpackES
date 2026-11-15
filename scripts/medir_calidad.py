@@ -43,6 +43,17 @@ def nombres_del_juego(carpeta: Path, dialecto: str) -> dict[str, str]:
     return salida
 
 
+def usos_del_juego(carpeta: Path, dialecto: str) -> list[tuple[dict[str, str], dict[str, str]]]:
+    """El archivo completo del juego en inglés y en el dialecto, para ver cómo se usan las palabras en minúscula."""
+    ruta = carpeta / f"{dialecto}.json"
+    if not ruta.is_file():
+        ruta = carpeta / "es_mx.json"
+    if not ruta.is_file():
+        return []
+    ingles: dict[str, str] = json.loads((carpeta / "en_us.json").read_text(encoding="utf-8"))
+    return [(ingles, json.loads(ruta.read_text(encoding="utf-8")))]
+
+
 def main(argv: list[str] | None = None) -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # pyright: ignore[reportAttributeAccessIssue]
     ap = argparse.ArgumentParser(description=__doc__)
@@ -114,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     banco = medicion.Banco.leer(args.banco)
     if args.vanilla is not None and not banco.juego:
         banco.juego = nombres_del_juego(args.vanilla, banco.dialecto)
+        banco.usos = usos_del_juego(args.vanilla, banco.dialecto)
         print(f"Nombres del juego: {len(banco.juego)}")
     if args.sin_vecindad:
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia, quitar_vecindad(c.pista)) for c in banco.casos]

@@ -303,6 +303,7 @@ class Proceso:
         glosario.fijar(configuracion.leer_glosario_usuario())
         preparar_sustituciones(glosario)
         tabla = self.instancia.tabla_idiomas()
+        glosario.proteger_nombres(tabla.datos)  # los namespaces: «Create» en «estilo Create» no es inglés
         orden = [dialecto, *(v for v in ("es_mx", "es_es", *VARIANTES) if v != dialecto)]
         vocabulario_listo = False
         for ns in ["minecraft", *sorted(n for n in tabla.datos if n != "minecraft")]:
@@ -311,6 +312,9 @@ class Proceso:
                 vocabulario_listo = True
             ingles = {k: v for k, v in tabla.textos(ns, "en_us").items() if es_nombre(k)}
             todo_ingles = tabla.textos(ns, "en_us")
+            # Cómo se traducen las palabras en minúscula («lead the way» no es la «Rienda»): con el primer español
+            if traducido := next((t for v in orden if (t := tabla.textos(ns, v))), None):
+                glosario.aprender_usos(todo_ingles, traducido)
             for variante in dict.fromkeys(orden):
                 oficial = ns == "minecraft"  # los nombres del juego que no se traducen («Creeper») se protegen
                 glosario.agregar_pares(
@@ -484,7 +488,7 @@ class Proceso:
         if tradujo_el_motor and self.motor.nombre not in _SIN_CREDITO and self.ctx.pack is not None:
             self.ctx.pack.anotar_motores([self.motor.nombre])
         relevantes = self.glosario.relevantes(todas, maximo=500)
-        informe.revision = revisar_glosario(todas, relevantes, relevantes)
+        informe.revision = revisar_glosario(todas, relevantes, relevantes, self.glosario.ambiguos(relevantes))
         if informe.dudosos:
             informe.archivo_dudosos = guardar_dudosos(informe.dudosos, self.instancia.juego)
             informe.avisos.append(aviso_de_dudosos(informe.dudosos, informe.archivo_dudosos))

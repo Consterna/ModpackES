@@ -55,6 +55,11 @@ class Banco:
     #: Nombres del propio juego ({inglés: español}, también los que no se traducen): entran como oficiales,
     #: igual que en la app. Vacío en los bancos viejos.
     juego: dict[str, str] = field(default_factory=dict[str, str])
+    #: Archivos completos del juego ({clave: inglés}, {clave: español}) para aprender cómo se usan las palabras
+    #: en minúscula (ver `Glosario.aprender_usos`); no se guardan en el banco
+    usos: list[tuple[dict[str, str], dict[str, str]]] = field(
+        default_factory=list[tuple[dict[str, str], dict[str, str]]]
+    )
 
     @classmethod
     def leer(cls, ruta: Path) -> Banco:
@@ -362,6 +367,8 @@ def medir(
         )
     agregar_vocabulario(glosario)
     glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario, fuente="banco")
+    for ingles, traducido in banco.usos:
+        glosario.aprender_usos(ingles, traducido)
     with Memoria(":memory:") as memoria:
         ejemplos = Ejemplos(cantidad=cantidad_ejemplos)
         ejemplos.agregar_pares(banco.ejemplos)
