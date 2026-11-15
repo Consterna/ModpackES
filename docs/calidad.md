@@ -436,6 +436,37 @@ Gemini 3.8 Flash, tres corridas por condición (unos US$ 0,04 cada una):
   sección de nombres propios coherentes).
 - Los 116 textos pasaron las reglas: ninguno quedó en inglés ni perdió códigos de formato (`$(bold)`, `$(item)`…).
 
+## 15 de noviembre de 2026 · respuestas grabadas y control de calidad determinista
+
+Entre dos corridas iguales Gemini solo devuelve lo mismo en un 67 % de los textos, y ese ruido tapa los cambios del
+post-proceso. Ahora `medir_calidad.py --grabacion RUTA` guarda cada respuesta del motor (la clave es el pedido
+exacto y el número de repetición) y `--solo-grabado` las vuelve a usar sin llamar a la API. Así un cambio que solo
+toca lo que pasa después del modelo se mide gratis y sin ruido. Al grabar apareció un error: se colaba un ejemplo en
+cada pedido aunque la app no manda ejemplos, y el pedido cambiaba según el orden de los hilos.
+
+Base grabada (tres repeticiones, US$ 0,43 en total): interfaz 74,8 · 73,3 · 74,4; libros 67,9 · 67,1 · 67,6.
+
+**Argumentos y códigos.** Con las mismas respuestas, numerar los `%s` que el modelo cambia de orden, decodificar los
+`\uXXXX` y rechazar los códigos inventados no rechazó ningún texto de más en los tres bancos.
+
+**Control de calidad** (`validacion/qa.py`). Sigue la idea de las herramientas de QA de la industria (cifras,
+parejas, espacios, puntuación), adaptada al español de Minecraft. Solo arregla lo que no tiene riesgo; lo demás
+queda como duda en el CSV de dudosos.
+
+| Banco | chrF con el control (corridas 1 a 3) | Arreglos por corrida | Dudas por corrida |
+|---|---|---|---|
+| Interfaz | 74,8 · 73,3 · 74,5 | 1 (comillas) | 0 |
+| Misiones | sin referencia | 0–1 (comillas) | 2 (cifras, paréntesis) |
+| Libros | 67,9 · 67,1 · 67,6 | 0 | 0 |
+
+- Ningún arreglo empeoró un texto. Sobre las 2.145 traducciones grabadas, los 4 arreglos de comillas subieron el
+  chrF en 3 casos y no lo bajaron en ninguno.
+- Gemini 3.8 Flash ya cuida casi toda la forma, así que el control casi no actúa con él. Sirve de red para modelos
+  más chicos y para lo que no sale en un banco.
+- **Mayúsculas de título en nombres** («Espada de Diamante»): bajarlas de forma automática acertó 3 veces y falló 10
+  («Vidrio a prueba de Wither», «Nivel III»), así que solo se informan y no se cambian.
+- Cada control tiene pruebas con textos correctos del español del juego que no deben marcarse (`tests/test_qa.py`).
+
 ## Cómo repetirlo
 
 ```
