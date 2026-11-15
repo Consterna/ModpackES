@@ -450,6 +450,9 @@ uv run python scripts/armar_banco_misiones.py --textos 400
 uv run python scripts/descargar_lang.py   # también baja los libros de Patchouli en inglés y español
 uv run python scripts/armar_banco_libros.py --textos 150
 uv run python scripts/medir_calidad.py --banco .descargas/banco/libros.json --vanilla .descargas/vanilla
+# Grabar las respuestas (una vez, cuesta) y medir después un cambio del post-proceso contra ellas (gratis):
+uv run python scripts/medir_calidad.py --banco .descargas/banco/ui_final.json --vanilla .descargas/vanilla --grabacion .descargas/banco/grabaciones/ui_final.sqlite --repeticiones 3
+uv run python scripts/medir_calidad.py --banco .descargas/banco/ui_final.json --vanilla .descargas/vanilla --grabacion .descargas/banco/grabaciones/ui_final.sqlite --repeticiones 3 --solo-grabado
 uv run python scripts/medir_calidad.py --sin-vecindad --banco .descargas/banco/misiones.json --salida build/base.json
 uv run python scripts/medir_calidad.py --banco .descargas/banco/misiones.json --salida build/mejora.json
 uv run python scripts/preferencia_pareada.py --a build/base.json --b build/mejora.json

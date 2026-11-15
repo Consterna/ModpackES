@@ -82,6 +82,7 @@ button[data-v=B].on{background:var(--bien);color:#fff;border-color:var(--bien)}
 button[data-v=L].on{background:var(--leve);color:#fff;border-color:var(--leve)}
 button[data-v=G].on{background:var(--grave);color:#fff;border-color:var(--grave)}
 input.nota{width:100%;margin-top:8px;padding:8px;border:1px solid var(--borde);border-radius:6px;background:var(--fondo);color:var(--texto);font:inherit}
+.causa{margin-top:8px;font:inherit;padding:6px;border-radius:8px;border:1px solid var(--borde);background:var(--tarjeta);color:inherit}
 .fin{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0}
 .fin .principal{background:var(--acento);color:#fff;border-color:var(--acento)}
 </style></head><body><main>
@@ -109,7 +110,16 @@ DATOS.forEach((d, i) => {
     <div class="botones">
       <button data-v="B">Bien</button><button data-v="L">Leve</button><button data-v="G">Grave</button>
     </div>
+    <select class="causa" aria-label="Qué falla">
+      <option value="">¿Qué falla? (opcional)</option><option value="sentido">Cambia el sentido</option>
+      <option value="termino">Término o nombre de objeto</option><option value="nombre">Nombre propio (jefe, mod, lugar)</option>
+      <option value="forma">Mayúsculas o puntuación</option><option value="codigos">Códigos, colores o formato</option>
+      <option value="ingles">Quedó en inglés</option><option value="estilo">Estilo o redacción</option>
+    </select>
     <input class="nota" placeholder="Nota (opcional): qué debería decir" aria-label="Nota">`;
+  const causa = t.querySelector(".causa");
+  causa.value = (estado[i] && estado[i].c) || "";
+  causa.addEventListener("change", () => { estado[i] = {...(estado[i] || {}), c: causa.value}; guardar(); });
   const nota = t.querySelector(".nota");
   nota.value = (estado[i] && estado[i].n) || "";
   nota.addEventListener("input", () => { estado[i] = {...(estado[i] || {}), n: nota.value}; guardar(); });
@@ -134,7 +144,7 @@ function pintar() {
 document.getElementById("copiar").addEventListener("click", async () => {
   const filas = DATOS.map((d, i) => {
     const e = estado[i] || {};
-    return `${i + 1}:${e.v || "-"}${e.n ? " (" + e.n.replace(/\\s+/g, " ") + ")" : ""}`;
+    return `${i + 1}:${e.v || "-"}${e.c ? "[" + e.c + "]" : ""}${e.n ?" (" + e.n.replace(/\\s+/g, " ") + ")" : ""}`;
   });
   const texto = "HOJA " + DATOS.length + "\\n" + filas.join("\\n");
   try { await navigator.clipboard.writeText(texto); document.getElementById("aviso").textContent = "Copiado: pégalo en el chat."; }

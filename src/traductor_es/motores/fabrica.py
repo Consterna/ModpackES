@@ -31,6 +31,7 @@ LIMITES_LOCALES = (1800, 12)
 
 def limites_de_lote(motor: Motor) -> tuple[int, int]:
     """Tamaño de los pedidos que conviene mandarle a este motor."""
+    motor = getattr(motor, "envuelto", motor)  # un motor grabado (medición) usa los límites del real
     return LIMITES_LOCALES if isinstance(motor, Compatible) and motor.es_local else LIMITES_NORMALES
 
 

@@ -80,6 +80,8 @@ class Ejemplos:
     def parecidos(self, textos: Iterable[str], cantidad: int | None = None, largo_total: int = 700) -> dict[str, str]:
         """Los pares más relevantes para estos textos, sin los textos mismos."""
         cantidad = self.cantidad if cantidad is None else cantidad
+        if cantidad <= 0:  # sin esto se colaba un ejemplo: el tope se miraba después de agregar el primero
+            return {}
         propios = {t.strip() for t in textos}
         buscadas = Counter(p for t in propios for p in _palabras(t))
         with self._lock:
