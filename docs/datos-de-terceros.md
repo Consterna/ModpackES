@@ -32,6 +32,9 @@ Solo se usa Modrinth, que publica la licencia de cada proyecto. CurseForge no se
 - Los textos del juego de Mojang no se redistribuyen.
 - Los pares inglés/español sacados de jars para medir calidad se quedan en `.descargas/banco/`. En
   `docs/calidad.md` solo van las métricas, nunca los textos.
+- `scripts/descargar_lang.py` baja, de los mods con licencia libre según Modrinth, solo sus archivos de idioma y los
+  libros de Patchouli en inglés y español (por rangos, sin el jar entero). `scripts/armar_banco_libros.py` saca de
+  esos libros el banco de libros, que también se queda en `.descargas/banco/`.
 
 ## Modelos locales (`.modelos/`)
 

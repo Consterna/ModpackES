@@ -409,6 +409,33 @@ uv run python scripts/comparar_mediciones.py --a build/qwen3.5-4b.json --b build
 del jar del cliente, leído por rangos, y es_mx y es_es del índice de assets. `descargar_lang.py` baja solo los idiomas
 de los mods.
 
+## 14 de noviembre de 2026 · primer banco de libros
+
+Hasta ahora los libros no se medían. `scripts/armar_banco_libros.py` arma un banco con traducciones humanas de
+libros de mods libres, de dos fuentes:
+- los libros de Patchouli en JSON que traen su español, emparejados campo por campo;
+- los textos largos (60 caracteres o más) de claves de libro en los archivos de idioma. Desde Patchouli 1.20 casi
+  todos los libros usan claves de idioma (`"i18n": true`): con el corpus local, los libros en JSON solo dieron 20
+  textos de un mod.
+
+Se descartan las referencias a medias, se deja un tope de 25 textos por mod y la muestra es fija (semilla 7). Con el
+corpus de este PC salen **116 textos de 9 mods**, de 167 caracteres de media. Es poco, pero sirve como referencia.
+
+Gemini 3.8 Flash, tres corridas por condición (unos US$ 0,04 cada una):
+
+| | chrF (corridas 1 a 3) | Términos del glosario |
+|---|---|---|
+| Sin los controles de forma | 67,9 · 68,6 · 67,5 | 130, 129 y 128 de 134 |
+| Con los controles (la app) | 68,0 · 68,3 · 67,0 | 127, 124 y 128 de 134 |
+| Diferencia pareada | −0,25 (IC −0,90 a +0,46), no se distingue del ruido | |
+
+- **Base de libros: chrF ≈ 68**, contra ≈ 75 en el banco de interfaz. Los textos son más largos y las referencias
+  de cada mod tienen su propio estilo, así que el chrF castiga más las traducciones correctas pero distintas.
+- Los controles no cambian nada en libros: cada texto de la muestra sale de un sitio distinto, así que casi no hay
+  nombres que se repitan entre textos para unificar. Donde sí actúan es en las misiones de un mismo pack (ver la
+  sección de nombres propios coherentes).
+- Los 116 textos pasaron las reglas: ninguno quedó en inglés ni perdió códigos de formato (`$(bold)`, `$(item)`…).
+
 ## Cómo repetirlo
 
 ```
@@ -420,6 +447,9 @@ uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.
 uv run python scripts/comparar_mediciones.py --a build/sin1.json build/sin2.json --b build/con1.json build/con2.json
 uv run python scripts/juzgar_calidad.py --entrada build/con1.json
 uv run python scripts/armar_banco_misiones.py --textos 400
+uv run python scripts/descargar_lang.py   # también baja los libros de Patchouli en inglés y español
+uv run python scripts/armar_banco_libros.py --textos 150
+uv run python scripts/medir_calidad.py --banco .descargas/banco/libros.json --vanilla .descargas/vanilla
 uv run python scripts/medir_calidad.py --sin-vecindad --banco .descargas/banco/misiones.json --salida build/base.json
 uv run python scripts/medir_calidad.py --banco .descargas/banco/misiones.json --salida build/mejora.json
 uv run python scripts/preferencia_pareada.py --a build/base.json --b build/mejora.json

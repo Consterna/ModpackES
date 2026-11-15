@@ -411,17 +411,28 @@ def pares_de_libros(pack: Contenedor, mods: Sequence[Contenedor], orden: Sequenc
         if clave not in en_ingles:
             continue
         contenedor, nombre_en = en_ingles[clave]
-        ingles, espanol = _textos_de_libro(contenedor.leer(nombre_en)), _textos_de_libro(pack.leer(nombre_es))
-        if ingles is None or espanol is None or [c for c, _ in ingles] != [c for c, _ in espanol]:
+        pares.update(emparejar_libro(contenedor.leer(nombre_en), pack.leer(nombre_es)))
+    return pares
+
+
+def emparejar_libro(ingles: bytes, espanol: bytes) -> dict[str, str]:
+    """{inglés: español} de un archivo de un libro de Patchouli y su traducción, campo por campo.
+
+    Solo si los dos tienen los mismos campos en el mismo orden, y cada campo se parte igual en los dos (párrafos);
+    lo que no encaja se deja fuera.
+    """
+    en, es = _textos_de_libro(ingles), _textos_de_libro(espanol)
+    if en is None or es is None or [c for c, _ in en] != [c for c, _ in es]:
+        return {}
+    pares: dict[str, str] = {}
+    for (_campo, texto_en), (_c, texto_es) in zip(en, es, strict=True):
+        partes_en, partes_es = unidades(texto_en), unidades(texto_es)
+        if len(partes_en) != len(partes_es):
             continue
-        for (_campo, en), (_c, es) in zip(ingles, espanol, strict=True):
-            partes_en, partes_es = unidades(en), unidades(es)
-            if len(partes_en) != len(partes_es):
-                continue
-            for a, b in zip(partes_en, partes_es, strict=True):
-                original, traduccion = separar_bordes(a)[1], separar_bordes(b)[1]
-                if es_traducible(original) and traduccion != original and _texto_valido(original, traduccion):
-                    pares[original] = traduccion
+        for a, b in zip(partes_en, partes_es, strict=True):
+            original, traduccion = separar_bordes(a)[1], separar_bordes(b)[1]
+            if es_traducible(original) and traduccion != original and _texto_valido(original, traduccion):
+                pares[original] = traduccion
     return pares
 
 
