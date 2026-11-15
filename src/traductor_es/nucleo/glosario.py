@@ -42,6 +42,7 @@ class Glosario:
         self._palabras_es: set[str] = set()  #: palabras del español de esos textos (sin mayúsculas)
         self._ambiguos: dict[tuple[str, str], bool] = {}
         self._marcas: set[str] = set()  #: nombres de mods («create»): no son inglés a medio traducir
+        self._por_palabra: dict[str, list[tuple[str, str, re.Pattern[str]]]] | None = None
 
     def __len__(self) -> int:
         return len(self._terminos) + len(self._fijos)
@@ -230,7 +231,36 @@ class Glosario:
                 for k in sorted(todos, key=len, reverse=True)
             ]
             self._orden = orden
+            self._por_palabra = None
         return orden
+
+    def oficial(self, texto: str) -> str | None:
+        """El nombre del propio juego para ese texto entero («Iron Ingot» → «Lingote de hierro»), si el usuario no
+        lo cambió."""
+        t = texto.strip()
+        return self._terminos.get(t) if t in self._oficiales and t not in self._fijos else None
+
+    def terminos_en(self, texto: str, maximo: int = 60) -> dict[str, str]:
+        """Lo mismo que `relevantes([texto])`, rápido para muchos textos sueltos: solo mira los términos que empiezan
+        con una palabra del texto."""
+        orden = self._ordenados()
+        if self._por_palabra is None:
+            indice: dict[str, list[tuple[str, str, re.Pattern[str]]]] = {}
+            for termino in orden:
+                primera = next(iter(PALABRA.findall(termino[0])), termino[0])
+                indice.setdefault(primera, []).append(termino)
+            self._por_palabra = indice
+        bajo = sin_formato(texto).lower()
+        candidatos = [c for p in set(PALABRA.findall(bajo)) for c in self._por_palabra.get(p, ())]
+        elegidos: dict[str, str] = {}
+        for termino_bajo, original, patron in sorted(candidatos, key=lambda c: -len(c[0])):
+            if termino_bajo in bajo and patron.search(bajo):
+                if self.ambiguo(original) and not uso_como_nombre(original, texto):
+                    continue
+                elegidos[original] = self._fijos.get(original) or self._terminos[original]
+                if len(elegidos) >= maximo:
+                    break
+        return elegidos
 
     def relevantes(self, textos: Iterable[str], maximo: int = 60) -> dict[str, str]:
         """Términos que aparecen como palabra completa en los textos, priorizando los más largos.

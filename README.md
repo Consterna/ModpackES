@@ -33,7 +33,7 @@ y **cualquier lanzador**, y escribe a la vez las siete variantes de español del
 
 - **No modifica los jars de los mods.** Lo de los mods va en un resource pack aparte.
 - **Todo tiene copia de seguridad.** Un botón devuelve el modpack a su texto original.
-- **No se paga dos veces.** Lo ya traducido queda en una memoria que se reutiliza, también entre modpacks.
+- **No se paga dos veces.** Lo ya traducido queda en una memoria que se reutiliza, también entre modpacks (de otro modpack, solo lo que quedó sin dudas).
 - **Respeta los formatos.** Colores, enlaces, variables y comandos llegan intactos; lo que no pasa las
   reglas de calidad se reintenta o queda en inglés antes que romper algo.
 

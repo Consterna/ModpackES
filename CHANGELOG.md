@@ -56,6 +56,13 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **La memoria distingue cada modpack y recuerda lo dudoso:**
+  - Cada traducción se guarda con su modpack y con su calidad: «ok», o el motivo por el que se aceptó con dudas.
+  - Un modpack siempre usa lo suyo. De otro modpack solo usa lo que quedó bien: un término del glosario que no se cumplió en un pack ya no se copia a todos los demás.
+  - Los nombres del propio juego mandan sobre la memoria («Lingote de hierro» aunque la memoria diga «Lingote de Hierro»). Por encima solo quedan tus correcciones y tu glosario.
+  - Lo que la memoria tiene como bueno se vuelve a comprobar con los códigos y el glosario de hoy. Si ya no cumple (por ejemplo, agregaste un término), ese texto se traduce de nuevo una vez. Lo que se aceptó con dudas en el mismo pack no se vuelve a pedir, para no pagar en cada traducción.
+  - La memoria se actualiza sola la primera vez que se abre: lo de antes queda como «ok» y para todos los packs, y se guarda una copia del archivo viejo (`memoria.sqlite.v1.bak`).
+  - El paquete compartible (`.modpackes.zip`) lleva marcado lo dudoso; al aplicarlo, eso queda solo para ese modpack. Un paquete viejo sigue sirviendo.
 - **Más contexto en los textos de los mods, sin costo extra:**
   - Los textos van al motor en el orden del archivo y no en orden alfabético, así que un lote junta el nombre de un objeto con su tooltip y el título de una misión con su descripción.
   - Un tooltip o una descripción dice de qué objeto habla («habla de «Teleporter»»).

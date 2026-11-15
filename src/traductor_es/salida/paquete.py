@@ -30,7 +30,7 @@ from ..modulos.libros import AMBITO as AMBITO_LIBRO
 from ..modulos.libros import CAMPOS_PATCHOULI
 from ..nucleo.dialectos import DIALECTOS, VARIANTES
 from ..nucleo.mascara import es_traducible, separar_bordes
-from ..nucleo.memoria import Fila, codigos_iguales
+from ..nucleo.memoria import OK, Fila, codigos_iguales
 
 if TYPE_CHECKING:
     from ..proceso import Informe, Proceso
@@ -130,7 +130,7 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
     """Guarda el paquete del modpack de `proceso` en `destino`."""
     dialecto = proceso.ctx.dialecto
     textos, avisos = textos_del_modpack(proceso)
-    filas = [f for f in proceso.memoria.filas(textos, dialecto) if f.motor not in _NO_SE_COMPARTE]
+    filas = [f for f in proceso.memoria.filas(textos, dialecto, proceso.pack) if f.motor not in _NO_SE_COMPARTE]
     nucleos = {n for n, _ in textos}
     correcciones = {o: t for o, t in proceso.memoria.correcciones(dialecto).items() if o in nucleos}
     glosario = configuracion.leer_glosario_usuario()
@@ -140,7 +140,7 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
     filas_es: list[Fila] = []
     correcciones_es: dict[str, str] = {}
     if dialecto != _ESPANA:  # la versión de España, si se tradujo con «Traducir también… para España»
-        filas_es = [f for f in proceso.memoria.filas(textos, _ESPANA) if f.motor not in _NO_SE_COMPARTE]
+        filas_es = [f for f in proceso.memoria.filas(textos, _ESPANA, proceso.pack) if f.motor not in _NO_SE_COMPARTE]
         correcciones_es = {o: t for o, t in proceso.memoria.correcciones(_ESPANA).items() if o in nucleos}
     modelos = sorted({f.motor for f in (*filas, *filas_es)})
     meta: dict[str, Any] = {
@@ -173,7 +173,10 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
 
 
 def _fila_json(f: Fila) -> dict[str, str]:
-    return {"origen": f.origen, "ambito": f.ambito, "traduccion": f.traduccion, "motor": f.motor}
+    fila = {"origen": f.origen, "ambito": f.ambito, "traduccion": f.traduccion, "motor": f.motor}
+    if f.calidad != OK:  # lo aceptado con dudas viaja marcado (un paquete viejo no trae el campo: todo «ok»)
+        fila["calidad"] = f.calidad
+    return fila
 
 
 def _json(datos: object) -> bytes:
@@ -244,7 +247,9 @@ def _filas_validas(crudo: object, resumen: ResumenImportacion) -> list[Fila]:
         if ambito not in _AMBITOS or not isinstance(motor, str) or not _texto_valido(origen, traduccion):
             resumen.descartados += 1
             continue
-        filas.append(Fila(cast(str, origen), cast(str, ambito), cast(str, traduccion).strip(), motor[:200]))
+        calidad = d.get("calidad")
+        calidad = calidad[:200] if isinstance(calidad, str) and calidad.strip() else OK
+        filas.append(Fila(cast(str, origen), cast(str, ambito), cast(str, traduccion).strip(), motor[:200], calidad))
     return filas
 
 
@@ -319,10 +324,10 @@ def importar_paquete(proceso: Proceso, ruta: Path) -> ResumenImportacion:
         correcciones_es = _pares_validos(_leer(zf, _CORRECCIONES_ES), _MAX_TEXTO, resumen) if con_espana else {}
     resumen.avisos = _avisos_de_version(proceso, meta)
     resumen.modelos = sorted({f.motor for f in (*filas, *filas_es)})
-    resumen.memoria = proceso.memoria.importar(filas, dialecto)
+    resumen.memoria = proceso.memoria.importar(filas, dialecto, proceso.pack)
     resumen.correcciones = _importar_correcciones(proceso, correcciones, dialecto, resumen)
     if filas_es or correcciones_es:
-        resumen.espana = proceso.memoria.importar(filas_es, _ESPANA)
+        resumen.espana = proceso.memoria.importar(filas_es, _ESPANA, proceso.pack)
         resumen.correcciones += _importar_correcciones(proceso, correcciones_es, _ESPANA, resumen)
     terminos = configuracion.leer_glosario_usuario()
     nuevos = {en: es for en, es in glosario.items() if en not in terminos}
@@ -370,8 +375,8 @@ def importar_resource_pack(proceso: Proceso, ruta: Path) -> ResumenImportacion:
     if not pares and not libros:
         raise ValueError(f"{ruta.name} no tiene textos en español de los mods de esta instancia.")
     motor = f"pack:{nombre}"
-    proceso.memoria.guardar(pares, dialecto, "ui", motor)
-    proceso.memoria.guardar(libros, dialecto, AMBITO_LIBRO, motor)
+    proceso.memoria.guardar(pares, dialecto, "ui", motor, proceso.pack)
+    proceso.memoria.guardar(libros, dialecto, AMBITO_LIBRO, motor, proceso.pack)
     resumen.memoria, resumen.modelos = len(pares) + len(libros), [motor]
     return resumen
 

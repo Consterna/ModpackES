@@ -36,7 +36,7 @@ from .mascara import (
     separar_bordes,
     sin_formato,
 )
-from .memoria import Memoria
+from .memoria import OK, SIN_PACK, Memoria, codigos_iguales
 
 Progreso = Callable[[int, int], None]
 Registro = Callable[[str], None]
@@ -142,6 +142,7 @@ class Traductor:
         ejemplos: Ejemplos | None = None,
         glosario_estricto: bool = True,
         controles_de_forma: bool = True,
+        pack: str = SIN_PACK,
     ) -> None:
         if dialecto not in DIALECTOS:
             raise ValueError(f"Dialecto desconocido: {dialecto}")
@@ -166,19 +167,42 @@ class Traductor:
         #: Mayúsculas del glosario, nombres que no se traducen, palabras repetidas y reparación del reintento.
         #: Solo se apaga para medir cuánto aportan.
         self.controles_de_forma = controles_de_forma
+        #: El modpack que se traduce: lo dudoso que se guarda en la memoria solo se reutiliza en él
+        self.pack = pack
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
-    def _conocida(self, nucleo: str, ambito: str, correcciones: Mapping[str, str]) -> str | None:
-        """Lo que el usuario corrigió o fijó manda; después, lo ya traducido; después, los nombres oficiales.
+    def _conocida(
+        self, nucleo: str, ambito: str, correcciones: Mapping[str, str], revalidar: bool = False
+    ) -> str | None:
+        """Qué manda: la corrección del usuario, su glosario, el nombre del propio juego, la memoria (la de este pack
+        o, de otro, solo lo que quedó bien) y, al final, los demás términos del glosario.
+
+        Con `revalidar`, lo que la memoria tiene como bueno vuelve a pasar los códigos y el glosario de hoy: si ya no
+        cumple (el glosario cambió, o se guardó antes de una regla nueva), se traduce de nuevo. Lo aceptado con dudas
+        en este pack no se vuelve a pedir: ya se intentó y saldría lo mismo.
 
         `correcciones` se lee una vez por llamada pública (son pocas): así no se consulta la base por cada texto.
         """
-        return (
-            correcciones.get(nucleo)
-            or self.glosario.fijo(nucleo)
-            or self.memoria.obtener(nucleo, self.dialecto, ambito)
-            or self.glosario.exacto(nucleo)
+        hecho = correcciones.get(nucleo) or self.glosario.fijo(nucleo) or self.glosario.oficial(nucleo)
+        if hecho:
+            return hecho
+        fila = self.memoria.fila(nucleo, self.dialecto, ambito, self.pack)
+        if fila is not None and (not revalidar or fila[1] != OK or self._sigue_valida(nucleo, fila[0])):
+            return fila[0]
+        return None if fila is not None else self.glosario.exacto(nucleo)
+
+    def _sigue_valida(self, nucleo: str, traduccion: str) -> bool:
+        """¿Una traducción de la memoria pasa hoy las reglas que no dependen del modelo (códigos y glosario)?"""
+        if not codigos_iguales(nucleo, traduccion):
+            return False
+        if not (self.glosario_estricto and self.controles_de_forma):
+            return True
+        terminos_del_texto = self.glosario.terminos_en(nucleo)
+        if not terminos_del_texto:
+            return True
+        return not terminos_faltantes(
+            nucleo, traduccion, terminos_del_texto, self.glosario.ambiguos(terminos_del_texto)
         )
 
     def pendientes(self, textos: Iterable[str], ambito: str) -> list[str]:
@@ -190,7 +214,7 @@ class Traductor:
         for t in textos:
             if es_traducible(t):
                 nucleo = separar_bordes(t)[1]
-                if nucleo not in vistos and self._conocida(nucleo, ambito, correcciones) is None:
+                if nucleo not in vistos and self._conocida(nucleo, ambito, correcciones, revalidar=True) is None:
                     vistos[nucleo] = None
         return list(vistos)
 
@@ -345,7 +369,7 @@ class Traductor:
                         raise Cancelado()
                     lote = futuros[fut]
                     buenos = fut.result()
-                    self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
+                    self._guardar(buenos, ambito, resultado)
                     fallidos.update(n for n in lote if n not in buenos)
                     hechos += len(lote)
                     progreso(hechos, total)
@@ -354,6 +378,12 @@ class Traductor:
                 ex.shutdown(wait=True, cancel_futures=True)
                 raise
         return fallidos
+
+    def _guardar(self, buenos: Mapping[str, str], ambito: str, resultado: Resultado) -> None:
+        """Guarda en la memoria, con el pack y el motivo de lo que se aceptó con dudas."""
+        with self._lock:
+            dudas = {n: resultado.dudosos[n] for n in buenos if n in resultado.dudosos}
+        self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre, self.pack, dudas)
 
     def _ronda_por_lotes(
         self,
@@ -371,7 +401,7 @@ class Traductor:
         total = sum(len(lote) for lote in lotes)
         for lote, (pedido, mascaras), salida in zip(lotes, pedidos, salidas, strict=True):
             buenos = self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito, pistas)
-            self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
+            self._guardar(buenos, ambito, resultado)
             fallidos.update(n for n in lote if n not in buenos)
             hechos += len(lote)
             progreso(hechos, total)

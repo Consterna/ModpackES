@@ -97,7 +97,7 @@ def test_importar_aplica_sin_llamar_al_motor(tmp_path: Path) -> None:
     with Memoria(":memory:") as memoria, Proceso(otra, motor, grupos=["mods"], memoria=memoria) as p:
         resumen, informe = paquete.aplicar(p, destino)
         assert memoria.correccion("Wrench", "es_mx") == "Llave inglesa"
-        assert memoria.obtener("Iron Gear", "es_mx", "ui") == "«ES» Iron Gear"
+        assert memoria.obtener("Iron Gear", "es_mx", "ui", p.pack) == "«ES» Iron Gear"
     assert resumen.memoria == 2 and resumen.correcciones == 1 and resumen.glosario == 0
     assert resumen.conservados == 1  # «Gear» del usuario se queda como estaba
     assert configuracion.leer_glosario_usuario() == {"Gear": "Rueda dentada", "Plate": "Placa"}
@@ -105,6 +105,21 @@ def test_importar_aplica_sin_llamar_al_motor(tmp_path: Path) -> None:
     assert informe.modulos and not informe.avisos
     assert leer_marca(otra / "resourcepacks" / "Traduccion_ES")["motores"] == ["prueba:modelo-1"]
     assert 'file/Traduccion_ES"' in (otra / "options.txt").read_text("utf-8")
+
+
+def test_lo_dudoso_viaja_marcado_y_solo_vale_en_el_pack(tmp_path: Path) -> None:
+    with Memoria(":memory:") as memoria:
+        destino = _traducir_y_exportar(tmp_path, memoria)
+    with zipfile.ZipFile(destino) as z:
+        filas = {f["origen"]: f for f in json.loads(z.read("memoria.json"))}
+    assert filas["Iron Gear"]["calidad"].startswith("terminología")  # «Gear» del glosario quedó sin cumplir
+    assert "calidad" not in filas["Copper Plate"]
+    otra = _instancia(tmp_path / "b", nombre="Otro")
+    with Memoria(":memory:") as memoria, Proceso(otra, SinLlamadas(), grupos=["mods"], memoria=memoria) as p:
+        paquete.aplicar(p, destino, activar=False)
+        assert memoria.obtener("Iron Gear", "es_mx", "ui", p.pack) == "«ES» Iron Gear"
+        assert memoria.obtener("Iron Gear", "es_mx", "ui", "Un tercer pack") is None
+        assert memoria.obtener("Copper Plate", "es_mx", "ui", "Un tercer pack") is not None
 
 
 def test_importar_avisa_si_el_modpack_o_la_version_no_coinciden(tmp_path: Path) -> None:
