@@ -420,6 +420,9 @@ uv run python scripts/medir_calidad.py --banco .descargas/banco/referencia_real.
 uv run python scripts/comparar_mediciones.py --a build/sin1.json build/sin2.json --b build/con1.json build/con2.json
 uv run python scripts/juzgar_calidad.py --entrada build/con1.json
 uv run python scripts/armar_banco_misiones.py --textos 400
+uv run python scripts/descargar_lang.py   # también baja los libros de Patchouli en inglés y español
+uv run python scripts/armar_banco_libros.py --textos 150
+uv run python scripts/medir_calidad.py --banco .descargas/banco/libros.json --vanilla .descargas/vanilla
 uv run python scripts/medir_calidad.py --sin-vecindad --banco .descargas/banco/misiones.json --salida build/base.json
 uv run python scripts/medir_calidad.py --banco .descargas/banco/misiones.json --salida build/mejora.json
 uv run python scripts/preferencia_pareada.py --a build/base.json --b build/mejora.json

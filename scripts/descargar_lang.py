@@ -1,9 +1,9 @@
-"""Baja solo los archivos de idioma (lang) de los mods de licencia libre de los packs del corpus.
+"""Baja solo los archivos de idioma (lang) y los libros de los mods de licencia libre de los packs del corpus.
 
 Para cada mod del índice cuya licencia (según Modrinth) sea libre, lee el directorio del jar con peticiones
-por rangos y baja solo `assets/*/lang/` en inglés y español. Lo deja en .descargas/<pack>/langs/<jar>/ para
-medir el glosario y la calidad (ver docs/datos-de-terceros.md). No baja jars completos ni mods con
-licencia reservada o dudosa.
+por rangos y baja solo `assets/*/lang/` y los libros de Patchouli (`assets/*/patchouli_books/`), en inglés y
+español. Lo deja en .descargas/<pack>/langs/<jar>/ para medir el glosario y la calidad (ver
+docs/datos-de-terceros.md). No baja jars completos ni mods con licencia reservada o dudosa.
 
 Uso:  uv run python scripts/descargar_lang.py [pack ...]
 """
@@ -20,6 +20,8 @@ import descargar_corpus as dc
 from auditar_licencias import mods_por_hash
 
 LANG = re.compile(r"^assets/[^/]+/lang/(en_us\.json|en_US\.lang|es_[a-z]{2}\.(json|lang)|es_[A-Z]{2}\.lang)$")
+#: Libros de Patchouli en inglés y español, para el banco de libros (scripts/armar_banco_libros.py).
+LIBRO = re.compile(r"^assets/[^/]+/patchouli_books/[^/]+/(en_us|es_[a-z]{2})/.+\.json$")
 LIMITE_POR_PACK = 30 * 1024 * 1024
 
 
@@ -37,7 +39,9 @@ def bajar_langs(pack: Path) -> dict[str, Any]:
             continue
         url = f["downloads"][0]
         try:
-            entradas = [e for e in dc.directorio_central(url, dc.tamano(url)) if LANG.match(e.nombre)]
+            entradas = [
+                e for e in dc.directorio_central(url, dc.tamano(url)) if LANG.match(e.nombre) or LIBRO.match(e.nombre)
+            ]
         except (OSError, RuntimeError) as e:
             resumen["omitidos"].append({"jar": nombre, "motivo": f"error: {e}"})
             continue
