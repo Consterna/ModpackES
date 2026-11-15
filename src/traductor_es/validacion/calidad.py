@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Iterable, Mapping
+from collections.abc import Container, Iterable, Mapping
 from dataclasses import dataclass, field
 
 from ..nucleo.mascara import sin_formato
 
-_PALABRA = re.compile(r"[^\W\d_]+")
+PALABRA = re.compile(r"[^\W\d_]+")
+_PALABRA = PALABRA
 #: Palabras muy comunes del inglés que casi nunca aparecen en un texto en español.
 _INGLES = frozenset({
     "the", "and", "with", "your", "you", "this", "that", "from", "have", "will", "which", "when", "into", "are",
@@ -126,12 +127,33 @@ def _con_mayuscula(termino: str, original: str) -> bool:
     return False
 
 
-def terminos_faltantes(original: str, traduccion: str, glosario: Mapping[str, str]) -> dict[str, str]:
+def uso_como_nombre(termino: str, original: str) -> bool:
+    """¿El original usa el término de una palabra como nombre, y no como palabra común?
+
+    Sí si es todo el texto («Lead»), si va con mayúscula a mitad de frase («Tie it with a Lead») o si el texto es un
+    nombre en estilo título («Lead Block»). «Lead the way» al empezar la frase o «lead» en minúscula, no.
+    """
+    original = sin_formato(original)
+    if original.strip(" .:!?¡¿\"'").casefold() == termino.casefold():
+        return True
+    for m in _patron_palabra(termino, re.IGNORECASE).finditer(original):
+        if m.group(0)[:1].isupper() and (
+            not _inicio_de_frase(original, m.start()) or _en_estilo_titulo(original, termino)
+        ):
+            return True
+    return False
+
+
+def terminos_faltantes(
+    original: str, traduccion: str, glosario: Mapping[str, str], ambiguos: Container[str] = frozenset()
+) -> dict[str, str]:
     """{inglés: traducción esperada} de los términos del glosario que salen en el original y no en la traducción.
 
     Se tolera que la palabra venga en plural o con otra terminación: es una red contra olvidos, no un corrector
     de estilo. Un término que queda igual en los dos idiomas («Creeper», un jefe, un mod) solo se exige cuando
-    el original lo escribe como nombre propio: así no se obliga a dejar en inglés una palabra común.
+    el original lo escribe como nombre propio: así no se obliga a dejar en inglés una palabra común. Un término de
+    `ambiguos` (una palabra que en minúscula tiene otro sentido, como «lead» en «lead the way») solo se exige si el
+    original lo usa como nombre.
     """
     original = sin_formato(original)  # «&4Arachnarch»: el código pegado no deja ver la palabra
     minusculas = original.casefold()
@@ -145,6 +167,8 @@ def terminos_faltantes(original: str, traduccion: str, glosario: Mapping[str, st
         if not patron.search(minusculas):
             continue
         minusculas = patron.sub(lambda m: " " * len(m.group(0)), minusculas)
+        if ingles in ambiguos and not uso_como_nombre(ingles, original):
+            continue
         if _sin_tildes(ingles) == _sin_tildes(esperado) and not _con_mayuscula(ingles, original):
             continue
         if not sale_el_termino(esperado, traduccion):
@@ -202,12 +226,79 @@ def reemplazar_en_ingles(traduccion: str, faltan: Mapping[str, str], original: s
         return traduccion, dict(faltan)
     siguen: dict[str, str] = {}
     for ingles, esperado in faltan.items():
-        patron = _patron_palabra(ingles, re.IGNORECASE)
-        if patron.search(traduccion):
-            traduccion = patron.sub(lambda _m, e=esperado: e, traduccion)
-        else:
+        cambiada = _reemplazar_con_articulo(traduccion, _patron_palabra(ingles, re.IGNORECASE), esperado)
+        if cambiada is None:
             siguen[ingles] = esperado
+        else:
+            traduccion = cambiada
     return traduccion, siguen
+
+
+#: Sustantivos que no siguen la regla de la terminación.
+_MASCULINOS = frozenset({
+    "día", "mapa", "planeta", "sistema", "problema", "tema", "idioma", "programa", "clima", "poema", "esquema",
+    "prisma", "aroma", "cometa", "portal", "altar", "panel", "nivel", "metal", "cristal", "cofre", "tridente",
+    "lingote", "diamante", "bloque", "puente", "motor", "generador", "reactor", "tanque", "imán", "tubo", "cable",
+    "maná",
+})  # fmt: skip
+_FEMENINOS = frozenset({
+    "mano", "radio", "foto", "moto", "llave", "red", "torre", "nave", "base", "fuente", "piel", "miel", "sal",
+    "luz", "cruz", "voz", "raíz", "nuez", "flor", "mesa", "lanza", "hacha", "espada", "pala", "azada", "gema",
+})  # fmt: skip
+#: Artículo → (género, el mismo artículo en el otro género)
+_ARTICULOS = {
+    "el": ("m", "la"), "la": ("f", "el"), "un": ("m", "una"), "una": ("f", "un"), "del": ("m", "de la"),
+    "de la": ("f", "del"), "al": ("m", "a la"), "a la": ("f", "al"), "los": ("m", "las"), "las": ("f", "los"),
+    "unos": ("m", "unas"), "unas": ("f", "unos"),
+}  # fmt: skip
+_ARTICULO_ANTES = re.compile(r"(?<![^\W_])(de la|a la|del|al|el|la|los|las|un|una|unos|unas)(\s+)$", re.IGNORECASE)
+
+
+def genero(termino: str) -> str | None:
+    """Género del término en español por su primera palabra («Llave inglesa» → «f»), o None si no se sabe."""
+    palabras = _PALABRA.findall(termino)
+    if not palabras:
+        return None
+    nucleo = palabras[0].casefold()
+    singular = nucleo[:-1] if nucleo.endswith("s") and len(nucleo) > 4 else nucleo
+    for forma in dict.fromkeys((nucleo, singular)):
+        if forma in _MASCULINOS:
+            return "m"
+        if forma in _FEMENINOS:
+            return "f"
+    if singular.endswith(("ción", "sión", "dad", "tad", "tud", "umbre")):
+        return "f"
+    if singular.endswith(("ma", "pa")) and len(singular) > 4:
+        return None  # «sistema», «mapa»: muchas excepciones que no están en la lista
+    if singular.endswith("a"):
+        return "f"
+    if singular.endswith(("o", "or", "aje", "ón", "án")):
+        return "m"
+    return None
+
+
+def _reemplazar_con_articulo(traduccion: str, patron: re.Pattern[str], esperado: str) -> str | None:
+    """Cambia cada aparición por `esperado` y ajusta el artículo de delante a su género («el Wrench» → «la Llave»).
+
+    None si no aparece o si hay un artículo delante y no se sabe el género: mejor avisar que dejar «el Llave».
+    """
+    apariciones = list(patron.finditer(traduccion))
+    if not apariciones:
+        return None
+    nuevo_genero = genero(esperado)
+    for m in reversed(apariciones):
+        antes, despues = traduccion[: m.start()], traduccion[m.end() :]
+        articulo = _ARTICULO_ANTES.search(antes)
+        if articulo is not None:
+            if nuevo_genero is None:
+                return None
+            palabra = articulo.group(1)
+            actual, otro = _ARTICULOS[palabra.casefold()]
+            if actual != nuevo_genero:
+                otro = otro[0].upper() + otro[1:] if palabra[0].isupper() else otro
+                antes = antes[: articulo.start()] + otro + articulo.group(2)
+        traduccion = antes + esperado + despues
+    return traduccion
 
 
 #: Largo mínimo de una palabra para comparar raíces al buscar repeticiones, y largo de la raíz.
@@ -256,7 +347,12 @@ class Revision:
         return "Términos del glosario no respetados: " + ", ".join(f"{t} ({n})" for t, n in peores)
 
 
-def revisar_glosario(traducciones: Mapping[str, str], glosario: Mapping[str, str], terminos: Iterable[str]) -> Revision:
+def revisar_glosario(
+    traducciones: Mapping[str, str],
+    glosario: Mapping[str, str],
+    terminos: Iterable[str],
+    ambiguos: Container[str] = frozenset(),
+) -> Revision:
     """Cuenta las veces que un término del glosario aparece en el original pero su traducción no sale.
 
     Usa la misma regla que el rechazo de cada traducción (`terminos_faltantes`): tolera tildes, mayúsculas y plurales.
@@ -264,6 +360,6 @@ def revisar_glosario(traducciones: Mapping[str, str], glosario: Mapping[str, str
     revision = Revision()
     elegidos = {t: glosario[t] for t in terminos if glosario.get(t)}
     for original, traducida in traducciones.items():
-        for termino in terminos_faltantes(original, traducida, elegidos):
+        for termino in terminos_faltantes(original, traducida, elegidos, ambiguos):
             revision.inconsistentes[termino] = revision.inconsistentes.get(termino, 0) + 1
     return revision

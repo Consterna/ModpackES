@@ -467,6 +467,28 @@ queda como duda en el CSV de dudosos.
   («Vidrio a prueba de Wither», «Nivel III»), así que solo se informan y no se cambian.
 - Cada control tiene pruebas con textos correctos del español del juego que no deben marcarse (`tests/test_qa.py`).
 
+## 15 de noviembre de 2026 · términos de una palabra con otro sentido
+
+El glosario exigía «Diana» en «the position of the target», «Poder» en «other power solutions» y «Cambiante» en
+«without changing the filter». La app ahora mira cómo traducen el juego y los mods cada palabra en minúscula. En el
+español del juego, «target» en minúscula nunca es «Diana» (sale «objetivo») y «power» casi nunca es «Poder» (sale
+«energía», «potencia»). Esas palabras solo se mandan y se exigen como término cuando el texto las usa como nombre.
+Las que el juego sí traduce siempre igual («fire» → «fuego», «clock» → «reloj») se siguen exigiendo.
+
+Con Gemini 3.8 Flash y dos corridas grabadas (US$ 0,12), cambiaron los términos de 6 textos de interfaz y 9 de
+misiones:
+
+| | chrF de los 6 textos de interfaz (corridas 1 y 2) |
+|---|---|
+| Antes | 68,6 · 67,1 |
+| Ahora | 75,2 · 75,4 |
+
+- Interfaz: «la diana» pasó a «el objetivo» en los tres textos. Ninguno empeoró.
+- Misiones (sin referencia): «Otras soluciones de Poder» pasó a «de energía» y «sin hacerla Cambiante» a «sin
+  cambiar»; los demás quedaron igual.
+- En todo el banco de interfaz, el chrF quedó en 74,8 · 73,8 (antes 74,8 · 73,3): el cambio toca pocos textos y el
+  ruido del modelo es mayor.
+
 ## Cómo repetirlo
 
 ```

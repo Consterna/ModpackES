@@ -21,7 +21,7 @@ from ..validacion.calidad import (
 from . import terminos
 from .dialectos import DIALECTO_POR_DEFECTO, DIALECTOS
 from .ejemplos import Ejemplos
-from .glosario import Glosario
+from .glosario import Glosario, parece_nombre_propio
 from .mascara import (
     Enmascarado,
     codigos_inventados,
@@ -33,6 +33,7 @@ from .mascara import (
     pares_en_orden,
     posicionar_argumentos,
     separar_bordes,
+    sin_formato,
 )
 from .memoria import Memoria
 
@@ -52,6 +53,8 @@ MOTIVO_TERMINOLOGIA = "terminología: "
 MOTIVO_QA = "control de calidad: "
 #: Prefijo del motivo de rechazo cuando la traducción repite una palabra que el original no repite.
 MOTIVO_REPETIDA = "palabra repetida: "
+#: Lo que vuelve igual al original en el reintento y parece un nombre propio: se acepta, pero se revisa
+MOTIVO_NOMBRE = "sin traducir (¿nombre propio?)"
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
 #: Lo que se le dice al motor de un nombre propio que se repite en las misiones o los libros.
 AVISO_NOMBRE = (
@@ -390,6 +393,9 @@ class Traductor:
                 final = ajustar_mayusculas(n, final, self._con_mayusculas(glosario))
             motivo = self._motivo_de_forma(n, final, glosario)
             if motivo and tolerante:  # segundo intento: se arregla lo que se pueda y se acepta, marcado
+                if self.controles_de_forma and motivo == "sin traducir" and not parece_nombre_propio(sin_formato(n)):
+                    rechazados[n] = motivo  # una frase en inglés no se guarda en la memoria como si fuera la traducción
+                    continue
                 if self.controles_de_forma:
                     final, motivo = self._reparar(n, final, glosario, motivo)
                     if motivo:
@@ -448,7 +454,7 @@ class Traductor:
             return "sin traducir"
         if glosario and self.glosario_estricto:
             exigidos = glosario if self.controles_de_forma else {en: es for en, es in glosario.items() if en != es}
-            faltan = terminos_faltantes(original, final, exigidos)
+            faltan = terminos_faltantes(original, final, exigidos, self.glosario.ambiguos(exigidos))
             if faltan:
                 return MOTIVO_TERMINOLOGIA + "; ".join(f"«{en}» = «{es}»" for en, es in faltan.items())
         repetida = palabra_repetida(original, final) if self.controles_de_forma else None
@@ -465,12 +471,12 @@ class Traductor:
         """Arreglo determinista en el reintento: un término del glosario que quedó en inglés se cambia por el suyo.
 
         Devuelve la traducción y el motivo que sigue sin resolverse (None si quedó bien). Lo que vuelve igual al
-        original en el reintento se acepta sin marcar: es un nombre propio.
+        original en el reintento (y parece un nombre propio) se acepta, marcado para revisarlo.
         """
         if motivo == "sin traducir":
-            return final, None
+            return final, MOTIVO_NOMBRE
         if motivo.startswith(MOTIVO_TERMINOLOGIA) and glosario:
-            faltan = terminos_faltantes(original, final, glosario)
+            faltan = terminos_faltantes(original, final, glosario, self.glosario.ambiguos(glosario))
             final, siguen = reemplazar_en_ingles(final, faltan, original)
             final = ajustar_mayusculas(original, final, self._con_mayusculas(glosario))
             if not siguen:
