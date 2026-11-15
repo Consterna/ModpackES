@@ -518,6 +518,35 @@ Para medirlo, una copia del banco de interfaz lleva las pistas nuevas, calculada
 - **Descripciones de FTB Quests:** traducirlas como un bloque y no línea por línea queda para la ola de segmentación,
   porque cambia cómo se escriben los archivos.
 
+## 15 de noviembre de 2026 · perfiles de calidad: corregir lo dudoso y el consenso de lo corto
+
+Hay tres perfiles: económico, equilibrado y máximo. En los perfiles equilibrado y máximo, toda corrección se queda
+solo si un juez a ciegas (el mismo modelo, tarea «comparar», con los códigos enmascarados) prefiere la versión nueva
+en los dos órdenes (`validacion/verificacion.py`). Eso vale también para la revisión de misiones y libros, que antes
+aceptaba lo rehecho sin juzgarlo.
+
+**Equilibrado** (corrige una vez lo dudoso): en la interfaz no hubo nada dudoso. En misiones actuó en un texto por
+corrida:
+- en una corrida, el juez prefirió la corrección («ítem» como el es_mx del juego, y la misma cifra que el original);
+- en la otra, se quedó la primera.
+
+El costo extra fueron unos 3 pedidos chicos por banco.
+
+**Máximo** (tres traducciones de cada texto de 6 palabras o menos, elegidas por consenso). Gemini 3.8 Flash, dos
+corridas, US$ 0,11:
+
+| | Interfaz |
+|---|---|
+| chrF, económico contra máximo | 75,6 contra 75,7: +0,09 (IC −0,38 a +0,60), no se distingue del ruido |
+| Textos que cambiaron | 41 y 42 de 390 |
+| Juez a ciegas en los dos órdenes | gana el máximo 37 veces, el económico 32 y 14 empates (p ≈ 0,6 y 0,19) |
+| Costo de la traducción | 1,2 veces el económico |
+
+- Con este modelo, las tres traducciones casi siempre coinciden. Cuando no coinciden, la elegida cambia la
+  redacción («adyacente» por «contiguo», «Unificador» por «Convergente») y no el sentido.
+- Coincide con la investigación: elegir entre salidas ayuda sobre todo cuando el modelo duda más. Por eso el
+  máximo queda como opción y el perfil por defecto es el equilibrado.
+
 ## Cómo repetirlo
 
 ```

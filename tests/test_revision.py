@@ -67,7 +67,7 @@ def test_marca_y_rehace_lo_grave(memoria: Memoria) -> None:
     assert memoria.obtener("Build a house", "es_mx", "mision") == "«ES» Build a house"
     pedido = next(lote for lote in motor.lotes_recibidos if lote.tarea == "revisar")
     assert {e.traduccion for e in pedido.entradas} == {"«ES» Find iron ore", "«ES» Build a house"}
-    rehecho = motor.lotes_recibidos[-1].entradas[0]
+    rehecho = next(lote for lote in reversed(motor.lotes_recibidos) if lote.tarea == "traducir").entradas[0]
     assert "marcado por la prueba" in rehecho.pista and "«ES» Find iron ore" in rehecho.pista
     assert "1 quedaron corregidos" in str(resumen)
 

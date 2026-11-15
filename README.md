@@ -86,10 +86,19 @@ El campo **Ambientación** (opcional) le cuenta al motor de qué va el modpack: 
 amable; “Bells” es la moneda del pueblo». Ayuda con el tono y con los términos propios del pack, y se guarda
 por instancia.
 
+**Calidad** (en «Opciones avanzadas» y `--calidad`):
+- **Equilibrado**, el perfil por defecto: lo que quedó con dudas se corrige una vez. La corrección se queda solo si
+  un juez a ciegas la prefiere. Cuesta cerca de un 5 % más.
+- **Máximo:** además, cada texto corto se traduce tres veces y se elige por consenso, y se revisan misiones y libros.
+  Cuesta un 30 % más, más la revisión. Con Gemini 3.8 Flash no mejoró de forma medible: es una opción para
+  modelos que dudan más.
+- **Económico:** solo los arreglos automáticos.
+
 **Revisión automática** (opcional, en «Opciones avanzadas», solo misiones y libros): después de traducir, otro
 pedido al motor juzga cada traducción nueva al estilo de [GEMBA-MQM](https://aclanthology.org/2023.wmt-1.64)
 (exactitud, terminología, fluidez y estilo, con gravedad leve, grave o crítica) y las graves se vuelven a
-traducir indicando el error. La nueva traducción tiene que pasar las mismas reglas; si no, queda la anterior.
+traducir indicando el error. La nueva traducción tiene que pasar las mismas reglas y ganarle a la anterior ante
+un juez a ciegas, en los dos órdenes; si no, queda la anterior.
 Tus correcciones nunca se revisan. Sube el costo de esos textos (el análisis lo incluye) y sus marcas no son
 infalibles: sirven para decidir qué rehacer, no como nota de calidad.
 
@@ -224,7 +233,7 @@ Desde el código fuente (ver [Desarrollo](#desarrollo)):
 uv run modpackes instancias
 uv run modpackes analizar "RUTA DE LA INSTANCIA"
 uv run modpackes cambios "RUTA" [--json]   # qué cambió desde la última traducción y cuánto cuesta (solo lee)
-uv run modpackes traducir "RUTA" [--dialecto es_es | --tambien-es-es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar]
+uv run modpackes traducir "RUTA" [--dialecto es_es | --tambien-es-es] [--solo misiones,libros] [--lotes] [--modelo gemini-3.5-flash-lite] [--contexto "granja acogedora"] [--revisar] [--calidad economico|equilibrado|maximo]
 uv run modpackes restaurar "RUTA"
 uv run modpackes cobertura "RUTA" [--java]   # qué queda en inglés y por qué (solo lee)
 uv run modpackes glosario listar | agregar "Death Knights" "Caballeros de la Muerte" | quitar "Fluix" | importar terminos.json
