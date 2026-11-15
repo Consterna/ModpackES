@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import re
 import sqlite3
 import threading
 from collections.abc import Callable, Mapping, Sequence
@@ -72,6 +74,10 @@ class Informe:
     modulos_cambios: list[InformeModulo] = field(default_factory=list[InformeModulo])
     #: Lo que se aceptó sin cumplir todas las reglas tras el reintento: original → (traducción, motivo)
     dudosos: dict[str, tuple[str, str]] = field(default_factory=dict[str, tuple[str, str]])
+    #: Arreglos automáticos del control de calidad (código → cuántos)
+    arreglos: dict[str, int] = field(default_factory=dict[str, int])
+    #: Lista completa de lo dudoso, para revisarla con calma (None si no hubo nada o no se pudo guardar)
+    archivo_dudosos: Path | None = None
 
     @property
     def diferencia(self) -> Informe:
@@ -120,15 +126,43 @@ def _textos(lugar: Lugar) -> list[str]:
 _EJEMPLOS_DUDOSOS = 3
 
 
-def aviso_de_dudosos(dudosos: Mapping[str, tuple[str, str]]) -> str:
+#: Nombres de los arreglos del control de calidad para el registro
+_NOMBRES_QA = {
+    "espacios": "espacios", "ancho_cero": "caracteres invisibles", "palabra_doble": "palabras repetidas",
+    "signo_apertura": "¿ y ¡", "puntuacion_final": "puntuación final", "comillas": "comillas",
+    "mes_dia": "meses y días",
+}  # fmt: skip
+
+
+def guardar_dudosos(dudosos: Mapping[str, tuple[str, str]], juego: Path) -> Path | None:
+    """Guarda la lista completa de lo dudoso en un CSV (original, traducción, motivo) en la carpeta de datos."""
+    try:
+        carpeta = configuracion.carpeta_datos() / "informes"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        fecha = datetime.now().strftime("%Y%m%d-%H%M%S")
+        nombre = re.sub(r"[^\w.-]+", "_", juego.parent.name if juego.name == "minecraft" else juego.name).strip("_")
+        ruta = carpeta / f"dudosos-{nombre or 'instancia'}-{fecha}.csv"
+        with ruta.open("w", encoding="utf-8-sig", newline="") as f:  # con BOM: Excel lo abre con tildes
+            escritor = csv.writer(f)
+            escritor.writerow(["original", "traduccion", "motivo"])
+            for original, (traduccion, motivo) in sorted(dudosos.items()):
+                escritor.writerow([original, traduccion, motivo])
+    except OSError:
+        return None
+    return ruta
+
+
+def aviso_de_dudosos(dudosos: Mapping[str, tuple[str, str]], archivo: Path | None = None) -> str:
     """Resumen de lo que se aceptó con dudas, con unos ejemplos para revisar a mano."""
     ejemplos = "; ".join(
         f"«{original}» → «{traduccion}» ({motivo.split(':')[0]})"
         for original, (traduccion, motivo) in sorted(dudosos.items())[:_EJEMPLOS_DUDOSOS]
     )
+    lista = f" La lista completa está en {archivo}." if archivo is not None else ""
     return (
-        f"{len(dudosos)} textos se aceptaron con dudas (un término del glosario que no salió o una palabra repetida); "
-        f"conviene revisarlos en «Más ▸ Correcciones…». Por ejemplo: {ejemplos}"
+        f"{len(dudosos)} textos se aceptaron con dudas (un término del glosario, una repetición o un aviso del control "
+        f"de calidad: cifras, usted, inglés, omisión…); conviene revisarlos en «Más ▸ Correcciones…».{lista} "
+        f"Por ejemplo: {ejemplos}"
     )
 
 
@@ -452,7 +486,13 @@ class Proceso:
         relevantes = self.glosario.relevantes(todas, maximo=500)
         informe.revision = revisar_glosario(todas, relevantes, relevantes)
         if informe.dudosos:
-            informe.avisos.append(aviso_de_dudosos(informe.dudosos))
+            informe.archivo_dudosos = guardar_dudosos(informe.dudosos, self.instancia.juego)
+            informe.avisos.append(aviso_de_dudosos(informe.dudosos, informe.archivo_dudosos))
+        if informe.arreglos:
+            self.registro(
+                "Arreglos automáticos de forma: "
+                + ", ".join(f"{_NOMBRES_QA.get(c, c)} {n}" for c, n in sorted(informe.arreglos.items()))
+            )
         informe.avisos.extend(self._avisos())
         self._guardar_indice(traducidos, informe)
         if activar and (self.ctx.pack is not None and (self.ctx.pack.raiz / "pack.mcmeta").is_file()):
@@ -505,6 +545,8 @@ class Proceso:
                 informe.revision_automatica.sumar(hecha)
                 if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
                     resultado.traducciones = traductor.conocidas(textos, modulo.ambito)
+            for codigo, cuantos in resultado.arreglos.items():
+                informe.arreglos[codigo] = informe.arreglos.get(codigo, 0) + cuantos
             informe.dudosos.update(
                 {n: (resultado.nuevas[n], motivo) for n, motivo in resultado.dudosos.items() if n in resultado.nuevas}
             )

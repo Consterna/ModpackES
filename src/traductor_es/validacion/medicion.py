@@ -28,7 +28,7 @@ from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.mascara import sin_formato
 from ..nucleo.memoria import Memoria
-from ..nucleo.traductor import Traductor
+from ..nucleo.traductor import MOTIVO_QA, Traductor
 from ..nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from ..proceso import Informe, InformeModulo
 from . import revision
@@ -207,6 +207,8 @@ class Medicion:
     terminos_respetados_lema: int = 0  #: como `terminos_respetados`, aceptando plurales y otras formas (WMT25)
     tokens_reales: tuple[int, int] | None = None  #: (entrada, salida) que facturó el motor en esta medición
     costo_real: float | None = None  #: US$ según `tokens_reales` y la tabla de precios (lo grabado no cuesta)
+    qa: dict[str, int] = field(default_factory=dict[str, int])  #: dudas del control de calidad por código
+    arreglos: dict[str, int] = field(default_factory=dict[str, int])  #: arreglos automáticos por código
 
     @property
     def porcentaje(self) -> float:
@@ -251,6 +253,11 @@ class Medicion:
                 ]
                 if self.rechazos
                 else []
+            ),
+            *(
+                (etiqueta, ", ".join(f"{c} {n}" for c, n in sorted(conteo.items(), key=lambda x: -x[1])))
+                for etiqueta, conteo in (("Arreglos de forma", self.arreglos), ("Dudas del control", self.qa))
+                if conteo
             ),
             ("Costo estimado", "desconocido" if self.costo_estimado is None else f"US$ {self.costo_estimado:.3f}"),
             *(
@@ -383,6 +390,16 @@ def medir(
         hechas = {(a, o): t for a, r in resultados.items() for o, t in r.traducciones.items()}
         mediciones = [_medir(nombre or motor.nombre, banco, hechas, informe.costo(modelo, False, motor_id), segundos)]
         mediciones[0].tokens_reales, mediciones[0].costo_real = _gasto(motor, uso_antes, modelo)
+        mediciones[0].arreglos = dict(sum((r.arreglos for r in resultados.values()), Counter[str]()))
+        mediciones[0].qa = dict(
+            Counter(
+                c.strip()
+                for r in resultados.values()
+                for m in r.dudosos.values()
+                if m.startswith(MOTIVO_QA)
+                for c in m.removeprefix(MOTIVO_QA).split(",")
+            )
+        )
         mediciones[0].rechazos = dict(
             Counter(m.split(":")[0] for r in resultados.values() for m in r.rechazados.values())
         )

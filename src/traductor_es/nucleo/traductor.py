@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import threading
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import cast
 
 from ..motores.base import Cancelado, Entrada, Lote, Motor, MotorPorLotes
+from ..validacion import qa
 from ..validacion.calidad import (
     ajustar_mayusculas,
     palabra_repetida,
@@ -46,6 +48,8 @@ AVISO_SIN_TRADUCIR = (
 )
 #: Prefijo del motivo de rechazo cuando falta un término del glosario; lo que sigue es «inglés=español; …».
 MOTIVO_TERMINOLOGIA = "terminología: "
+#: Prefijo del motivo de una traducción aceptada con dudas del control de calidad (números, usted, inglés…).
+MOTIVO_QA = "control de calidad: "
 #: Prefijo del motivo de rechazo cuando la traducción repite una palabra que el original no repite.
 MOTIVO_REPETIDA = "palabra repetida: "
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
@@ -74,6 +78,8 @@ class Resultado:
     borradores: dict[str, str] = field(default_factory=dict[str, str])
     #: Lo que se aceptó en el reintento sin cumplir todas las reglas (núcleo → motivo): conviene revisarlo
     dudosos: dict[str, str] = field(default_factory=dict[str, str])
+    #: Arreglos automáticos del control de calidad (código → cuántos), p. ej. «signo_apertura»: 3
+    arreglos: Counter[str] = field(default_factory=Counter[str])
 
 
 class Traductor:
@@ -322,7 +328,7 @@ class Traductor:
         hechos = 0
         total = sum(len(lote) for lote in lotes)
         for lote, (pedido, mascaras), salida in zip(lotes, pedidos, salidas, strict=True):
-            buenos = self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito)
+            buenos = self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito, pistas)
             self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
             fallidos.update(n for n in lote if n not in buenos)
             hechos += len(lote)
@@ -347,7 +353,7 @@ class Traductor:
             return {}
         pedido, mascaras = self._pedido(lote, ambito, pistas)
         salida = self.motor.traducir_lote(pedido)
-        return self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito)
+        return self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito, pistas)
 
     def _procesar(
         self,
@@ -358,8 +364,10 @@ class Traductor:
         tolerante: bool = False,
         glosario: Mapping[str, str] | None = None,
         ambito: str = "ui",
+        pistas: Mapping[str, str] | None = None,
     ) -> dict[str, str]:
         buenos: dict[str, str] = {}
+        arreglos: Counter[str] = Counter()
         rechazados: dict[str, str] = {}
         borradores: dict[str, str] = {}
         dudosos: dict[str, str] = {}
@@ -390,6 +398,12 @@ class Traductor:
                 rechazados[n] = motivo
                 borradores[n] = final
                 continue
+            if self.controles_de_forma:  # control de calidad: arreglos seguros y dudas
+                rol = "nombre" if "nombre de un" in (pistas or {}).get(n, "") else ""
+                final, hallazgos = qa.revisar(n, final, ambito=ambito, dialecto=self.dialecto, rol=rol)
+                arreglos.update(qa.arreglos(hallazgos))
+                if (codigos := qa.dudas(hallazgos)) and n not in dudosos:
+                    dudosos[n] = MOTIVO_QA + ", ".join(codigos)
             buenos[n] = final
         self.ejemplos.agregar_pares(buenos)  # lo que ya se tradujo guía a los lotes que faltan
         with self._lock:
@@ -397,6 +411,7 @@ class Traductor:
             resultado.rechazados.update(rechazados)
             resultado.borradores.update(borradores)
             resultado.dudosos.update(dudosos)
+            resultado.arreglos.update(arreglos)
             resultado.nuevas.update(buenos)
         return buenos
 
