@@ -47,6 +47,26 @@ class _Marco:
         return f"{base}:{self.primera}" if self.primera is not None else base
 
 
+_HEX = frozenset("0123456789abcdefABCDEF")
+
+
+def _escape_visible(crudo: str, i: int) -> tuple[str, int] | None:
+    """(carácter, largo del escape) si en `i` empieza un `\\uXXXX` o `\\xXX` de un carácter visible; si no, None.
+
+    Los de control (`\\u0000`, `\\x1b`…) no se decodifican: quedan como escape crudo y la máscara los protege enteros.
+    """
+    largo = {"u": 4, "x": 2}.get(crudo[i + 1] if i + 1 < len(crudo) else "")
+    if largo is None:
+        return None
+    cifras = crudo[i + 2 : i + 2 + largo]
+    if len(cifras) != largo or not set(cifras) <= _HEX:
+        return None
+    caracter = chr(int(cifras, 16))
+    if not caracter.isprintable() or 0xD800 <= ord(caracter) <= 0xDFFF:
+        return None
+    return caracter, 2 + largo
+
+
 def des_escapar(crudo: str) -> str:
     salida: list[str] = []
     i = 0
@@ -54,6 +74,12 @@ def des_escapar(crudo: str) -> str:
         c = crudo[i]
         if c == "\\" and i + 1 < len(crudo):
             sig = crudo[i + 1]
+            visible = _escape_visible(crudo, i)
+            if visible is not None:  # «é» → «é»: el modelo ve la palabra entera; «§» → «§», un color
+                caracter, largo = visible
+                salida.append(caracter)
+                i += largo
+                continue
             salida.append(_ESCAPES.get(sig, ESCAPE_CRUDO + sig))
             i += 2
         else:

@@ -20,7 +20,18 @@ from . import terminos
 from .dialectos import DIALECTO_POR_DEFECTO, DIALECTOS
 from .ejemplos import Ejemplos
 from .glosario import Glosario
-from .mascara import Enmascarado, desenmascarar, enmascarar, es_traducible, separar_bordes
+from .mascara import (
+    Enmascarado,
+    codigos_inventados,
+    desenmascarar,
+    enmascarar,
+    es_argumento,
+    es_traducible,
+    escapar_porcentajes,
+    pares_en_orden,
+    posicionar_argumentos,
+    separar_bordes,
+)
 from .memoria import Memoria
 
 Progreso = Callable[[int, int], None]
@@ -311,7 +322,7 @@ class Traductor:
         hechos = 0
         total = sum(len(lote) for lote in lotes)
         for lote, (pedido, mascaras), salida in zip(lotes, pedidos, salidas, strict=True):
-            buenos = self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario)
+            buenos = self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito)
             self.memoria.guardar(buenos, self.dialecto, ambito, self.motor.nombre)
             fallidos.update(n for n in lote if n not in buenos)
             hechos += len(lote)
@@ -335,7 +346,8 @@ class Traductor:
         if self.cancelar.is_set():
             return {}
         pedido, mascaras = self._pedido(lote, ambito, pistas)
-        return self._procesar(lote, mascaras, self.motor.traducir_lote(pedido), resultado, tolerante, pedido.glosario)
+        salida = self.motor.traducir_lote(pedido)
+        return self._procesar(lote, mascaras, salida, resultado, tolerante, pedido.glosario, ambito)
 
     def _procesar(
         self,
@@ -345,6 +357,7 @@ class Traductor:
         resultado: Resultado,
         tolerante: bool = False,
         glosario: Mapping[str, str] | None = None,
+        ambito: str = "ui",
     ) -> dict[str, str]:
         buenos: dict[str, str] = {}
         rechazados: dict[str, str] = {}
@@ -355,9 +368,9 @@ class Traductor:
             if not isinstance(crudo, str) or not crudo.strip():
                 rechazados[n] = "sin respuesta"
                 continue
-            final = desenmascarar(crudo.strip(), m.tokens)
+            final, motivo_codigos = self._restaurar(crudo.strip(), m.tokens, ambito)
             if final is None:
-                rechazados[n] = "códigos dañados"
+                rechazados[n] = motivo_codigos
                 continue
             motivo = self.validador(n, final) if self.validador else None
             if motivo:
@@ -386,6 +399,33 @@ class Traductor:
             resultado.dudosos.update(dudosos)
             resultado.nuevas.update(buenos)
         return buenos
+
+    @staticmethod
+    def _restaurar(crudo: str, tokens: tuple[str, ...], ambito: str) -> tuple[str | None, str]:
+        """Devuelve los códigos a su sitio. (traducción, "") si quedó bien; (None, motivo) si no.
+
+        - Si el modelo cambió el orden de los «%s», en los archivos de idioma se numeran (`%1$s`, `%2$s`); en scripts,
+          misiones y libros no se puede, y el texto se rechaza (mejor en inglés que con los valores al revés).
+        - Con argumentos, un «%» que escribió el modelo pasa a «%%» (si no, el formato falla).
+        - Cada código que abre un formato tiene que seguir antes del que lo cierra.
+        - La traducción no puede traer códigos que no estaban («§a», «%s» escritos por el modelo).
+        """
+        posicionados = posicionar_argumentos(crudo, tokens)
+        if posicionados is None or (posicionados[1] and ambito != "ui"):
+            return None, "orden de argumentos"
+        tokens = posicionados[0]
+        porcentajes = 0
+        if ambito == "ui" and any(es_argumento(t) for t in tokens) and "%" in crudo:
+            porcentajes = crudo.count("%")
+            crudo = escapar_porcentajes(crudo)
+        if not pares_en_orden(crudo, tokens):
+            return None, "formato fuera de orden"
+        final = desenmascarar(crudo, tokens)
+        if final is None:
+            return None, "códigos dañados"
+        if codigos_inventados(final, tokens, porcentajes):
+            return None, "códigos inventados"
+        return final, ""
 
     def _motivo_de_forma(self, original: str, final: str, glosario: Mapping[str, str] | None) -> str | None:
         """Reglas que un reintento puede arreglar: sin traducir, términos del glosario y palabras repetidas."""
