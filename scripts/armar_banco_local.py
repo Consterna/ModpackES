@@ -25,7 +25,7 @@ from typing import Any, NamedTuple
 import descargar_corpus as dc
 
 from traductor_es.formatos import lang_json, lang_legacy
-from traductor_es.modulos.mods import Mods, es_nombre
+from traductor_es.modulos.mods import es_nombre, pista_con_contexto, textos_del_juego
 from traductor_es.nucleo import terminos
 from traductor_es.nucleo.glosario import Glosario
 from traductor_es.nucleo.mascara import es_traducible
@@ -153,6 +153,14 @@ def main() -> int:
     en_el_banco = {p.ingles for p in elegidos}
     ejemplos = {p.ingles: p.castellano for p in todos if p.jar not in medir and p.ingles not in en_el_banco}
     glosario = glosario_del_banco(todos, medir, args.glosario_ingenuo)
+    # Las pistas como las manda la app: con el objeto de un tooltip, las vecinas de un menú y lo que dice el juego
+    archivos = {(r.parts[-5], r.parts[-3]): _leer(r) for r in dc.RAIZ.glob("*/langs/*/assets/*/lang/en_[uU][sS].*")}
+    vanilla = dc.RAIZ / "vanilla"
+    juego = (
+        textos_del_juego(_leer(vanilla / "en_us.json"), _leer(vanilla / "es_mx.json"))
+        if (vanilla / "es_mx.json").is_file()
+        else {}
+    )
     banco: dict[str, Any] = {
         "descripcion": "Pares reales en/es de mods libres, solo para uso local (no se publica).",
         "dialecto": "es_mx",
@@ -163,7 +171,7 @@ def main() -> int:
                 "original": p.ingles,
                 "referencia": p.castellano,
                 "jar": p.jar,
-                "pista": Mods.pista(p.namespace, p.clave),
+                "pista": pista_con_contexto(p.namespace, p.clave, archivos.get((p.jar, p.namespace), {}), juego),
             }
             for p in elegidos
         ],
