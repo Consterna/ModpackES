@@ -19,6 +19,7 @@ from traductor_es.motores import fabrica
 from traductor_es.motores.base import Motor
 from traductor_es.motores.carga import Enfriador
 from traductor_es.motores.gemini import MODELO_POR_DEFECTO
+from traductor_es.motores.grabadora import MotorGrabado
 from traductor_es.motores.simulador import Simulador
 from traductor_es.nucleo.ejemplos import CANTIDAD_EN_LA_APP
 from traductor_es.validacion import medicion
@@ -81,6 +82,23 @@ def main(argv: list[str] | None = None) -> int:
         help="carpeta con en_us.json, es_mx.json y es_es.json del juego: sus nombres entran como oficiales (como "
         "en la app) si el banco no los trae",
     )
+    ap.add_argument(
+        "--grabacion",
+        type=Path,
+        default=None,
+        help="archivo SQLite donde se graban las respuestas del motor; un pedido ya grabado no se vuelve a pagar",
+    )
+    ap.add_argument(
+        "--solo-grabado",
+        action="store_true",
+        help="con --grabacion: no llamar a la API; lo que no esté grabado queda sin respuesta (mide gratis)",
+    )
+    ap.add_argument(
+        "--repeticiones",
+        type=int,
+        default=1,
+        help="corridas independientes (cada una con su grabación); la salida lleva _1, _2… en el nombre",
+    )
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
@@ -102,27 +120,41 @@ def main(argv: list[str] | None = None) -> int:
     if args.sin_contexto:
         banco.ejemplos = {}
         banco.casos = [medicion.Caso(c.ambito, c.original, c.referencia) for c in banco.casos]
-    resultados = medicion.medir(
-        motor,
-        banco,
-        nombre,
-        modelo,
-        args.motor,
-        revisar=args.revisar,
-        glosario_estricto=not args.glosario_laxo,
-        hilos=args.hilos or (1 if args.carga_segura else 4),
-        cantidad_ejemplos=args.n_ejemplos,
-        controles_de_forma=not args.sin_controles,
-    )
-    for m in resultados:
-        print(m.tabla(), end="\n\n")
-    peores = resultados[-1].ejemplos[:5]
-    if peores:
-        print("Más lejos de la referencia (no siempre son errores):")
-        for e in peores:
-            print(f"  [{e['chrf']}] {e['original']}\n      → {e['traduccion']}\n      ref. {e['referencia']}")
-    medicion.guardar(resultados, args.salida)
-    print(f"\nDetalle en {args.salida}")
+    total = 0.0
+    for repeticion in range(1, max(1, args.repeticiones) + 1):
+        usado: Motor = motor
+        if args.grabacion is not None:
+            usado = MotorGrabado(motor, args.grabacion, repeticion, solo_grabado=args.solo_grabado)
+        resultados = medicion.medir(
+            usado,
+            banco,
+            nombre,
+            modelo,
+            args.motor,
+            revisar=args.revisar,
+            glosario_estricto=not args.glosario_laxo,
+            hilos=args.hilos or (1 if args.carga_segura else 4),
+            cantidad_ejemplos=args.n_ejemplos,
+            controles_de_forma=not args.sin_controles,
+        )
+        for m in resultados:
+            print(m.tabla(), end="\n\n")
+        if isinstance(usado, MotorGrabado):
+            print(f"Grabación: {usado.aciertos} pedidos grabados, {usado.pedidos} nuevos, {usado.faltantes} sin grabar")
+            usado.cerrar()
+        peores = resultados[-1].ejemplos[:5]
+        if peores and args.repeticiones == 1:
+            print("Más lejos de la referencia (no siempre son errores):")
+            for e in peores:
+                print(f"  [{e['chrf']}] {e['original']}\n      → {e['traduccion']}\n      ref. {e['referencia']}")
+        salida = args.salida
+        if args.repeticiones > 1:
+            salida = salida.with_name(f"{salida.stem}_{repeticion}{salida.suffix}")
+        medicion.guardar(resultados, salida)
+        print(f"\nDetalle en {salida}")
+        total += sum(m.costo_real or 0.0 for m in resultados)
+    if total:
+        print(f"Gasto real en la API: US$ {total:.4f}")
     return 0
 
 

@@ -18,10 +18,11 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..motores import fabrica
 from ..motores.base import Motor
+from ..motores.gemini import PRECIOS
 from ..nucleo import terminos as terminos_repetidos
 from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
@@ -204,6 +205,8 @@ class Medicion:
     descanso: float = 0.0  #: segundos de pausa de la carga segura (motores locales)
     traducciones: list[dict[str, str]] = field(default_factory=list[dict[str, str]])  #: todas, para juzgarlas
     terminos_respetados_lema: int = 0  #: como `terminos_respetados`, aceptando plurales y otras formas (WMT25)
+    tokens_reales: tuple[int, int] | None = None  #: (entrada, salida) que facturó el motor en esta medición
+    costo_real: float | None = None  #: US$ según `tokens_reales` y la tabla de precios (lo grabado no cuesta)
 
     @property
     def porcentaje(self) -> float:
@@ -250,6 +253,16 @@ class Medicion:
                 else []
             ),
             ("Costo estimado", "desconocido" if self.costo_estimado is None else f"US$ {self.costo_estimado:.3f}"),
+            *(
+                [
+                    (
+                        "Costo real",
+                        f"US$ {self.costo_real:.4f} ({self.tokens_reales[0]} + {self.tokens_reales[1]} tokens)",
+                    )
+                ]
+                if self.costo_real is not None and self.tokens_reales is not None
+                else []
+            ),
             (
                 "Tiempo",
                 f"{self.segundos:.0f} s" + (f" (de ellos {self.descanso:.0f} s de descanso)" if self.descanso else ""),
@@ -302,6 +315,25 @@ def _medir(
     )
 
 
+def _uso(motor: Motor) -> list[int]:
+    """Tokens (entrada, salida) que el motor lleva facturados; [0, 0] si no los informa."""
+    uso: object = getattr(motor, "uso", None)
+    if not isinstance(uso, list):
+        return [0, 0]
+    valores = cast("list[int]", uso)
+    return [int(valores[0]), int(valores[1])] if len(valores) == 2 else [0, 0]
+
+
+def _gasto(motor: Motor, antes: list[int], modelo: str) -> tuple[tuple[int, int] | None, float | None]:
+    """(tokens, US$) gastados desde `antes`, si el motor los informa y se conoce el precio del modelo."""
+    if getattr(motor, "uso", None) is None:
+        return None, None
+    ahora = _uso(motor)
+    tokens = (ahora[0] - antes[0], ahora[1] - antes[1])
+    precio = PRECIOS.get(modelo)
+    return tokens, (None if precio is None else (tokens[0] * precio[0] + tokens[1] * precio[1]) / 1e6)
+
+
 def medir(
     motor: Motor,
     banco: Banco,
@@ -339,6 +371,7 @@ def medir(
             if caso.pista:
                 pistas[caso.original] = caso.pista
         inicio = time.perf_counter()
+        uso_antes = list(_uso(motor))
         resultados = {ambito: traductor.traducir(textos, ambito, pistas) for ambito, textos in por_ambito.items()}
         segundos = time.perf_counter() - inicio
         informe = Informe(
@@ -349,6 +382,7 @@ def medir(
         )
         hechas = {(a, o): t for a, r in resultados.items() for o, t in r.traducciones.items()}
         mediciones = [_medir(nombre or motor.nombre, banco, hechas, informe.costo(modelo, False, motor_id), segundos)]
+        mediciones[0].tokens_reales, mediciones[0].costo_real = _gasto(motor, uso_antes, modelo)
         mediciones[0].rechazos = dict(
             Counter(m.split(":")[0] for r in resultados.values() for m in r.rechazados.values())
         )

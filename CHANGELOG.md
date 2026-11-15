@@ -73,6 +73,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Se colaba un ejemplo en cada pedido** aunque la app no manda ejemplos (`CANTIDAD_EN_LA_APP = 0`): el tope se miraba después de agregar el primero. Los ejemplos de otros textos empeoraban la calidad y, como salían de lo traducido en esa misma ejecución, el mismo pedido cambiaba según el orden en que terminaban los hilos.
 - **El glosario no veía los términos pegados a un código de color** («Defeat the &4Arachnarch», «&eBronze Dungeons»): no se mandaban al modelo ni se exigían. Ahora los códigos se quitan antes de buscar términos, en el original y en la traducción.
 - **El pack no se activaba en una instancia nueva.** Si en `options.txt` solo estaban los packs internos (`["vanilla"]` o `["vanilla","mod_resources"]`), se escribía `Traduccion_ES` sin el prefijo `file/` que usa Minecraft desde 1.13, y el juego lo ignoraba. Ahora el formato sale de la versión de la instancia (también en 1.12, que no usa el prefijo).
 - **«Guardar el informe de lo que queda…» no guardaba nada**, ni desde el menú «Más» ni desde el botón del cuadro del informe.

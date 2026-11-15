@@ -110,6 +110,9 @@ class Gemini:
         self._reintentos = reintentos
         self._temperatura = temperatura
         self._con_razonamiento = True
+        #: Tokens facturados (entrada, salida con el razonamiento) en esta sesión, según lo que informa Google
+        self.uso = [0, 0]
+        self._lock_uso = threading.Lock()
         #: Para el modo por lotes: se llama con el estado del trabajo mientras se espera.
         self.al_esperar: Callable[[str], None] = lambda _estado: None
         #: Si se activa mientras se espera un trabajo por lotes, se cancela en Google y se deja de esperar.
@@ -157,6 +160,17 @@ class Gemini:
             thinking_config=razonamiento,
         )
 
+    def _anotar_uso(self, respuesta: Any) -> None:
+        """Suma los tokens que Google dice haber cobrado por esta respuesta (sin datos, no suma nada)."""
+        uso = getattr(respuesta, "usage_metadata", None)
+        if uso is None:
+            return
+        entrada = int(getattr(uso, "prompt_token_count", 0) or 0)
+        salida = int(getattr(uso, "candidates_token_count", 0) or 0) + int(getattr(uso, "thoughts_token_count", 0) or 0)
+        with self._lock_uso:
+            self.uso[0] += entrada
+            self.uso[1] += salida
+
     def traducir_lote(self, lote: Lote) -> dict[str, str]:
         espera = _ESPERA_INICIAL
         for intento in range(self._reintentos):
@@ -166,6 +180,7 @@ class Gemini:
                 respuesta = self._cliente.models.generate_content(
                     model=self.modelo, contents=usuario(lote), config=self._config(lote)
                 )
+                self._anotar_uso(respuesta)
                 return interpretar(getattr(respuesta, "text", None))
             except errors.APIError as e:
                 fatal = explicar(e)
@@ -231,5 +246,7 @@ class Gemini:
         for i in range(len(lotes)):
             r = respuestas[i] if i < len(respuestas) else None
             texto = getattr(getattr(r, "response", None), "text", None) if r is not None else None
+            if r is not None:
+                self._anotar_uso(getattr(r, "response", None))
             salida.append(interpretar(texto))
         return salida
