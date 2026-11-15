@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
@@ -57,6 +58,43 @@ MOTIVO_REPETIDA = "palabra repetida: "
 MOTIVO_NOMBRE = "sin traducir (¿nombre propio?)"
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
 #: Lo que se le dice al motor de un nombre propio que se repite en las misiones o los libros.
+#: Cuántas apariciones de un nombre o término se mandan al decidirlo, y cuánto de cada una.
+_APARICIONES = 2
+_LARGO_APARICION = 120
+_FRASE = re.compile(r"[^.!?\n]*[.!?]?")
+
+
+def por_nucleo(pistas: Mapping[str, str]) -> dict[str, str]:
+    """Las pistas por núcleo (sin espacios de borde), igual que la memoria. Si dos textos solo difieren en esos
+    espacios, sus pistas se juntan en vez de pisarse."""
+    salida: dict[str, list[str]] = {}
+    for texto, pista in pistas.items():
+        if pista:
+            vistas = salida.setdefault(separar_bordes(texto)[1], [])
+            if pista not in vistas:
+                vistas.append(pista)
+    return {n: " | ".join(v) for n, v in salida.items()}
+
+
+def con_apariciones(aviso: str, termino: str, textos: Iterable[str]) -> str:
+    """El aviso y una o dos frases donde aparece el término («aparece en: «Defeat the Arachnarch…»»), para decidir
+    con el sentido que tiene en el pack y no en el vacío."""
+    patron = re.compile(r"(?<![^\W_])" + re.escape(termino) + r"(?![^\W_])")
+    vistas: list[str] = []
+    for texto in textos:
+        plano = " ".join(sin_formato(texto).split())  # «&4Arachnarch»: el código pegado no deja ver el nombre
+        if plano == termino or not patron.search(plano):
+            continue
+        frase = next((f.strip() for f in _FRASE.findall(plano) if patron.search(f)), "")
+        if frase and frase not in vistas:
+            vistas.append(frase if len(frase) <= _LARGO_APARICION else frase[: _LARGO_APARICION - 1] + "…")
+            if len(vistas) >= _APARICIONES:
+                break
+    if not vistas:
+        return aviso
+    return f"{aviso} Aparece en: " + "; ".join(f"«{v}»" for v in vistas)
+
+
 AVISO_NOMBRE = (
     "Nombre propio que se repite en los textos de este modpack: decide una sola traducción para todos. El nombre "
     "de un jefe, una criatura única, una dimensión o un mod se deja igual; un lugar, objeto o grupo con nombre "
@@ -144,15 +182,17 @@ class Traductor:
         )
 
     def pendientes(self, textos: Iterable[str], ambito: str) -> list[str]:
-        """Núcleos únicos que habría que mandar al motor (lo demás sale de memoria o glosario)."""
+        """Núcleos únicos que habría que mandar al motor (lo demás sale de memoria o glosario), en el orden en que
+        llegan: así un lote junta lo que va junto en el archivo (el nombre de un objeto y su tooltip, el título de una
+        misión y su descripción) y cada texto le da contexto a sus vecinos."""
         correcciones = self.memoria.correcciones(self.dialecto)
-        vistos: set[str] = set()
+        vistos: dict[str, None] = {}
         for t in textos:
             if es_traducible(t):
                 nucleo = separar_bordes(t)[1]
                 if nucleo not in vistos and self._conocida(nucleo, ambito, correcciones) is None:
-                    vistos.add(nucleo)
-        return sorted(vistos)
+                    vistos[nucleo] = None
+        return list(vistos)
 
     def conocidas(self, textos: Iterable[str], ambito: str) -> dict[str, str]:
         """{texto: traducción} de lo que ya se sabe (corrección, glosario o memoria), sin pedir nada al motor."""
@@ -168,10 +208,9 @@ class Traductor:
     # ------------------------------------------------------------------ traducción
     def traducir(self, textos: Iterable[str], ambito: str, pistas: Mapping[str, str] | None = None) -> Resultado:
         """Traduce y devuelve {texto original: traducción}. Lo que no se pudo traducir con garantías no aparece."""
-        # Las pistas se buscan por el núcleo (sin espacios de borde), igual que la memoria
-        pistas = {separar_bordes(k)[1]: v for k, v in (pistas or {}).items()}
+        pistas = por_nucleo(pistas or {})
         resultado = Resultado()
-        unicos = {t for t in textos if es_traducible(t)}
+        unicos = list(dict.fromkeys(t for t in textos if es_traducible(t)))
         faltan = self.pendientes(unicos, ambito)
         if faltan and ambito == "ui" and self._unificar_terminos(faltan, ambito):
             faltan = self.pendientes(unicos, ambito)
@@ -232,7 +271,7 @@ class Traductor:
         if not candidatos or self.cancelar.is_set():
             return False
         parcial = Resultado()
-        pistas = dict.fromkeys(candidatos, AVISO_TERMINO)
+        pistas = {t: con_apariciones(AVISO_TERMINO, t, faltan) for t in candidatos}
         self._ronda(candidatos, ambito, pistas, (1500, 40), parcial, informar=False, por_lotes=False)
         hallados = {t: parcial.nuevas[t] for t in candidatos if t in parcial.nuevas}
         if hallados:
@@ -251,7 +290,7 @@ class Traductor:
         if not candidatos or self.cancelar.is_set():
             return
         parcial = Resultado()
-        pistas = dict.fromkeys(candidatos, AVISO_NOMBRE)
+        pistas = {n: con_apariciones(AVISO_NOMBRE, n, faltan) for n in candidatos}
         self._ronda(candidatos, ambito, pistas, (1500, 40), parcial, informar=False, por_lotes=False, tolerante=True)
         hallados = {n: parcial.nuevas[n] for n in candidatos if n in parcial.nuevas}
         if hallados:

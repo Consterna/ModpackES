@@ -56,6 +56,14 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **Más contexto en los textos de los mods, sin costo extra:**
+  - Los textos van al motor en el orden del archivo y no en orden alfabético, así que un lote junta el nombre de un objeto con su tooltip y el título de una misión con su descripción.
+  - Un tooltip o una descripción dice de qué objeto habla («habla de «Teleporter»»).
+  - Un texto corto de un menú («Any», «Left») va con las claves vecinas del archivo («junto a «Source Only», «None»»).
+  - Si el inglés es igual a un texto del juego, la pista dice cómo lo traduce el juego («en el juego: «Alternar»»), para seguir el español de Minecraft.
+  - Al decidir un nombre propio o un término que se repite, el motor recibe una o dos frases donde aparece.
+  - Si el mismo texto sale con y sin espacios en los bordes, sus pistas se juntan en vez de pisarse.
+  - La versión de España recibe hasta 1.500 caracteres de la traducción latinoamericana como referencia (antes 400), así que también los párrafos largos de los libros conservan las mismas decisiones.
 - **Controles de forma sin depender del modelo.** Atacan lo que más se corrigió en la revisión humana de 100 textos:
   - Mayúsculas: un término del glosario que el original escribe como nombre propio («the Quantum Ring») sale con las mayúsculas del glosario («el Anillo Cuántico»). Los nombres del juego («Lingote de hierro», «Cofre») siguen en minúscula en medio de una frase.
   - Nombres que no se traducen: los del juego («Creeper», «Redstone») y los de una palabra que el modelo dejó igual al traducir los mods («Arachnarch») se protegen. Si una misión los traduce, se reintenta.

@@ -189,7 +189,7 @@ DIALECTO_ESPANA = "es_es"
 #: Lo que se agrega al nombre de un módulo en la segunda pasada.
 ETIQUETA_ESPANA = " (España)"
 #: Largo máximo de la traducción principal que acompaña a cada texto en la versión de España.
-LARGO_VERSION_PRINCIPAL = 400
+LARGO_VERSION_PRINCIPAL = 1500
 
 
 @dataclass(slots=True)

@@ -489,6 +489,35 @@ misiones:
 - En todo el banco de interfaz, el chrF quedó en 74,8 · 73,8 (antes 74,8 · 73,3): el cambio toca pocos textos y el
   ruido del modelo es mayor.
 
+## 15 de noviembre de 2026 · contexto barato en la interfaz
+
+Sin cambiar el prompt ni agregar pedidos:
+- los textos van al motor en el orden del archivo y no en orden alfabético;
+- un tooltip dice de qué objeto habla;
+- un texto corto de un menú va con sus claves vecinas;
+- si el inglés es igual a un texto del juego, la pista dice cómo lo traduce el juego.
+
+Para medirlo, una copia del banco de interfaz lleva las pistas nuevas, calculadas con los mismos archivos del corpus
+(41 de 399 textos cambian de pista). Gemini 3.8 Flash, dos corridas por condición (US$ 0,09 la condición nueva):
+
+| | chrF (corridas 1 y 2) |
+|---|---|
+| Antes (ola 3) | 74,8 · 73,8 |
+| Con el contexto | 75,6 · 75,8 |
+| Diferencia pareada | **+1,37** (IC 95 %: +0,35 a +2,30) → mejora |
+
+| Textos | Cuántos | chrF antes | chrF ahora |
+|---|---|---|---|
+| Con sus vecinas del menú («junto a…») | 26 | 66,8 | 69,6 |
+| Con el nombre de su objeto («habla de…») | 8 | 83,6 | 85,0 |
+| Igual a un texto del juego | 7 | 100 | 100 |
+| Sin pista nueva (solo cambia el orden) | 350 | 74,1 | 75,3 |
+
+- **Banco de libros:** solo cambia el orden de los lotes y las frases que acompañan a los nombres que se deciden
+  primero. Dio 67,1 contra 67,5: −0,46 (IC −1,14 a +0,21), no se distingue del ruido.
+- **Descripciones de FTB Quests:** traducirlas como un bloque y no línea por línea queda para la ola de segmentación,
+  porque cambia cómo se escriben los archivos.
+
 ## Cómo repetirlo
 
 ```

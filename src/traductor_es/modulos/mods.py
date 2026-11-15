@@ -78,6 +78,87 @@ def es_nombre(clave: str) -> bool:
     return clave.startswith(_CLAVES_DE_NOMBRES) and not clave.endswith((".desc", ".description", ".tooltip", ".info"))
 
 
+#: Hasta cuántos caracteres de un texto vecino van en la pista, y cuántas claves hermanas.
+_LARGO_EN_PISTA = 60
+_HERMANAS = 2
+#: Un texto de menú de hasta estas palabras («Left», «Mode») es ambiguo sin sus hermanas.
+_PALABRAS_CORTO = 3
+_PREFIJOS_DE_MENU = ("gui.", "key.", "screen.", "container.", "config.", "options.", "button.", "tooltip.")
+_SUFIJOS_DE_DESCRIPCION = (".desc", ".description", ".tooltip", ".info", ".lore")
+
+
+def _corto(texto: str) -> str:
+    plano = " ".join(texto.split())
+    return plano if len(plano) <= _LARGO_EN_PISTA else plano[: _LARGO_EN_PISTA - 1] + "…"
+
+
+def _nombre_del_objeto(clave: str, textos: Mapping[str, str]) -> str | None:
+    """El nombre del objeto o bloque del que habla una descripción: «item.m.wrench.tooltip.0» → «item.m.wrench»;
+    «tooltip.m.wrench» → «item.m.wrench» o «block.m.wrench»."""
+    partes = clave.split(".")
+    for i in range(len(partes) - 1, 1, -1):
+        candidata = ".".join(partes[:i])
+        if candidata != clave and es_nombre(candidata) and textos.get(candidata):
+            return textos[candidata]
+    if partes[0] in ("tooltip", "desc", "description") and len(partes) >= 3:
+        for prefijo in ("item", "block"):
+            for i in range(len(partes), 2, -1):
+                candidata = ".".join((prefijo, *partes[1:i]))
+                if textos.get(candidata):
+                    return textos[candidata]
+    return None
+
+
+def _hermanas(clave: str, textos: Mapping[str, str]) -> list[str]:
+    """Los textos de las claves vecinas en el archivo con el mismo padre («gui.m.mode.left» junto a
+    «gui.m.mode.right»): la de antes y la de después."""
+    padre = clave.rsplit(".", 1)[0] + "."
+    claves = list(textos)
+    if clave not in textos:
+        return []
+    i = claves.index(clave)
+    vecinas = [k for k in (claves[i - 1] if i else None, claves[i + 1] if i + 1 < len(claves) else None) if k]
+    return [
+        _corto(textos[k]) for k in vecinas if k.startswith(padre) and "." not in k[len(padre) :] and textos[k].strip()
+    ][:_HERMANAS]
+
+
+def textos_del_juego(ingles: Mapping[str, str], traducido: Mapping[str, str]) -> dict[str, str]:
+    """{inglés: español} de los textos del juego que no son nombres y tienen una sola traducción («Done» → «Listo»)."""
+    vistos: dict[str, set[str]] = {}
+    for clave, en in ingles.items():
+        es = traducido.get(clave)
+        if es is not None and en.strip() and es.strip() and en != es and not es_nombre(clave):
+            vistos.setdefault(en.strip(), set()).add(es.strip())
+    return {en: next(iter(es)) for en, es in vistos.items() if len(es) == 1}
+
+
+def pista_con_contexto(
+    namespace: str, clave: str, textos: Mapping[str, str], juego: Mapping[str, str] | None = None
+) -> str:
+    """La pista de `Mods.pista` y, si ayuda a elegir el sentido, un poco de contexto barato:
+
+    - una descripción o tooltip lleva el nombre de su objeto («de «Llave inglesa»»);
+    - un texto corto de un menú lleva una o dos claves hermanas («junto a «Right»»);
+    - si el inglés es igual a un texto del juego, cómo lo dice el juego («en el juego: «Listo»»).
+    """
+    partes = [Mods.pista(namespace, clave)]
+    ingles = textos.get(clave, "")
+    bajo = clave.lower()
+    if not es_nombre(clave) and (bajo.endswith(_SUFIJOS_DE_DESCRIPCION) or bajo.split(".")[0] in ("tooltip", "desc")):
+        if (nombre := _nombre_del_objeto(clave, textos)) is not None:
+            partes.append(f"habla de «{_corto(nombre)}»")
+    elif (
+        bajo.startswith(_PREFIJOS_DE_MENU)
+        and 0 < len(ingles.split()) <= _PALABRAS_CORTO
+        and (hermanas := _hermanas(clave, textos))
+    ):
+        partes.append("junto a " + ", ".join(f"«{h}»" for h in hermanas))
+    if juego and (del_juego := juego.get(ingles.strip())):
+        partes.append(f"en el juego: «{_corto(del_juego)}»")
+    return " · ".join(partes)
+
+
 def _salto_nuevo(original: str, traduccion: str) -> bool:
     return any(c in traduccion and c not in original for c in ("\r", "\n"))
 
@@ -103,7 +184,16 @@ class Mods:
         copiados = sum(1 for p in self._pendientes if p.existente is not None)
         if copiados:
             self.ctx.registro(f"{copiados} textos se copian de otra variante de español, sin gastar")
-        return [Pieza(p.ingles, self.pista(p.namespace, p.clave)) for p in self._pendientes if p.existente is None]
+        juego = textos_del_juego(tabla.textos("minecraft", "en_us"), tabla.textos("minecraft", self.ctx.dialecto))
+        por_mod: dict[str, Mapping[str, str]] = {}
+        piezas: list[Pieza] = []
+        for p in self._pendientes:
+            if p.existente is None:
+                textos = por_mod.get(p.namespace)
+                if textos is None:
+                    textos = por_mod[p.namespace] = tabla.textos(p.namespace, "en_us")
+                piezas.append(Pieza(p.ingles, pista_con_contexto(p.namespace, p.clave, textos, juego)))
+        return piezas
 
     def lugares(self) -> list[Lugar]:
         """Por mod (espacio de nombres), {clave: inglés} de lo que la app traduce (tras `recolectar`)."""
