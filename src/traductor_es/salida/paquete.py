@@ -122,7 +122,7 @@ def textos_del_modpack(proceso: Proceso) -> tuple[set[tuple[str, str]], list[str
         except (ValueError, OSError) as e:
             avisos.append(f"{modulo.nombre}: no se pudo leer ({e}). Queda fuera del paquete.")
             continue
-        textos |= {(separar_bordes(p.texto)[1], modulo.ambito) for p in piezas if es_traducible(p.texto)}
+        textos |= {(separar_bordes(p.texto)[1], p.ambito or modulo.ambito) for p in piezas if es_traducible(p.texto)}
     return textos, avisos
 
 

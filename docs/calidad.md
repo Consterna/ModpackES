@@ -547,6 +547,29 @@ corridas, US$ 0,11:
 - Coincide con la investigación: elegir entre salidas ayuda sobre todo cuando el modelo duda más. Por eso el
   máximo queda como opción y el perfil por defecto es el equilibrado.
 
+## 15 de noviembre de 2026 · libros guía en los archivos de idioma, y un tono que estorbaba
+
+Desde Patchouli 1.20 casi todos los libros guardan su texto en los archivos de idioma (`"i18n": true`), igual que
+Modonomicon, y la app los traducía como textos de interfaz. Ahora sus claves se traducen como libro, con el título de
+la entrada y el texto anterior como contexto.
+
+Al medirlo apareció otra cosa: con el tono de libro de entonces («Escribe de forma clara y natural»), los 116 textos
+del banco salían peor que como interfaz. La frase empujaba a reescribir. Se quitó: el tono de libro ahora solo
+describe qué son los textos, como el de interfaz.
+
+Gemini 3.8 Flash, dos corridas por condición (US$ 0,15 en total):
+
+| Banco de libros | chrF (corridas 1 y 2) |
+|---|---|
+| Como interfaz (lo que pasaba con las claves de idioma) | 68,3 · 67,6 |
+| Como libro, con «clara y natural» | 66,6 · 67,6 |
+| Como libro, sin esa frase (ahora) | 68,8 · 68,3 |
+
+| Comparación pareada | Diferencia |
+|---|---|
+| Sin la frase contra con la frase | **+1,45** (IC 95 %: +0,80 a +2,12) → mejora |
+| Sin la frase contra como interfaz | +0,60 (IC 95 %: −0,03 a +1,28), no se distingue del ruido |
+
 ## Cómo repetirlo
 
 ```

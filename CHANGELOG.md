@@ -61,6 +61,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **Libros más fieles al original:** el pedido de libros ya no dice «Escribe de forma clara y natural». Esa frase empujaba al modelo a reescribir en vez de traducir: sin ella, el chrF del banco de libros subió 1,45 (IC 0,80 a 2,12). Vale para todos los libros guía, en JSON o en archivos de idioma.
 - **La memoria distingue cada modpack y recuerda lo dudoso:**
   - Cada traducción se guarda con su modpack y con su calidad: «ok», o el motivo por el que se aceptó con dudas.
   - Un modpack siempre usa lo suyo. De otro modpack solo usa lo que quedó bien: un término del glosario que no se cumplió en un pack ya no se copia a todos los demás.
@@ -98,6 +99,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Los libros guía que viven en los archivos de idioma se traducían como interfaz.** Desde Patchouli 1.20 casi todos los libros usan claves de idioma (`"i18n": true`), igual que Modonomicon, y la app los mandaba al motor como textos de menú, sueltos. Ahora sus claves («occultism.book.entries…», «…guide.entry…») se traducen como libro, con el título de la entrada y el texto anterior como contexto, y entran en la revisión de misiones y libros. Los nombres de objetos y los textos de menús o tooltips siguen como interfaz. Lo ya traducido de esas claves se vuelve a pedir una vez, con el tono de libro.
 - **El glosario exigía términos donde la palabra tenía otro sentido:** «lead the way» pedía «Correa», «the power signal» pedía «Poder» y «the target» pedía «Diana». Ahora la app mira en el inglés y el español del juego y de los mods cómo se traduce cada palabra cuando va en minúscula. Si casi nunca sale con el término del glosario, ese término solo se manda y se exige cuando el texto lo usa como nombre: es todo el texto, va con mayúscula a mitad de frase o el texto es un nombre en estilo título. Las palabras que sí se traducen igual («fire» → «fuego») se siguen exigiendo, y los términos del usuario siempre.
 - **Términos de un mod a medio traducir** («Almacen Portable de Energía», «slot de los Muslos») ya no entran en el glosario: se descarta el término que deja en español una palabra inglesa que no sale en ningún texto en español del juego ni de los mods. Los nombres de los mods de la instancia («estilo Create») no cuentan.
 - **Artículo con el género equivocado** al cambiar un término que quedó en inglés: «Usa el Wrench» pasa a «Usa la Llave inglesa», no a «el Llave inglesa». Si no se sabe el género, no se cambia y queda como duda.
