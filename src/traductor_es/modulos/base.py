@@ -38,6 +38,24 @@ def unidades(texto: str, literal: bool = False) -> list[str]:
     return [p for p in candidatos if es_traducible(p) and not parece_clave(p)]
 
 
+#: Hasta cuántos caracteres de la frase entera de un componente JSON van en la pista de cada trozo.
+LARGO_FRASE = 160
+
+
+def piezas_de(texto: str, pista: str, literal: bool = False) -> list[Pieza]:
+    """Las piezas traducibles de un texto, con su pista. Un componente JSON con varios trozos de estilo distinto
+    («Use the », «Wrench» en dorado, « to rotate») se traduce por trozos para no perder los estilos; cada uno lleva la
+    frase entera como contexto, para que encaje en ella."""
+    partes = unidades(texto, literal)
+    trozos = json_texto.extraer(texto, literal) or []
+    if len(partes) < 2 or len(trozos) < 2:
+        return [Pieza(u, pista) for u in partes]
+    frase = " ".join("".join(trozos).split())
+    frase = frase if len(frase) <= LARGO_FRASE else frase[: LARGO_FRASE - 1] + "…"
+    extra = f"trozo de la frase «{frase}»"
+    return [Pieza(u, f"{pista} · {extra}" if pista else extra) for u in partes]
+
+
 def aplicar(texto: str, traducciones: Mapping[str, str], literal: bool = False) -> str:
     if not texto.strip() or parece_clave(texto):
         return texto
@@ -103,7 +121,9 @@ class Modulo(Protocol):
 
 #: Cuántos caracteres de un texto vecino o de un título se mandan como contexto.
 LARGO_VECINO = 100
-MARCAS_VECINDAD = ("dentro de «", "viene después de «")
+MARCAS_VECINDAD = ("dentro de «", "viene después de «", "sigue con «")
+#: Una línea que termina así cierra su frase; si no, la frase sigue en la línea siguiente.
+_FIN_DE_FRASE = (".", "!", "?", ":", "…", '"', "»", ")", "]")
 
 
 def _recortar(texto: str) -> str:
@@ -119,7 +139,7 @@ def con_vecindad(piezas: Sequence[Pieza], es_titulo: Callable[[Pieza], bool]) ->
     """
     titulo = anterior = ""
     salida: list[Pieza] = []
-    for p in piezas:
+    for i, p in enumerate(piezas):
         if es_titulo(p):
             titulo, anterior = _recortar(p.texto), ""
             salida.append(p)
@@ -129,9 +149,18 @@ def con_vecindad(piezas: Sequence[Pieza], es_titulo: Callable[[Pieza], bool]) ->
             partes.append(f"dentro de «{titulo}»")
         if anterior:
             partes.append(f"viene después de «{anterior}»")
+        # Una línea que no cierra su frase («Right-click the block») sigue en la siguiente: se manda su comienzo
+        siguiente = piezas[i + 1] if i + 1 < len(piezas) else None
+        if siguiente is not None and not es_titulo(siguiente) and not _cierra_frase(p.texto):
+            partes.append(f"sigue con «{_recortar(siguiente.texto)}»")
         salida.append(Pieza(p.texto, " · ".join(partes), p.ambito))
         anterior = _recortar(p.texto)
     return salida
+
+
+def _cierra_frase(texto: str) -> bool:
+    limpio = re.sub(r"(?:[§&][0-9a-fk-or]|\$\([^)]*\))+$", "", texto.strip(), flags=re.I).rstrip()
+    return not limpio or limpio.endswith(_FIN_DE_FRASE)
 
 
 def quitar_vecindad(pista: str) -> str:

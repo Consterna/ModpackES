@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..formatos import json_cadenas, nbt, snbt
-from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, contar, unidades
+from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, contar, piezas_de, unidades
 from .cambios import Lugar
 
 AMBITO = "mision"
@@ -167,7 +167,7 @@ class FTBQuests(_Base):
     ) -> _Trabajo:
         cadenas = [c for c in snbt.escanear(src) if filtro(c)]
         piezas = con_vecindad(
-            [Pieza(u, f"misión: {c.campo}") for c in cadenas if c.inicio not in fijos for u in unidades(c.texto)],
+            [p for c in cadenas if c.inicio not in fijos for p in piezas_de(c.texto, f"misión: {c.campo}")],
             _es_titulo,
         )
 
@@ -244,9 +244,7 @@ class FTBQuests(_Base):
             textos = [c for c in nbt.cadenas(arbol) if c.campo in CAMPOS_FTBQ]
             if not textos:
                 continue
-            piezas = con_vecindad(
-                [Pieza(u, f"misión: {c.campo}") for c in textos for u in unidades(c.texto)], _es_titulo
-            )
+            piezas = con_vecindad([p for c in textos for p in piezas_de(c.texto, f"misión: {c.campo}")], _es_titulo)
 
             def generar(
                 trad: Mapping[str, str], original: bytes = original, compresion: nbt.Compresion = compresion
@@ -311,7 +309,7 @@ class _MisionesJson(_Base):
             elegidas = [(c, lit) for c in cadenas for ok, lit in [self._es_texto(c)] if ok]
             if not elegidas:
                 continue
-            piezas = [Pieza(u, f"misión: {c.campo}") for c, lit in elegidas for u in unidades(c.texto, lit)]
+            piezas = [p for c, lit in elegidas for p in piezas_de(c.texto, f"misión: {c.campo}", lit)]
             bom = original.startswith(b"\xef\xbb\xbf")
 
             def generar(
