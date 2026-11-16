@@ -18,7 +18,7 @@ from ..formatos import json_cadenas, markdown
 from ..fuentes.contenedores import Carpeta
 from ..fuentes.recursos import Fuente
 from ..nucleo.mascara import es_traducible
-from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, parece_clave, unidades
+from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, parece_clave, piezas_de
 from .cambios import Lugar
 
 AMBITO = "libro"
@@ -208,7 +208,7 @@ class Libros:
             if c.campo in campos and not c.texto.strip().startswith("#") and not parece_clave(c.texto)
         ]
         a.piezas = con_vecindad(
-            [Pieza(u, f"libro: {c.campo}") for c in elegidas for u in unidades(c.texto)],
+            [p for c in elegidas for p in piezas_de(c.texto, f"libro: {c.campo}")],
             lambda p: p.pista in ("libro: name", "libro: title"),
         )
 
