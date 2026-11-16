@@ -8,6 +8,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Perfiles de calidad** («Calidad» en la ventana y `--calidad` en `analizar` y `traducir`). El análisis estima el costo de cada uno:
+  - **Equilibrado** (por defecto): después de traducir, lo que quedó con dudas (cifras distintas, un paréntesis sin cerrar, usted, inglés, un término del glosario…) se corrige una vez explicando qué falló. La corrección se queda solo si pasa las reglas y un juez a ciegas la prefiere en los dos órdenes; si no, queda la primera, marcada. Cuesta cerca de un 5 % más.
+  - **Máximo:** además, cada texto corto (6 palabras o menos: nombres, botones) se traduce tres veces en lotes distintos. Gana la traducción en que coinciden dos; si no coinciden, gana la de mejor promedio entre tres señales (dudas del control de calidad, términos del glosario y parecido con las otras), y el texto queda marcado para revisarlo. También activa la revisión de misiones y libros. Cuesta un 30 % más, más la revisión. Con Gemini 3.8 Flash no mejoró de forma medible (ver [docs/calidad.md](docs/calidad.md)): queda como opción.
+  - **Económico:** solo los arreglos automáticos, como hasta ahora.
+- **La revisión de misiones y libros ya no acepta a ciegas lo que rehace:** la versión nueva tiene que ganarle a la anterior ante un juez que no sabe cuál es cuál, en los dos órdenes. Un modelo que corrige su propia traducción tiende a cambiar cosas que estaban bien.
 - **Control de calidad determinista** después de cada traducción, con las ideas de las herramientas de QA de la industria y las convenciones del español de Minecraft:
   - Se arregla solo lo que no tiene riesgo: espacios dobles o antes de la puntuación, caracteres invisibles, una palabra repetida seguida, «¿» y «¡» que faltan en una frase única, el «:» o los «...» finales que se perdieron (el juego escribe «...», no «…»), las comillas del dialecto (es_es «», es_mx "") si el original las tiene, y meses y días con mayúscula a mitad de frase. Los códigos de formato no se tocan.
   - Queda como duda, para revisarlo: cifras distintas del original (con tolerancia a «1,000» = «1.000» y a las cifras escritas con letras), paréntesis o corchetes sin pareja, formas de usted (el juego tutea), palabras en inglés que quedaron, y frases que se perdieron.

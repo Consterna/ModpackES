@@ -30,7 +30,7 @@ from .nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
-from .nucleo.traductor import Resultado, Traductor
+from .nucleo.traductor import ECONOMICO, EQUILIBRADO, MAXIMO, PERFIL_POR_DEFECTO, Resultado, Traductor
 from .nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
@@ -93,8 +93,18 @@ class Informe:
     def caracteres(self) -> int:
         return sum(m.caracteres for m in self.modulos)
 
-    def costo(self, modelo: str, por_lotes: bool, motor: str = fabrica.GEMINI, revisar: bool = False) -> float | None:
-        """Costo estimado en US$: 0 con un motor en el PC; None si no se conoce el precio del modelo."""
+    def costo(
+        self,
+        modelo: str,
+        por_lotes: bool,
+        motor: str = fabrica.GEMINI,
+        revisar: bool = False,
+        calidad: str = ECONOMICO,
+    ) -> float | None:
+        """Costo estimado en US$: 0 con un motor en el PC; None si no se conoce el precio del modelo.
+
+        `calidad` es el perfil (ver `Traductor.perfil`): el máximo incluye la revisión de misiones y libros.
+        """
         if fabrica.es_local(motor):
             return 0.0
         precio = PRECIOS.get(modelo) if motor == fabrica.GEMINI else None
@@ -102,7 +112,8 @@ class Informe:
             return None
         total = _costo_traduccion(self.caracteres, self.a_traducir, precio)
         total = total / 2 if por_lotes else total
-        if revisar:  # la revisión va en modo normal aunque la traducción vaya por lotes
+        total *= _COSTO_DEL_PERFIL.get(calidad, 1.0)
+        if revisar or calidad == MAXIMO:  # la revisión va en modo normal aunque la traducción vaya por lotes
             revisados = [m for m in self.modulos if m.grupo in GRUPOS_REVISADOS]
             caracteres = sum(m.caracteres for m in revisados)
             textos = sum(m.a_traducir for m in revisados)
@@ -111,6 +122,11 @@ class Informe:
             total += (tokens * 2.4 * precio[0] + textos * 12 * precio[1]) / 1e6
             total += 0.15 * _costo_traduccion(caracteres, textos, precio)
         return total
+
+
+#: Cuánto más cuesta la traducción con cada perfil, medido con Gemini 3.8 Flash: lo dudoso es poco, y el máximo
+#: traduce tres veces lo corto (que pesa poco). La revisión de misiones y libros del máximo se suma aparte.
+_COSTO_DEL_PERFIL = {ECONOMICO: 1.0, EQUILIBRADO: 1.05, MAXIMO: 1.3}
 
 
 def _grupo_del_indice(grupo: str, modulo: Modulo) -> str:
@@ -222,9 +238,12 @@ class Proceso:
         texto_java: bool = False,
         scripts_exhaustivo: bool = False,
         tambien_es_es: bool = False,
+        calidad: str = PERFIL_POR_DEFECTO,
     ) -> None:
         self.instancia = Instancia(carpeta)
-        self.revisar = revisar
+        #: Perfil de calidad (ver `Traductor.perfil`); el máximo incluye la revisión de misiones y libros
+        self.calidad = calidad
+        self.revisar = revisar or calidad == MAXIMO
         self.texto_java = texto_java
         self.scripts_exhaustivo = scripts_exhaustivo
         self.registro = registro
@@ -245,7 +264,7 @@ class Proceso:
         self.traductor = Traductor(
             motor, self.memoria, self.glosario, dialecto, hilos, progreso, registro, cancelar, validar,
             usar_lotes=usar_lotes, contexto=contexto, ejemplos=self.ejemplos,
-            limite_caracteres=limites[0], limite_entradas=limites[1], pack=self.pack,
+            limite_caracteres=limites[0], limite_entradas=limites[1], pack=self.pack, perfil=calidad,
         )  # fmt: skip
         self.motor = motor
         if isinstance(motor, Compatible):
@@ -286,7 +305,7 @@ class Proceso:
         traductor_es = Traductor(
             self.motor, self.memoria, glosario_es, DIALECTO_ESPANA, t.hilos, t.progreso, t.registro, t.cancelar,
             validar, usar_lotes=t.usar_lotes, contexto=t.contexto, ejemplos=ejemplos_es,
-            limite_caracteres=t.limite_caracteres, limite_entradas=t.limite_entradas, pack=t.pack,
+            limite_caracteres=t.limite_caracteres, limite_entradas=t.limite_entradas, pack=t.pack, perfil=t.perfil,
         )  # fmt: skip
         self._espana = _Pasada(ctx_es, glosario_es, ejemplos_es, traductor_es)
 

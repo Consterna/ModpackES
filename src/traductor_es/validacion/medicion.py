@@ -28,13 +28,12 @@ from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
 from ..nucleo.mascara import sin_formato
 from ..nucleo.memoria import Memoria
-from ..nucleo.traductor import MOTIVO_QA, Traductor
+from ..nucleo.traductor import ECONOMICO, MOTIVO_QA, Traductor
 from ..nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from ..proceso import Informe, InformeModulo
 from . import revision
 from .calidad import sale_el_termino, validar
-
-_N_MAXIMO, _BETA = 6, 2.0
+from .chrf import chrf
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,31 +76,6 @@ class Banco:
             ejemplos,
             juego,
         )
-
-
-def _ngramas(texto: str, n: int) -> Counter[str]:
-    sin_espacios = re.sub(r"\s+", "", texto)
-    return Counter(sin_espacios[i : i + n] for i in range(len(sin_espacios) - n + 1))
-
-
-def chrf(hipotesis: str, referencia: str) -> float:
-    """chrF de una oración (0 a 100): F-beta (beta 2) de n-gramas de caracteres de 1 a 6, sin espacios."""
-    precisiones: list[float] = []
-    recalls: list[float] = []
-    for n in range(1, _N_MAXIMO + 1):
-        h, r = _ngramas(hipotesis, n), _ngramas(referencia, n)
-        if not h or not r:
-            continue
-        comunes = sum((h & r).values())
-        precisiones.append(comunes / sum(h.values()))
-        recalls.append(comunes / sum(r.values()))
-    if not precisiones:
-        return 100.0 if hipotesis.strip() == referencia.strip() else 0.0
-    p, r = sum(precisiones) / len(precisiones), sum(recalls) / len(recalls)
-    if p == 0 and r == 0:
-        return 0.0
-    b2 = _BETA**2
-    return 100 * (1 + b2) * p * r / (b2 * p + r)
 
 
 def _sin_tildes(texto: str) -> str:
@@ -357,6 +331,7 @@ def medir(
     hilos: int = 4,
     cantidad_ejemplos: int = CANTIDAD_EN_LA_APP,
     controles_de_forma: bool = True,
+    perfil: str = ECONOMICO,
 ) -> list[Medicion]:
     """Traduce el banco con el motor (memoria vacía) y devuelve la medición; con `revisar`, también la de después."""
     glosario = Glosario()
@@ -376,7 +351,7 @@ def medir(
         traductor = Traductor(
             motor, memoria, glosario, banco.dialecto, hilos, validador=validar, ejemplos=ejemplos,
             glosario_estricto=glosario_estricto, limite_caracteres=limites[0], limite_entradas=limites[1],
-            controles_de_forma=controles_de_forma,
+            controles_de_forma=controles_de_forma, perfil=perfil,
         )  # fmt: skip
         por_ambito: dict[str, list[str]] = {}
         pistas: dict[str, str] = {}

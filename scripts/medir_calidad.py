@@ -22,6 +22,7 @@ from traductor_es.motores.gemini import MODELO_POR_DEFECTO
 from traductor_es.motores.grabadora import MotorGrabado
 from traductor_es.motores.simulador import Simulador
 from traductor_es.nucleo.ejemplos import CANTIDAD_EN_LA_APP
+from traductor_es.nucleo.traductor import ECONOMICO, PERFILES
 from traductor_es.validacion import medicion
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -111,6 +112,12 @@ def main(argv: list[str] | None = None) -> int:
         help="corridas independientes (cada una con su grabación); la salida lleva _1, _2… en el nombre",
     )
     ap.add_argument("--simular", action="store_true", help="sin API: solo comprueba que todo funcione")
+    ap.add_argument(
+        "--calidad",
+        choices=PERFILES,
+        default=ECONOMICO,
+        help="perfil de calidad (por defecto economico, para comparar con las mediciones anteriores)",
+    )
     ap.add_argument("--banco", type=Path, default=RAIZ / "tests" / "datos" / "referencia_es.json")
     ap.add_argument("--salida", type=Path, default=RAIZ / "build" / "medicion.json")
     args = ap.parse_args(argv)
@@ -148,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             hilos=args.hilos or (1 if args.carga_segura else 4),
             cantidad_ejemplos=args.n_ejemplos,
             controles_de_forma=not args.sin_controles,
+            perfil=args.calidad,
         )
         for m in resultados:
             print(m.tabla(), end="\n\n")

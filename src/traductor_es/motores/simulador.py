@@ -1,7 +1,7 @@
 """Motor falso para probar todo sin gastar: antepone «ES» y, si se pide, daña textos a propósito.
 
 Para probar la revisión: marca como «grave» las traducciones de `marcar` y, cuando una pista pide corregir, antepone
-«ES*» en vez de «ES».
+«ES*» en vez de «ES». Como juez («comparar»), con `marcar` prefiere la versión corregida («ES*»); si no, dice «igual».
 """
 
 from __future__ import annotations
@@ -33,6 +33,17 @@ class Simulador:
             if lote.tarea == "revisar":
                 return {
                     e.id: "grave|exactitud|marcado por la prueba" if e.traduccion in self.marcar else "OK"
+                    for e in lote.entradas
+                }
+            if lote.tarea == "comparar":
+                return {
+                    e.id: "igual"
+                    if not self.marcar
+                    else "A"
+                    if "«ES*»" in e.traduccion
+                    else "B"
+                    if "«ES*»" in e.alternativa
+                    else "igual"
                     for e in lote.entradas
                 }
             salida: dict[str, str] = {}

@@ -56,7 +56,7 @@ from ..motores.base import Cancelado, ErrorFatal, Motor
 from ..motores.compatible import Compatible
 from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
-from ..nucleo.traductor import LARGO_CONTEXTO
+from ..nucleo.traductor import ECONOMICO, EQUILIBRADO, LARGO_CONTEXTO, MAXIMO, PERFIL_POR_DEFECTO
 from ..proceso import DIALECTO_ESPANA, ETIQUETA_ESPANA, GRUPOS, Informe, Proceso
 from ..salida import exportar, mod_apoyo, paquete
 from . import correcciones, iconos, tema
@@ -75,6 +75,13 @@ from .componentes import (
 from .informe import DialogoInforme
 from .instancias import Lector, ListaInstancias, traducida
 from .motor import DialogoMotor
+
+#: Los perfiles de calidad como se ven en la ventana.
+_PERFILES = {
+    EQUILIBRADO: "Equilibrado (recomendado): corrige lo dudoso",
+    MAXIMO: "Máximo: traduce lo corto tres veces y revisa misiones y libros (cuesta más)",
+    ECONOMICO: "Económico: solo los arreglos automáticos",
+}
 
 #: (motor, clave, modelo, dirección) → motor listo para traducir
 FabricaMotor = Callable[[str, str | None, str, str], Motor]
@@ -172,6 +179,7 @@ class Trabajador(QObject):
                 usar_lotes=self.opciones["lotes"],
                 contexto=self.opciones["contexto"],
                 revisar=self.opciones["revisar"],
+                calidad=self.opciones["calidad"],
                 texto_java=self.opciones["texto_java"],
                 scripts_exhaustivo=self.opciones["exhaustivo"],
                 tambien_es_es=self.opciones["tambien_es_es"],
@@ -292,6 +300,7 @@ class Ventana(QMainWindow):
         for senal in (
             self.c_lotes.toggled,
             self.c_revisar.toggled,
+            self.c_calidad.currentIndexChanged,
             self.c_activar.toggled,
             self.c_java.toggled,
             self.c_exhaustivo.toggled,
@@ -490,6 +499,18 @@ class Ventana(QMainWindow):
         self.c_lotes.setToolTip("Usa la Batch API de Google: solo con Gemini")
         self.c_lotes.setChecked(bool(self._preferencias.get("lotes", False)))
         formulario.addRow("", self.c_lotes)
+        self.c_calidad = QComboBox()
+        for perfil, texto in _PERFILES.items():
+            self.c_calidad.addItem(texto, perfil)
+        self.c_calidad.setToolTip(
+            "Equilibrado: después de traducir, lo que quedó con dudas se corrige una vez y la corrección se queda solo "
+            "si un juez a ciegas la prefiere (cuesta un poco más). Máximo: además, los textos cortos se traducen "
+            "tres veces y se elige por consenso, y se revisan misiones y libros (cuesta un 30 % más y la revisión). "
+            "Económico: solo los arreglos automáticos."
+        )
+        indice = self.c_calidad.findData(self._preferencias.get("calidad", PERFIL_POR_DEFECTO))
+        self.c_calidad.setCurrentIndex(max(0, indice))
+        formulario.addRow("Calidad:", self.c_calidad)
         self.c_revisar = QCheckBox("Revisar misiones y libros, y rehacer lo que tenga errores graves")
         self.c_revisar.setToolTip(
             "Otro pedido al motor juzga cada traducción nueva de misiones y libros; las que tengan errores graves se "
@@ -856,7 +877,7 @@ class Ventana(QMainWindow):
         con_espana = any(m.nombre.endswith(ETIQUETA_ESPANA) for m in informe.modulos)
         if o["tambien_es_es"] and not con_espana:
             texto += " Vuelve a analizar para sumar la versión de España."
-        costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"])
+        costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"], o["calidad"])
         if fabrica.es_local(o["motor"]):
             texto += " Sin costo: el modelo corre en tu PC."
         elif costo is not None:
@@ -873,7 +894,7 @@ class Ventana(QMainWindow):
         if informe is None or not informe.a_traducir:
             return "Aplicar la traducción (ya está en la memoria)"
         o = self.opciones()
-        costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"])
+        costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"], o["calidad"])
         precio = "" if costo is None else " · gratis" if costo == 0 else f" · {_dinero(costo)}"
         return f"Traducir {_miles(informe.a_traducir)} textos{precio}"
 
@@ -927,6 +948,7 @@ class Ventana(QMainWindow):
             "idioma": self.c_activar.isChecked(),
             "contexto": self.e_contexto.text().strip(),
             "revisar": self.c_revisar.isChecked(),
+            "calidad": str(self.c_calidad.currentData() or PERFIL_POR_DEFECTO),
             "texto_java": self.c_java.isChecked(),
             "exhaustivo": self.c_exhaustivo.isChecked(),
             "tambien_es_es": self.c_espana.isChecked() and self.c_espana.isEnabled(),
@@ -945,7 +967,7 @@ class Ventana(QMainWindow):
         informe = self.informe_elegido()
         if informe is not None:
             o = self.opciones()
-            costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"])
+            costo = informe.costo(o["modelo"], o["lotes"], o["motor"], o["revisar"], o["calidad"])
             if costo is not None:
                 texto = f"Costo estimado: {_dinero(costo)}.\n\n" + texto
         if self._preguntar("Traducir", texto):
@@ -1327,7 +1349,8 @@ class Ventana(QMainWindow):
             "carpeta": carpeta, "dialecto": o["dialecto"], "grupos": o["grupos"], "motor": o["motor"],
             "modelo": modelos.get(fabrica.GEMINI, MODELO_POR_DEFECTO), "modelos": modelos,
             "direcciones": direcciones, "lotes": o["lotes"], "hilos": o["hilos"], "contextos": contextos,
-            "revisar": o["revisar"], "texto_java": o["texto_java"], "exhaustivo": o["exhaustivo"],
+            "revisar": o["revisar"], "calidad": o["calidad"], "texto_java": o["texto_java"],
+            "exhaustivo": o["exhaustivo"],
             "tambien_es_es": self.c_espana.isChecked(),
             "avisar_version": self.c_avisar.isChecked(),
             "tema": self._preferencias.get("tema", "sistema"),

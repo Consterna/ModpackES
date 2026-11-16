@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 import threading
 from collections import Counter
@@ -11,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import cast
 
 from ..motores.base import Cancelado, Entrada, Lote, Motor, MotorPorLotes
-from ..validacion import qa
+from ..validacion import qa, verificacion
 from ..validacion.calidad import (
     ajustar_mayusculas,
     palabra_repetida,
@@ -19,6 +20,7 @@ from ..validacion.calidad import (
     sin_traducir,
     terminos_faltantes,
 )
+from ..validacion.chrf import chrf
 from . import terminos
 from .dialectos import DIALECTO_POR_DEFECTO, DIALECTOS
 from .ejemplos import Ejemplos
@@ -54,6 +56,26 @@ MOTIVO_TERMINOLOGIA = "terminología: "
 MOTIVO_QA = "control de calidad: "
 #: Prefijo del motivo de rechazo cuando la traducción repite una palabra que el original no repite.
 MOTIVO_REPETIDA = "palabra repetida: "
+#: Perfiles de calidad: cuánto se verifica después de traducir (ver `Traductor.perfil`).
+ECONOMICO, EQUILIBRADO, MAXIMO = "economico", "equilibrado", "maximo"
+PERFILES = (ECONOMICO, EQUILIBRADO, MAXIMO)
+#: El de la app: una corrección verificada solo de lo dudoso.
+PERFIL_POR_DEFECTO = EQUILIBRADO
+#: En el perfil máximo, los textos de hasta estas palabras se traducen tres veces y se elige por consenso.
+PALABRAS_CORTO = 6
+#: Cuántas traducciones más se piden de cada texto corto en el perfil máximo.
+MUESTRAS_EXTRA = 2
+#: Lo que se marca cuando las tres traducciones de un texto corto no coinciden.
+MOTIVO_INCIERTO = "incierto: las traducciones no coinciden"
+#: Lo que se le explica al motor al corregir un texto que el control de calidad marcó.
+_EXPLICACION_QA = {
+    "numeros": "las cifras no coinciden con las del original",
+    "pareja": "un paréntesis, corchete o comilla quedó sin su pareja",
+    "usted": "usa «usted»; el juego tutea al jugador",
+    "ingles": "quedaron palabras en inglés sin traducir",
+    "omision": "parece que falta una parte del original",
+    "signo_apertura": "falta el signo de apertura ¿ o ¡",
+}
 #: Lo que vuelve igual al original en el reintento y parece un nombre propio: se acepta, pero se revisa
 MOTIVO_NOMBRE = "sin traducir (¿nombre propio?)"
 AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúcelo suelto, como se diría de un objeto."
@@ -62,6 +84,21 @@ AVISO_TERMINO = "Término que se repite en los nombres de este modpack: tradúce
 _APARICIONES = 2
 _LARGO_APARICION = 120
 _FRASE = re.compile(r"[^.!?\n]*[.!?]?")
+
+
+def _explicar(motivo: str) -> str:
+    """El motivo de una duda en palabras para el motor («control de calidad: numeros» → «las cifras no…»)."""
+    if motivo.startswith(MOTIVO_QA):
+        codigos = [c.strip() for c in motivo.removeprefix(MOTIVO_QA).split(",")]
+        return "; ".join(_EXPLICACION_QA.get(c, c) for c in codigos)
+    return motivo
+
+
+def _rango(valores: list[float] | list[int], i: int) -> float:
+    """El rango (1 = mejor, el valor más bajo) de `valores[i]`; los empates comparten el rango promedio."""
+    menores = sum(1 for v in valores if v < valores[i])
+    iguales = sum(1 for v in valores if v == valores[i])
+    return menores + (iguales + 1) / 2
 
 
 def por_nucleo(pistas: Mapping[str, str]) -> dict[str, str]:
@@ -121,6 +158,10 @@ class Resultado:
     dudosos: dict[str, str] = field(default_factory=dict[str, str])
     #: Arreglos automáticos del control de calidad (código → cuántos), p. ej. «signo_apertura»: 3
     arreglos: Counter[str] = field(default_factory=Counter[str])
+    #: Textos que se cambiaron después de traducir porque un juez a ciegas prefirió la versión nueva
+    corregidos: int = 0
+    #: Textos cortos en que se cambió la primera traducción por la del consenso (perfil máximo)
+    elegidos: int = 0
 
 
 class Traductor:
@@ -143,9 +184,12 @@ class Traductor:
         glosario_estricto: bool = True,
         controles_de_forma: bool = True,
         pack: str = SIN_PACK,
+        perfil: str = ECONOMICO,
     ) -> None:
         if dialecto not in DIALECTOS:
             raise ValueError(f"Dialecto desconocido: {dialecto}")
+        if perfil not in PERFILES:
+            raise ValueError(f"Perfil de calidad desconocido: {perfil}")
         self.motor = motor
         self.memoria = memoria
         self.glosario = glosario
@@ -169,6 +213,10 @@ class Traductor:
         self.controles_de_forma = controles_de_forma
         #: El modpack que se traduce: lo dudoso que se guarda en la memoria solo se reutiliza en él
         self.pack = pack
+        #: «economico»: solo los arreglos deterministas. «equilibrado»: además, una corrección de lo dudoso que se
+        #: queda solo si un juez a ciegas la prefiere. «maximo»: además, los textos cortos se traducen tres veces
+        #: y se elige por consenso.
+        self.perfil = perfil
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ consulta
@@ -261,6 +309,10 @@ class Traductor:
             if resultado.rechazados:
                 n = len(resultado.rechazados)
                 self.registro(f"{n} textos se quedan en inglés porque no pasaron la validación.")
+            if self.perfil == MAXIMO and not self.cancelar.is_set():
+                self._consenso_de_cortos(resultado, ambito, pistas)
+            if self.perfil != ECONOMICO and resultado.dudosos and not self.cancelar.is_set():
+                self._corregir_dudosos(resultado, ambito, pistas)
             if resultado.dudosos:
                 self.registro(f"{len(resultado.dudosos)} textos se aceptaron con dudas (términos o repeticiones).")
         resultado.traducciones = self.conocidas(unicos, ambito)
@@ -349,8 +401,10 @@ class Traductor:
         informar: bool = True,
         por_lotes: bool = True,
         tolerante: bool = False,
+        guardar: bool = True,
     ) -> set[str]:
-        """Traduce una ronda. Devuelve los núcleos que fallaron."""
+        """Traduce una ronda. Devuelve los núcleos que fallaron. Sin `guardar`, lo traducido no va a la memoria
+        (para elegir antes entre varias versiones)."""
         fallidos: set[str] = set()
         hechos = 0
         total = len(nucleos)
@@ -369,7 +423,8 @@ class Traductor:
                         raise Cancelado()
                     lote = futuros[fut]
                     buenos = fut.result()
-                    self._guardar(buenos, ambito, resultado)
+                    if guardar:
+                        self._guardar(buenos, ambito, resultado)
                     fallidos.update(n for n in lote if n not in buenos)
                     hechos += len(lote)
                     progreso(hechos, total)
@@ -554,18 +609,124 @@ class Traductor:
         return final, motivo
 
     # ------------------------------------------------------------------ revisión
-    def rehacer(self, motivos: Mapping[str, tuple[str, str]], ambito: str, pistas: Mapping[str, str]) -> dict[str, str]:
+    def rehacer(
+        self, motivos: Mapping[str, tuple[str, str]], ambito: str, pistas: Mapping[str, str], verificar: bool = True
+    ) -> dict[str, str]:
         """Vuelve a traducir núcleos que una revisión marcó, aunque estén en la memoria.
 
         `motivos` es {núcleo: (traducción anterior, motivo)}. La nueva traducción reemplaza a la anterior en la
-        memoria solo si pasa las mismas reglas; si no, queda la anterior. Devuelve las que cambiaron.
+        memoria solo si pasa las mismas reglas y, con `verificar`, si un juez a ciegas la prefiere en los dos órdenes;
+        si no, queda la anterior. Devuelve las que cambiaron.
         """
+        return self._rehacer(motivos, ambito, pistas, verificar)[0]
+
+    def _rehacer(
+        self, motivos: Mapping[str, tuple[str, str]], ambito: str, pistas: Mapping[str, str], verificar: bool = True
+    ) -> tuple[dict[str, str], Resultado]:
+        resultado = Resultado()
         if not motivos:
-            return {}
+            return {}, resultado
         pistas_nuevas: dict[str, str] = {}
         for n, (anterior, motivo) in motivos.items():
             aviso = f"Una revisión marcó la traducción anterior («{anterior}»): {motivo}. Corrígela."
             pistas_nuevas[n] = f"{pistas[n]} · {aviso}" if pistas.get(n) else aviso
-        resultado = Resultado()
-        self._ronda(sorted(motivos), ambito, pistas_nuevas, (1500, 10), resultado, informar=False, por_lotes=False)
-        return {n: t for n, t in resultado.nuevas.items() if t != motivos[n][0]}
+        self._ronda(
+            sorted(motivos),
+            ambito,
+            pistas_nuevas,
+            (1500, 10),
+            resultado,
+            informar=False,
+            por_lotes=False,
+            guardar=False,
+        )
+        cambiadas = {n: t for n, t in resultado.nuevas.items() if t != motivos[n][0]}
+        if verificar and cambiadas:
+            casos = [(n, pistas.get(n, ""), motivos[n][0], t) for n, t in cambiadas.items()]
+            ganan = verificacion.gana_la_nueva(
+                self.motor, self.dialecto, ambito, casos, self.glosario.relevantes(cambiadas), self.contexto, self.hilos
+            )
+            cambiadas = {caso[0]: caso[3] for caso, gana in zip(casos, ganan, strict=True) if gana}
+        self._guardar(cambiadas, ambito, resultado)
+        return cambiadas, resultado
+
+    def _corregir_dudosos(self, resultado: Resultado, ambito: str, pistas: Mapping[str, str]) -> None:
+        """Perfil equilibrado: una sola corrección de lo que se aceptó con dudas, explicando qué falló. Se queda solo
+        si pasa las reglas y un juez a ciegas la prefiere; si no, queda la primera (marcada)."""
+        candidatos = {
+            n: (resultado.nuevas[n], _explicar(m))
+            for n, m in resultado.dudosos.items()
+            if n in resultado.nuevas and m not in (MOTIVO_NOMBRE, MOTIVO_INCIERTO)
+        }
+        if not candidatos:
+            return
+        self.registro(
+            f"Corrigiendo {len(candidatos)} textos dudosos (solo se cambian si un juez a ciegas lo prefiere)…"
+        )
+        cambiadas, nuevo = self._rehacer(candidatos, ambito, pistas)
+        for n, t in cambiadas.items():
+            resultado.nuevas[n] = t
+            if n in nuevo.dudosos:
+                resultado.dudosos[n] = nuevo.dudosos[n]
+            else:
+                resultado.dudosos.pop(n, None)
+        resultado.corregidos += len(cambiadas)
+        if cambiadas:
+            self.registro(f"{len(cambiadas)} textos dudosos quedaron corregidos.")
+
+    def _consenso_de_cortos(self, resultado: Resultado, ambito: str, pistas: Mapping[str, str]) -> None:
+        """Perfil máximo: los textos cortos (nombres, botones) se traducen dos veces más, en otro orden, y se elige.
+
+        Si dos de las tres coinciden, gana esa. Si no, gana la de mejor promedio de rangos entre tres señales (dudas
+        del control de calidad, términos del glosario que faltan y parecido con las otras dos), nunca una sola, y el
+        texto queda marcado como incierto para revisarlo.
+        """
+        cortos = [n for n in resultado.nuevas if len(n.split()) <= PALABRAS_CORTO and n not in resultado.dudosos]
+        if not cortos:
+            return
+        self.registro(f"Traduciendo {len(cortos)} textos cortos dos veces más para elegir por consenso…")
+        muestras: list[Resultado] = []
+        for k in range(MUESTRAS_EXTRA):
+            orden = list(cortos)
+            random.Random(k + 1).shuffle(orden)  # otro orden: otros vecinos en el lote y otra muestra del modelo
+            muestra = Resultado()
+            self._ronda(
+                orden, ambito, pistas, (self.limite_caracteres, self.limite_entradas), muestra,
+                informar=False, por_lotes=False, guardar=False,
+            )  # fmt: skip
+            muestras.append(muestra)
+        cambiadas: dict[str, str] = {}
+        dudas: dict[str, str] = {}
+        for n in cortos:
+            opciones = [resultado.nuevas[n], *(m.nuevas[n] for m in muestras if n in m.nuevas)]
+            if len(opciones) < 2:
+                continue
+            elegida, hay_mayoria = self._elegir(n, opciones)
+            if not hay_mayoria:
+                dudas[n] = MOTIVO_INCIERTO
+            if elegida != resultado.nuevas[n]:
+                cambiadas[n] = elegida
+        resultado.nuevas.update(cambiadas)
+        resultado.dudosos.update(dudas)
+        resultado.elegidos += len(cambiadas)
+        self.memoria.guardar(
+            {n: resultado.nuevas[n] for n in {*cambiadas, *dudas}}, self.dialecto, ambito, self.motor.nombre,
+            self.pack, {n: resultado.dudosos[n] for n in {*cambiadas, *dudas} if n in resultado.dudosos},
+        )  # fmt: skip
+
+    def _elegir(self, original: str, opciones: list[str]) -> tuple[str, bool]:
+        """La traducción de la mayoría, o la de mejor promedio de rangos si no hay mayoría. (elegida, hubo mayoría)."""
+        conteo = Counter(opciones)
+        mas_votada, votos = conteo.most_common(1)[0]
+        if votos >= 2:
+            return mas_votada, True
+        terminos = self.glosario.terminos_en(original)
+        ambiguos = self.glosario.ambiguos(terminos)
+        senales = [
+            [len(qa.dudas(qa.revisar(original, o, dialecto=self.dialecto)[1])) for o in opciones],
+            [len(terminos_faltantes(original, o, terminos, ambiguos)) for o in opciones],
+            [-sum(chrf(o, otra) for otra in opciones if otra is not o) for o in opciones],
+        ]
+        promedio = [sum(_rango(senal, i) for senal in senales) / len(senales) for i in range(len(opciones))]
+        mejor = min(range(len(opciones)), key=lambda i: (promedio[i], i))  # empate: la primera traducción
+        return opciones[mejor], False

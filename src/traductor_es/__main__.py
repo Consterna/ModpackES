@@ -23,6 +23,7 @@ from .motores.gemini import MODELO_POR_DEFECTO
 from .motores.simulador import Simulador
 from .nucleo.dialectos import DIALECTOS
 from .nucleo.memoria import Memoria
+from .nucleo.traductor import PERFIL_POR_DEFECTO, PERFILES
 from .proceso import GRUPOS, Informe, Proceso
 from .registro import LOGGER, configurar
 from .salida import exportar, mod_apoyo, paquete
@@ -52,7 +53,7 @@ def _mostrar(informe: Informe, args: argparse.Namespace) -> None:
         linea = f"  {m.nombre}: {m.descripcion} — {m.textos} textos, {m.a_traducir} para el motor ({m.caracteres} car.)"
         _escribir(linea + (f"\n      {m.resumen}" if m.resumen else ""))
     modelo, lotes = _modelo(args), args.lotes
-    costo = informe.costo(modelo, lotes, args.motor, args.revisar)
+    costo = informe.costo(modelo, lotes, args.motor, args.revisar, getattr(args, "calidad", PERFIL_POR_DEFECTO))
     _escribir(f"Total para el motor: {informe.a_traducir} textos, {informe.caracteres} caracteres")
     if costo is not None:
         _escribir(f"Costo estimado con {modelo}{' (por lotes)' if lotes else ''}: US$ {costo:.2f}")
@@ -93,6 +94,16 @@ def _argumentos() -> argparse.ArgumentParser:
         p.add_argument("--lotes", action="store_true", help="usar la Batch API de Gemini (mitad de precio, tarda más)")
         p.add_argument("--contexto", default="", help="ambientación del modpack para el tono y los términos")
         p.add_argument("--revisar", action="store_true", help="revisión automática de misiones y libros (cuesta más)")
+        p.add_argument(
+            "--calidad",
+            choices=PERFILES,
+            default=PERFIL_POR_DEFECTO,
+            help=(
+                "economico: solo arreglos automáticos; equilibrado (por defecto): además corrige lo dudoso si un "
+                "juez a ciegas lo prefiere (≈ +5 %%); maximo: además traduce tres veces lo corto y revisa misiones "
+                "y libros (≈ +30 %% más la revisión)"
+            ),
+        )
         p.add_argument(
             "--exhaustivo",
             action="store_true",
@@ -177,6 +188,7 @@ def _traducir_o_analizar(args: argparse.Namespace) -> None:
         Proceso(
             args.carpeta, motor, args.dialecto, grupos, memoria=memoria, registro=_escribir,
             hilos=getattr(args, "hilos", 4), usar_lotes=args.lotes, contexto=args.contexto, revisar=args.revisar,
+            calidad=getattr(args, "calidad", PERFIL_POR_DEFECTO),
             texto_java=args.java,
             scripts_exhaustivo=args.exhaustivo, tambien_es_es=args.tambien_es_es,
         ) as p,
@@ -296,7 +308,7 @@ def _cambios(args: argparse.Namespace) -> None:
     cambios = informe.cambios or Cambios()
     diferencia = informe.diferencia
     modelo = _modelo(args)
-    costo = diferencia.costo(modelo, args.lotes, args.motor, args.revisar)
+    costo = diferencia.costo(modelo, args.lotes, args.motor, args.revisar, getattr(args, "calidad", PERFIL_POR_DEFECTO))
     if args.json:
         datos = {
             "base": cambios.base, "fecha": cambios.fecha, "nuevas": cambios.nuevas, "cambiadas": cambios.cambiadas,
