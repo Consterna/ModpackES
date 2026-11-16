@@ -20,6 +20,12 @@ def _es_titulo(pieza: Pieza) -> bool:
     return pieza.pista.endswith("title")
 
 
+def _es_titulo_json(pieza: Pieza) -> bool:
+    """El nombre de una misión en BetterQuesting («name:8»), HQM («name») o Heracles («title»)."""
+    campo = pieza.pista.split(" · ", 1)[0]
+    return campo.endswith(("title", "name:8", ": name"))
+
+
 def _relativa(ctx: Contexto, ruta: Path) -> str:
     return ruta.relative_to(ctx.instancia.juego).as_posix()
 
@@ -309,7 +315,10 @@ class _MisionesJson(_Base):
             elegidas = [(c, lit) for c in cadenas for ok, lit in [self._es_texto(c)] if ok]
             if not elegidas:
                 continue
-            piezas = [p for c, lit in elegidas for p in piezas_de(c.texto, f"misión: {c.campo}", lit)]
+            # Con el título de la misión y el texto anterior, como en FTB Quests
+            piezas = con_vecindad(
+                [p for c, lit in elegidas for p in piezas_de(c.texto, f"misión: {c.campo}", lit)], _es_titulo_json
+            )
             bom = original.startswith(b"\xef\xbb\xbf")
 
             def generar(

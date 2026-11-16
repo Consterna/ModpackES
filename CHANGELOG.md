@@ -64,6 +64,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - **Frases partidas con su contexto:**
   - Un texto con estilos mezclados («Use the » + «Wrench» en dorado + « to rotate») se sigue traduciendo por trozos, para no perder los estilos, pero cada trozo va con la frase entera, para que encaje en ella. Vale para las misiones (FTB Quests, Heracles) y los libros.
   - Una línea de una misión o de un libro que no cierra su frase («Right-click the block with») va con el comienzo de la siguiente, además de la anterior y el título que ya llevaba.
+  - Las misiones de BetterQuesting, Hardcore Questing Mode y Heracles van con el título de la misión y el texto anterior, como ya iban las de FTB Quests.
 - **Libros más fieles al original:** el pedido de libros ya no dice «Escribe de forma clara y natural». Esa frase empujaba al modelo a reescribir en vez de traducir: sin ella, el chrF del banco de libros subió 1,45 (IC 0,80 a 2,12). Vale para todos los libros guía, en JSON o en archivos de idioma.
 - **La memoria distingue cada modpack y recuerda lo dudoso:**
   - Cada traducción se guarda con su modpack y con su calidad: «ok», o el motivo por el que se aceptó con dudas.

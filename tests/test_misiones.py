@@ -268,3 +268,17 @@ def test_ftbquests_lang_ignora_lo_que_quests_lang_splitter_ya_fusiono(tmp_path: 
     assert not (lang / "es_mx" / "chapters").exists()  # el «.snbt_merged» no genera traducción aparte
     assert "«ES» Find Iron" in (lang / "es_mx.snbt").read_text(encoding="utf-8")
     assert fusionado.read_text(encoding="utf-8") == '{ quest.A.title: "Find Iron" }'
+
+
+def test_las_misiones_json_llevan_su_titulo_y_el_texto_anterior(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1", "fabric")
+    sets = juego / "config" / "hqm" / "sets"
+    sets.mkdir(parents=True)
+    (juego / "config" / "hqm" / "sets.json").write_text('{"sets": ["Basics"]}', encoding="utf-8")
+    quest = {"quests": [{"name": "Wood", "description": "Get some wood"}]}
+    (sets / "Basics.json").write_text(json.dumps(quest), encoding="utf-8")
+    inst, ctx = contexto(juego)
+    with inst:
+        piezas = {p.texto: p.pista for p in HQM(ctx).recolectar()}
+    assert "dentro de «Wood»" in piezas["Get some wood"]
+    assert "dentro de" not in piezas["Wood"]
