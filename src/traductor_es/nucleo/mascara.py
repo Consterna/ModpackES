@@ -13,14 +13,19 @@ from typing import Final
 #: Carácter de uso privado con el que los formatos marcan escapes que hay que conservar tal cual.
 ESCAPE_CRUDO: Final = chr(0xE000)
 
+#: Códigos de color y estilo. «&D» no lo es en una abreviatura en mayúsculas («R&D», «Q&A», «B&B»); pegado a una
+#: palabra en minúscula sí («&6Wrench&r»).
+_COLOR: Final = r"§[0-9a-fk-orA-FK-OR]|(?<![A-Z])&[0-9a-fk-orA-FK-OR]|(?<=[A-Z])&(?:[0-9a-fk-or]|[A-FK-OR](?=[a-z]))"
+
 _PATRONES: Final[tuple[str, ...]] = (
     # escapes del formato de origen (\n en SNBT, etc.), incluido barra + salto real; uno de control, entero
     ESCAPE_CRUDO + r"(?:u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])",
     r"\$\([^)]*\)",  # macros de Patchouli: $(l) $(item) $(l:ruta) $()
     r"\$\{[^{}\n]*\}",  # expresiones de plantillas de JavaScript: ${precio}
-    r"\{[^{}\n]*\}",  # FTB Quests {image:..} {@pagebreak} {clave}, {0} de Java
+    # FTB Quests {image:..} {@pagebreak} {clave}, {0} de Java; una frase entre llaves sí se traduce
+    r"\{(?:[^{}\s]*|@[^{}\n]*|[\w.-]+:[^{}\n]*)\}",
     r"%(?:\d+\$)?[-#+0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%n]",  # printf: %s %1$s %d %.1f %%
-    r"[§&][0-9a-fk-orA-FK-OR]",  # códigos de color y estilo
+    _COLOR,  # códigos de color y estilo
     r"<NEWLINE>",  # salto de los libros de Citadel
     r"</?[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?/?>",  # etiquetas: GuideME <ItemLink .../>, <br>, <b>
     r"!\[[^\]]*\]\([^)\s]*\)",  # imagen markdown completa
@@ -81,7 +86,7 @@ def separar_bordes(texto: str) -> tuple[str, str, str]:
 
 
 #: Códigos de color y formato de Minecraft («&4», «§l»), pegados al texto que colorean.
-_CODIGO_DE_FORMATO = re.compile(r"[&§][0-9a-fk-orA-FK-OR]")
+_CODIGO_DE_FORMATO = re.compile(_COLOR)
 
 
 def sin_formato(texto: str) -> str:
