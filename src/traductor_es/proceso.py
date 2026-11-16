@@ -17,7 +17,7 @@ from . import configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
 from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts
-from .modulos.base import Contexto, Modulo, Pieza, Resumen, reunir_pistas
+from .modulos.base import Contexto, Modulo, Pieza, Resumen, pendientes_de, por_ambito, reunir_pistas
 from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
 from .modulos.mods import es_nombre
@@ -30,7 +30,7 @@ from .nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
-from .nucleo.traductor import ECONOMICO, EQUILIBRADO, MAXIMO, PERFIL_POR_DEFECTO, Resultado, Traductor
+from .nucleo.traductor import ECONOMICO, EQUILIBRADO, MAXIMO, PERFIL_POR_DEFECTO, Traductor
 from .nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
@@ -417,7 +417,7 @@ class Proceso:
             if isinstance(modulo, scripts.ScriptsKubeJS):
                 scripts_leidos.append(modulo)
             leidos.append((grupo, modulo, lugares_de(modulo, piezas)))
-            pendientes = self.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
+            pendientes = pendientes_de(self.traductor, modulo, [p.texto for p in piezas])
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre, modulo.describir(), len({p.texto for p in piezas}),
                               len(pendientes), sum(len(t) for t in pendientes))
@@ -437,7 +437,7 @@ class Proceso:
                 piezas = modulo.recolectar()
             except (ValueError, OSError):  # ya se avisó en la pasada principal
                 continue
-            pendientes = self._espana.traductor.pendientes([p.texto for p in piezas], modulo.ambito)
+            pendientes = pendientes_de(self._espana.traductor, modulo, [p.texto for p in piezas])
             # Sin contar los textos otra vez: son los mismos de la pasada principal
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre + ETIQUETA_ESPANA, "versión de España", 0, len(pendientes),
@@ -459,7 +459,7 @@ class Proceso:
             informe.cambios = Cambios(comparar(indice, actuales), "indice", fecha)
         else:
             pendientes = {
-                m.nombre: set(self.traductor.pendientes([t for lugar in lugares for t in _textos(lugar)], m.ambito))
+                m.nombre: set(pendientes_de(self.traductor, m, [t for lugar in lugares for t in _textos(lugar)]))
                 for _g, m, lugares in leidos
             }
             informe.cambios = Cambios(
@@ -470,7 +470,7 @@ class Proceso:
             textos = [t for c in informe.cambios.lugares if c.modulo == modulo.nombre for t in c.textos]
             if not textos:
                 continue
-            pendientes_mod = self.traductor.pendientes(textos, modulo.ambito)
+            pendientes_mod = pendientes_de(self.traductor, modulo, textos)
             informe.modulos_cambios.append(
                 InformeModulo(grupo, modulo.nombre, modulo.describir(), len(set(textos)), len(pendientes_mod),
                               sum(len(t) for t in pendientes_mod))
@@ -543,7 +543,6 @@ class Proceso:
 
         Devuelve si el motor tradujo algo (para los créditos del pack).
         """
-        traductor = pasada.traductor
         tradujo_el_motor = False
         etiqueta = ETIQUETA_ESPANA if pasada is self._espana else ""
         for grupo, modulo in self.modulos(pasada.ctx):
@@ -552,47 +551,68 @@ class Proceso:
             if traducidos is not None:  # el índice de cambios mira el inglés: basta con la pasada principal
                 traducidos.append((_grupo_del_indice(grupo, modulo), modulo.nombre, lugares_de(modulo, piezas)))
             textos = [p.texto for p in piezas]
-            pendientes = traductor.pendientes(textos, modulo.ambito)
-            pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
-            if pasada is self._espana:
-                pistas = self._con_version_principal(pistas, textos, modulo.ambito)
-            if solo_memoria:
-                resultado = Resultado(traducciones=traductor.conocidas(textos, modulo.ambito))
-            else:
-                resultado = traductor.traducir(textos, modulo.ambito, pistas)
-                tradujo_el_motor = tradujo_el_motor or bool(resultado.nuevas)
-            if self.revisar and grupo in GRUPOS_REVISADOS and resultado.nuevas:
-                self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
-                por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
-                hecha = revision.revisar_y_corregir(traductor, resultado.nuevas, modulo.ambito, por_nucleo)
-                self.registro(f"   {hecha}")
-                if informe.revision_automatica is None:
-                    informe.revision_automatica = revision.ResumenRevision()
-                informe.revision_automatica.sumar(hecha)
-                if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
-                    resultado.traducciones = traductor.conocidas(textos, modulo.ambito)
-            for codigo, cuantos in resultado.arreglos.items():
-                informe.arreglos[codigo] = informe.arreglos.get(codigo, 0) + cuantos
-            informe.dudosos.update(
-                {n: (resultado.nuevas[n], motivo) for n, motivo in resultado.dudosos.items() if n in resultado.nuevas}
-            )
-            resumen = modulo.escribir(resultado.traducciones)
+            pendientes: list[str] = []
+            traducciones: dict[str, str] = {}
+            # Cada ámbito con su tono: los libros guía de los archivos de idioma van como libro, no como interfaz
+            for ambito, del_ambito in por_ambito(piezas, modulo.ambito).items():
+                hecho = self._traducir_ambito(pasada, informe, grupo, ambito, del_ambito, solo_memoria)
+                pendientes += hecho[0]
+                traducciones.update(hecho[1])
+                tradujo_el_motor = tradujo_el_motor or hecho[2]
+            resumen = modulo.escribir(traducciones)
             self.registro(f"   {resumen}")
             informe.modulos.append(
                 InformeModulo(grupo, modulo.nombre + etiqueta, modulo.describir(), len(set(textos)), len(pendientes),
                               sum(len(t) for t in pendientes), resumen)
             )  # fmt: skip
             if grupo != "mods":  # la revisión del glosario mira textos largos (misiones, libros, scripts)
-                todas.update(resultado.traducciones)
+                todas.update(traducciones)
             if isinstance(modulo, mods.Mods):
                 # Los nombres recién traducidos pasan al glosario: libros, misiones y scripts los usarán igual
-                nuevos = modulo.nombres(resultado.traducciones)
+                nuevos = modulo.nombres(traducciones)
                 pasada.glosario.agregar_pares({en: en for en in nuevos}, nuevos)
                 # Un nombre de una sola palabra que el modelo dejó igual es un nombre propio («Arachnarch»): se
                 # protege para que las misiones no lo traduzcan. Con varias palabras suele ser un olvido.
                 iguales = {en: es for en, es in nuevos.items() if en == es and " " not in en}
                 pasada.glosario.agregar_pares({en: en for en in iguales}, iguales, proteger_iguales=True)
         return tradujo_el_motor
+
+    def _traducir_ambito(
+        self,
+        pasada: _Pasada,
+        informe: Informe,
+        grupo: str,
+        ambito: str,
+        piezas: list[Pieza],
+        solo_memoria: bool,
+    ) -> tuple[list[str], dict[str, str], bool]:
+        """Traduce las piezas de un ámbito de un módulo (y las revisa si toca). (pendientes, traducciones, si el
+        motor tradujo algo)."""
+        traductor = pasada.traductor
+        textos = [p.texto for p in piezas]
+        pendientes = traductor.pendientes(textos, ambito)
+        pistas = reunir_pistas(piezas)  # un texto que sale con varias claves lleva el contexto de todas
+        if pasada is self._espana:
+            pistas = self._con_version_principal(pistas, textos, ambito)
+        if solo_memoria:
+            return pendientes, traductor.conocidas(textos, ambito), False
+        resultado = traductor.traducir(textos, ambito, pistas)
+        if self.revisar and (grupo in GRUPOS_REVISADOS or ambito == mods.AMBITO_LIBRO) and resultado.nuevas:
+            self.registro(f"   Revisando {len(resultado.nuevas)} traducciones nuevas…")
+            por_nucleo = {separar_bordes(k)[1]: v for k, v in pistas.items()}
+            hecha = revision.revisar_y_corregir(traductor, resultado.nuevas, ambito, por_nucleo)
+            self.registro(f"   {hecha}")
+            if informe.revision_automatica is None:
+                informe.revision_automatica = revision.ResumenRevision()
+            informe.revision_automatica.sumar(hecha)
+            if hecha.corregidos:  # lo rehecho ya está en la memoria: se vuelve a juntar sin pedir nada
+                resultado.traducciones = traductor.conocidas(textos, ambito)
+        for codigo, cuantos in resultado.arreglos.items():
+            informe.arreglos[codigo] = informe.arreglos.get(codigo, 0) + cuantos
+        informe.dudosos.update(
+            {n: (resultado.nuevas[n], motivo) for n, motivo in resultado.dudosos.items() if n in resultado.nuevas}
+        )
+        return pendientes, resultado.traducciones, bool(resultado.nuevas)
 
     def _con_version_principal(self, pistas: Mapping[str, str], textos: list[str], ambito: str) -> dict[str, str]:
         """Pistas de la versión de España con la traducción ya hecha en el dialecto principal.

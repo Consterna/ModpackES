@@ -16,8 +16,7 @@ TONO = {
     "Deben ser breves; los nombres van con mayúscula inicial como en el original.",
     "mision": "Son misiones de un modpack: títulos, subtítulos y descripciones que guían al jugador. "
     "Usa un tono cercano y tutea al jugador.",
-    "libro": "Son páginas de libros guía dentro del juego que explican mecánicas, objetos y recetas. "
-    "Escribe de forma clara y natural.",
+    "libro": "Son páginas de libros guía dentro del juego que explican mecánicas, objetos y recetas.",
     "script": "Son mensajes y tooltips que el modpack muestra al jugador.",
 }
 

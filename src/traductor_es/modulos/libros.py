@@ -2,7 +2,8 @@
 
 Todos buscan primero el archivo en el idioma del juego y, si no está, usan el inglés archivo por archivo
 (comprobado en el código de cada mod). Por eso se escriben solo los archivos que faltan en cada variante.
-Modonomicon y los libros de Patchouli con `i18n` usan claves de idioma: los traduce el módulo de mods.
+Modonomicon y los libros de Patchouli con `i18n` usan claves de idioma: los traduce el módulo de mods, con
+el ámbito de libro (ver `mods.es_clave_de_libro`).
 """
 
 from __future__ import annotations

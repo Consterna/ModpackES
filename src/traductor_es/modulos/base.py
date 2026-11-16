@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -69,6 +69,8 @@ class Contexto:
 class Pieza:
     texto: str
     pista: str = ""
+    #: Otro ámbito que el del módulo (vacío: el del módulo). Lo usan las claves de libro del módulo de mods.
+    ambito: str = ""
 
 
 @dataclass(slots=True)
@@ -127,7 +129,7 @@ def con_vecindad(piezas: Sequence[Pieza], es_titulo: Callable[[Pieza], bool]) ->
             partes.append(f"dentro de «{titulo}»")
         if anterior:
             partes.append(f"viene después de «{anterior}»")
-        salida.append(Pieza(p.texto, " · ".join(partes)))
+        salida.append(Pieza(p.texto, " · ".join(partes), p.ambito))
         anterior = _recortar(p.texto)
     return salida
 
@@ -152,9 +154,32 @@ def reunir_pistas(piezas: list[Pieza]) -> dict[str, str]:
     return {texto: " | ".join(vistas) for texto, vistas in por_texto.items()}
 
 
+def por_ambito(piezas: Iterable[Pieza], ambito: str) -> dict[str, list[Pieza]]:
+    """Las piezas por ámbito (el suyo o el del módulo), en orden: cada ámbito se traduce con su tono."""
+    grupos: dict[str, list[Pieza]] = {}
+    for p in piezas:
+        grupos.setdefault(p.ambito or ambito, []).append(p)
+    return grupos
+
+
+def ambito_de(modulo: Modulo, texto: str) -> str:
+    """El ámbito con que se traduce un texto del módulo (el del módulo, salvo que el módulo diga otro)."""
+    propio = getattr(modulo, "ambito_de", None)
+    return str(propio(texto)) if callable(propio) else modulo.ambito
+
+
+def pendientes_de(traductor: Traductor, modulo: Modulo, textos: Iterable[str]) -> list[str]:
+    """Lo que habría que mandar al motor de esos textos del módulo, cada uno en su ámbito."""
+    grupos: dict[str, list[str]] = {}
+    for t in textos:
+        grupos.setdefault(ambito_de(modulo, t), []).append(t)
+    return [n for ambito, del_ambito in grupos.items() for n in traductor.pendientes(del_ambito, ambito)]
+
+
 def traducir_modulo(modulo: Modulo, traductor: Traductor) -> Resumen:
     """Recolecta los textos del módulo, los traduce (memoria, glosario o motor) y escribe el resultado."""
-    piezas = modulo.recolectar()
-    pistas = reunir_pistas(piezas)
-    resultado = traductor.traducir([p.texto for p in piezas], modulo.ambito, pistas)
-    return modulo.escribir(resultado.traducciones)
+    traducciones: dict[str, str] = {}
+    for ambito, piezas in por_ambito(modulo.recolectar(), modulo.ambito).items():
+        resultado = traductor.traducir([p.texto for p in piezas], ambito, reunir_pistas(piezas))
+        traducciones.update(resultado.traducciones)
+    return modulo.escribir(traducciones)

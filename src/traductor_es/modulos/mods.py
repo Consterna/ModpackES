@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
 from ..fuentes.recursos import Pendiente
-from .base import Contexto, Pieza, Resumen, contar
+from .base import Contexto, Pieza, Resumen, con_vecindad, contar
 from .cambios import Lugar
 
 AMBITO = "ui"
@@ -159,6 +160,29 @@ def pista_con_contexto(
     return " · ".join(partes)
 
 
+#: Ámbito de los textos de libros que viven en los archivos de idioma (Patchouli con `i18n`, Modonomicon…).
+AMBITO_LIBRO = "libro"
+#: Una clave de libro tiene uno de estos tramos («mysticalagriculture.guide.entry…», «occultism.book.…»).
+_CLAVE_DE_LIBRO = re.compile(r"(^|[._])(book|books|guide|guidebook|lexicon|codex|journal|manual)([._]|$)", re.I)
+_NO_ES_LIBRO = ("options.", "config.", "key.", "gui.", "tooltip.", "item.", "block.", "itemgroup.", "creativetab.")
+#: Un texto de libro de hasta estas palabras y sin punto final es un título (de entrada, de página o de categoría).
+_PALABRAS_TITULO = 6
+
+
+def es_clave_de_libro(clave: str) -> bool:
+    """¿La clave es texto de un libro guía («occultism.book.entries.ritual.page1»)? No los nombres de objetos ni los
+    textos de menús o tooltips («item.m.guide_book», «gui.m.book_title»)."""
+    bajo = clave.lower()
+    return bool(_CLAVE_DE_LIBRO.search(bajo)) and not bajo.startswith(_NO_ES_LIBRO) and not es_nombre(clave)
+
+
+def _es_titulo_de_libro(p: Pieza, clave: str) -> bool:
+    texto = p.texto.strip()
+    return clave.lower().endswith((".name", ".title", ".category")) or (
+        len(texto.split()) <= _PALABRAS_TITULO and not texto.endswith((".", "!", "?", ":"))
+    )
+
+
 def _salto_nuevo(original: str, traduccion: str) -> bool:
     return any(c in traduccion and c not in original for c in ("\r", "\n"))
 
@@ -170,6 +194,7 @@ class Mods:
     def __init__(self, ctx: Contexto) -> None:
         self.ctx = ctx
         self._pendientes: list[Pendiente] = []
+        self._ambitos: dict[str, str] = {}  #: texto → ámbito, para los que no son de interfaz
 
     def detectar(self) -> bool:
         return True
@@ -187,13 +212,32 @@ class Mods:
         juego = textos_del_juego(tabla.textos("minecraft", "en_us"), tabla.textos("minecraft", self.ctx.dialecto))
         por_mod: dict[str, Mapping[str, str]] = {}
         piezas: list[Pieza] = []
+        # Los libros guía de los archivos de idioma van como libro, con el título y el texto anterior (por libro)
+        libros: dict[str, list[tuple[Pieza, str]]] = {}
         for p in self._pendientes:
             if p.existente is None:
                 textos = por_mod.get(p.namespace)
                 if textos is None:
                     textos = por_mod[p.namespace] = tabla.textos(p.namespace, "en_us")
-                piezas.append(Pieza(p.ingles, pista_con_contexto(p.namespace, p.clave, textos, juego)))
+                if es_clave_de_libro(p.clave):
+                    libros.setdefault(p.namespace, []).append((Pieza(p.ingles, f"{p.namespace}: {p.clave}"), p.clave))
+                else:
+                    piezas.append(Pieza(p.ingles, pista_con_contexto(p.namespace, p.clave, textos, juego)))
+        self._ambitos = {}
+        for del_libro in libros.values():
+            claves = {id(pieza): clave for pieza, clave in del_libro}
+            con_contexto = con_vecindad(
+                [pieza for pieza, _ in del_libro],
+                lambda q, claves=claves: _es_titulo_de_libro(q, claves.get(id(q), "")),
+            )
+            for pieza in con_contexto:
+                piezas.append(Pieza(pieza.texto, pieza.pista, AMBITO_LIBRO))
+                self._ambitos[pieza.texto] = AMBITO_LIBRO
         return piezas
+
+    def ambito_de(self, texto: str) -> str:
+        """El ámbito de un texto que juntó `recolectar` («libro» para los libros guía; si no, interfaz)."""
+        return self._ambitos.get(texto, AMBITO)
 
     def lugares(self) -> list[Lugar]:
         """Por mod (espacio de nombres), {clave: inglés} de lo que la app traduce (tras `recolectar`)."""
