@@ -85,6 +85,11 @@ def _patron_palabra(termino: str, flags: int = 0) -> re.Pattern[str]:
     return re.compile(r"(?<![^\W_])" + re.escape(termino) + r"(?![^\W_])", flags)
 
 
+def patron_de_termino(termino: str, flags: int = 0) -> re.Pattern[str]:
+    """Un término del glosario en el texto en inglés, también en plural («wither skeletons» es «Wither Skeleton»)."""
+    return re.compile(r"(?<![^\W_])" + re.escape(termino) + r"(?:e?s)?(?![^\W_])", flags)
+
+
 def _inicio_de_frase(texto: str, posicion: int) -> bool:
     """¿La posición abre el texto o una frase (después de «.», «!», «?», «:» o un salto de línea)?"""
     antes = texto[:posicion].rstrip(" \t\"'«“¿¡([")
@@ -163,7 +168,7 @@ def terminos_faltantes(
     for ingles, esperado in sorted(glosario.items(), key=lambda par: -len(par[0])):
         if not esperado.strip():
             continue
-        patron = _patron_palabra(ingles.casefold())
+        patron = patron_de_termino(ingles.casefold())
         if not patron.search(minusculas):
             continue
         minusculas = patron.sub(lambda m: " " * len(m.group(0)), minusculas)

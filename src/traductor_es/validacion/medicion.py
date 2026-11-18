@@ -29,7 +29,7 @@ from ..nucleo.glosario import Glosario
 from ..nucleo.mascara import sin_formato
 from ..nucleo.memoria import Memoria
 from ..nucleo.traductor import ECONOMICO, MOTIVO_QA, Traductor
-from ..nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
+from ..nucleo.vocabulario import agregar_nucleos, agregar_vocabulario, preparar_sustituciones
 from ..proceso import Informe, InformeModulo
 from . import revision
 from .calidad import sale_el_termino, validar
@@ -340,6 +340,8 @@ def medir(
         glosario.agregar_pares(
             {k: k for k in banco.juego}, banco.juego, fuente="minecraft", oficial=True, proteger_iguales=True
         )
+    for ingles, traducido in banco.usos:  # como la app: las palabras sueltas de los objetos del juego
+        agregar_nucleos(glosario, ingles, traducido)
     agregar_vocabulario(glosario)
     glosario.agregar_pares({k: k for k in banco.glosario}, banco.glosario, fuente="banco")
     for ingles, traducido in banco.usos:
