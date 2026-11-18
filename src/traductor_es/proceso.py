@@ -31,7 +31,7 @@ from .nucleo.glosario import Glosario
 from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import ECONOMICO, EQUILIBRADO, MAXIMO, PERFIL_POR_DEFECTO, Traductor
-from .nucleo.vocabulario import agregar_vocabulario, preparar_sustituciones
+from .nucleo.vocabulario import agregar_nucleos, agregar_vocabulario, preparar_sustituciones
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
 from .salida.resource_pack import NOMBRE, PackSalida
@@ -343,6 +343,8 @@ class Proceso:
                     ingles, tabla.textos(ns, variante), fuente=ns, oficial=oficial, proteger_iguales=oficial
                 )
                 ejemplos.agregar(todo_ingles, tabla.textos(ns, variante))
+            if ns == "minecraft":  # «Chestplate» → «Pechera» (es_mx), de las familias de objetos del juego
+                agregar_nucleos(glosario, todo_ingles, tabla.textos(ns, dialecto))
         if not vocabulario_listo:  # un modpack sin mods con textos
             agregar_vocabulario(glosario)
         ejemplos.agregar_pares(self.memoria.recientes(dialecto))

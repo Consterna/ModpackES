@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
-from ..validacion.calidad import PALABRA, sale_el_termino, uso_como_nombre
+from ..validacion.calidad import PALABRA, patron_de_termino, sale_el_termino, uso_como_nombre
 from .mascara import es_traducible, sin_formato
 
 _MAX_LARGO = 48
@@ -233,10 +233,7 @@ class Glosario:
         if orden is None:
             todos = {**self._validos(), **self._fijos}
             # Cada patrón se compila una sola vez; luego se reutiliza en todos los lotes.
-            orden = [
-                (k.lower(), k, re.compile(r"(?<![^\W_])" + re.escape(k.lower()) + r"(?![^\W_])"))
-                for k in sorted(todos, key=len, reverse=True)
-            ]
+            orden = [(k.lower(), k, patron_de_termino(k.lower())) for k in sorted(todos, key=len, reverse=True)]
             self._orden = orden
             self._por_palabra = None
         return orden
@@ -258,10 +255,12 @@ class Glosario:
                 indice.setdefault(primera, []).append(termino)
             self._por_palabra = indice
         bajo = sin_formato(texto).lower()
-        candidatos = [c for p in set(PALABRA.findall(bajo)) for c in self._por_palabra.get(p, ())]
+        palabras = {f for p in PALABRA.findall(bajo) for f in (p, p.removesuffix("s"), p.removesuffix("es"))}  # plural
+        candidatos = [c for p in palabras for c in self._por_palabra.get(p, ())]
         elegidos: dict[str, str] = {}
         for termino_bajo, original, patron in sorted(candidatos, key=lambda c: -len(c[0])):
             if termino_bajo in bajo and patron.search(bajo):
+                bajo = patron.sub(lambda m: " " * len(m.group(0)), bajo)  # lo cubierto no cuenta para los cortos
                 if self.ambiguo(original) and not uso_como_nombre(original, texto):
                     continue
                 elegidos[original] = self._fijos.get(original) or self._terminos[original]
@@ -280,6 +279,8 @@ class Glosario:
         elegidos: dict[str, str] = {}
         for bajo, original, patron in self._ordenados():
             if bajo in bloque and patron.search(bloque):
+                # Lo que cubre un término largo no cuenta para uno corto: «Wither» dentro de «Wither Skeleton»
+                bloque = patron.sub(lambda m: " " * len(m.group(0)), bloque)
                 if self.ambiguo(original) and not any(uso_como_nombre(original, t) for t in lista):
                     continue
                 elegidos[original] = self._fijos.get(original) or self._terminos[original]

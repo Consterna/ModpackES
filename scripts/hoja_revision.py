@@ -87,8 +87,10 @@ input.nota{width:100%;margin-top:8px;padding:8px;border:1px solid var(--borde);b
 .fin .principal{background:var(--acento);color:#fff;border-color:var(--acento)}
 </style></head><body><main>
 <header><h1>Hoja de revisión</h1>
-<p class="sub">Marca cada traducción: <b>Bien</b> (la dejarías tal cual), <b>Leve</b> (se entiende, pero la retocarías) o <b>Grave</b>
-(cambia el sentido, está mal o quedó en inglés). Si dudas entre dos, elige la más estricta. Se guarda sola en este navegador.</p>
+<p class="sub">Fíjate en dos cosas: <b>¿dice lo mismo que el inglés?</b> y <b>¿se entiende y suena natural en el juego?</b>
+No te preocupes por tildes, comas ni ortografía: eso lo revisan aparte un diccionario y otro revisor.
+Marca <b>Bien</b> (la dejarías tal cual), <b>Leve</b> (se entiende, pero suena rara o la dirías de otra forma) o <b>Grave</b>
+(cambia el sentido, le falta algo o quedó en inglés). Si dudas entre dos, elige la más estricta. Se guarda sola en este navegador.</p>
 <div class="barra"><i id="progreso"></i></div><div class="resumen" id="resumen"></div></header>
 <div id="lista"></div>
 <div class="fin"><button class="principal" id="copiar">Copiar resultados</button><span id="aviso" class="sub"></span></div>
