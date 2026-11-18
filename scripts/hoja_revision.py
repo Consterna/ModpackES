@@ -159,7 +159,7 @@ def _html(args: argparse.Namespace) -> int:
     datos: list[dict[str, Any]] = json.loads(args.entrada.read_text(encoding="utf-8"))
     filas = []
     for t in datos[-1]["traducciones"]:
-        tipo = "Misión" if t["ambito"] == "mision" else "Interfaz de un mod"
+        tipo = {"mision": "Misión", "libro": "Libro guía"}.get(t["ambito"], "Interfaz de un mod")
         filas.append(
             {
                 "tipo": tipo,
@@ -260,7 +260,7 @@ def _ab(args: argparse.Namespace) -> int:
             continue
         ahora_es_a = azar.random() < 0.5  # a ciegas: no se sabe cuál es la nueva
         a, b = (otra, t["traduccion"]) if ahora_es_a else (t["traduccion"], otra)
-        tipo = "Misión" if t["ambito"] == "mision" else "Interfaz de un mod"
+        tipo = {"mision": "Misión", "libro": "Libro guía"}.get(t["ambito"], "Interfaz de un mod")
         filas.append(
             {
                 "tipo": tipo,

@@ -586,8 +586,14 @@ class Traductor:
 
     def _con_mayusculas(self, glosario: Mapping[str, str]) -> dict[str, str]:
         """Términos cuyas mayúsculas se respetan: los del pack y del usuario. Los del juego («Cofre») no: en medio
-        de una frase en español los objetos del juego van en minúscula."""
-        return {en: es for en, es in glosario.items() if not self.glosario.del_juego(en)}
+        de una frase en español los objetos del juego van en minúscula. Tampoco una palabra suelta de un mod que el
+        español escribe en minúscula («Engranaje»): es un sustantivo común. «Fluix» o «Arachnarch» sí la conservan."""
+        return {
+            en: es
+            for en, es in glosario.items()
+            if not self.glosario.del_juego(en)
+            and (self.glosario.fijo(en) is not None or " " in es.strip() or not self.glosario.comun_en_espanol(es))
+        }
 
     def _reparar(
         self, original: str, final: str, glosario: Mapping[str, str] | None, motivo: str

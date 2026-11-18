@@ -40,6 +40,7 @@ class Glosario:
         #: Palabra inglesa en minúscula → textos en español donde sale (del juego y los mods ya traducidos)
         self._usos: dict[str, list[str]] = {}
         self._palabras_es: set[str] = set()  #: palabras del español de esos textos (sin mayúsculas)
+        self._minusculas_es: set[str] = set()  #: las que esos textos escriben en minúscula («engranaje»)
         self._ambiguos: dict[tuple[str, str], bool] = {}
         self._marcas: set[str] = set()  #: nombres de mods («create»): no son inglés a medio traducir
         self._por_palabra: dict[str, list[tuple[str, str, re.Pattern[str]]]] | None = None
@@ -90,6 +91,7 @@ class Glosario:
                 continue
             limpio = sin_formato(valor_es)
             self._palabras_es.update(p.casefold() for p in PALABRA.findall(limpio))
+            self._minusculas_es.update(p for p in PALABRA.findall(limpio) if p.islower())
             for palabra in {p for p in PALABRA.findall(sin_formato(valor_en)) if p.islower() and len(p) >= 3}:
                 usos = self._usos.setdefault(palabra, [])
                 if len(usos) < _MAX_USOS:
@@ -115,6 +117,11 @@ class Glosario:
             aciertos = sum(1 for es in usos if sale_el_termino(traduccion, es))
             self._ambiguos[clave] = aciertos < len(usos) / 2
         return self._ambiguos[clave]
+
+    def comun_en_espanol(self, palabra: str) -> bool:
+        """¿El español del juego o de los mods escribe esta palabra en minúscula («engranaje», «martillo»)? Entonces
+        es un sustantivo común, no un nombre propio, aunque un mod la ponga con mayúscula en su nombre."""
+        return palabra.casefold() in self._minusculas_es
 
     def ambiguos(self, terminos: Iterable[str]) -> frozenset[str]:
         """Los términos de una palabra que en minúscula tienen otro sentido (ver `ambiguo`)."""
