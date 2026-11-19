@@ -32,6 +32,8 @@ SOLO_FECHA = (".jar",)
 #: Lo que escribe la app y que restaurar no borra a propósito: el resource pack (basta con desactivarlo) y su carpeta
 #: de copias. Antes y después de cada foto se borran, para que cada pasada empiece igual.
 PROPIO_DE_LA_APP = ("traductor_es/", "resourcepacks/Traduccion_ES/")
+#: Lo que deja `restaurar` en un archivo que la app creó (no existía): vacío o un SNBT vacío.
+NEUTROS = frozenset({b"", b"{ }", b"{}"})
 #: Un subconjunto que cubre todas las fuentes (misiones, libros, scripts, datos, shaders, FancyMenu, descripciones,
 #: Origins) y versiones de 1.7.10 a 26.x. Los 47 packs, dos veces, tardan unas 8 horas.
 REPRESENTATIVOS = (
@@ -100,6 +102,13 @@ def foto(pack: Path) -> dict[str, Any]:
     despues = huellas(juego)
     escritos = {k: v for k, v in despues.items() if antes.get(k) != v}
     _modpackes("restaurar", str(pack))
+    # Un archivo que la app creó (p. ej. lang/es_mx.snbt de FTB Quests) queda con su contenido neutro al restaurar
+    # («{ }»: FTB Quests vuelve al inglés), por diseño de salida/copias.py. Se acepta y se borra, para que el
+    # corpus quede como se bajó.
+    for k in set(huellas(juego)) - set(antes):
+        archivo = juego / k
+        if not k.startswith(PROPIO_DE_LA_APP) and archivo.read_bytes().strip() in NEUTROS:
+            archivo.unlink()
     final = huellas(juego)
     distintos = sorted(
         k for k in set(antes) | set(final)
