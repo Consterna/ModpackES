@@ -1,0 +1,89 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = "${mod_id}-neoforge-${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+}
+
+// NeoForge 1.21.1 corre con los nombres oficiales: los mixins no necesitan refmap
+neoForge {
+    version = project.neo_version
+
+    runs {
+        client {
+            client()
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    // Pone Minecraft (y su Gson) en el classpath de las pruebas, como en ../../neoforge-1.21.1
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            neo_version_minimo     : neo_version_minimo,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+    ]
+    // gradle.properties se lee como ISO-8859-1 (sus tildes van escapadas) y los metadatos se escriben en UTF-8
+    filteringCharset = 'UTF-8'
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// La lógica pura vive en ../comun (con sus pruebas) y lo que usa Minecraft y no cambia entre 1.20.1 y 1.21.1, en
+// ../comun-mc; lo propio de 1.21.1 está en este proyecto
+sourceSets {
+    main.java.srcDir '../comun/src/main/java'
+    main.java.srcDir '../comun-mc/src/main/java'
+    test.java.srcDir '../comun/src/test/java'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
