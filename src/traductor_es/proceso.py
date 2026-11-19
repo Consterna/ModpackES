@@ -16,7 +16,7 @@ from typing import Self, cast
 from . import configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
-from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts, shaders
+from .modulos import crafttweaker, datos, descripciones, libros, misiones, mods, runtime, scripts, shaders
 from .modulos.base import Contexto, Modulo, Pieza, Resumen, pendientes_de, por_ambito, reunir_pistas
 from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
@@ -394,6 +394,7 @@ class Proceso:
         lista: list[tuple[str, Modulo]] = []
         if "mods" in self.grupos:
             lista.append(("mods", shaders.Shaders(ctx)))  # un archivo por idioma: también en la versión de España
+            lista.append(("mods", descripciones.Descripciones(ctx)))
         return lista
 
     # ------------------------------------------------------------------ acciones
