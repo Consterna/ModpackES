@@ -570,6 +570,42 @@ Gemini 3.8 Flash, dos corridas por condición (US$ 0,15 en total):
 | Sin la frase contra con la frase | **+1,45** (IC 95 %: +0,80 a +2,12) → mejora |
 | Sin la frase contra como interfaz | +0,60 (IC 95 %: −0,03 a +1,28), no se distingue del ruido |
 
+## 18 de noviembre de 2026 · criterio de parada: lo que queda es del modelo
+
+El plan de calidad terminaba cuando los errores que quedaran fueran del modelo y no del proceso (máscara, glosario,
+contexto, segmentación, memoria o control de calidad). Para comprobarlo se revisaron 150 traducciones del proceso
+actual (60 de interfaz, 50 de misiones y 40 de libros) en tres pasos:
+
+1. **Diccionario de español** (es_MX de RLA-ES, el de LibreOffice, con `spylls`).
+   - Marcó 18 textos. Casi todo eran formas correctas que no trae («reevalúan», «rómpela», «sintiente») o términos
+     del juego («netherita», «encantable»).
+   - Un error era del proceso: «crafteo». Ahora es «fabricación».
+2. **Revisor MQM con un modelo más fuerte** (Gemini 3.1 Pro, US$ 0,27).
+   - Marcó 14 textos.
+   - Dos eran del proceso y se corrigieron:
+     - un término en plural que no se reconocía: «wither skeletons» salía con el efecto «Descomposición»;
+     - una palabra suelta de los objetos del juego que faltaba en el glosario: «peto» en vez de «pechera» en es_mx.
+3. **Revisión humana** de 27 textos: solo los que esas herramientas no podían decidir.
+   - Son los que el revisor marcó, los que tienen palabras que ningún diccionario confirma y los muy distintos de la
+     traducción humana del mod.
+   - La persona juzgó el sentido y la naturalidad, no la ortografía.
+
+| Revisión humana (27 textos) | Bien | Leve | Grave |
+|---|---|---|---|
+| Resultado | 26 | 1 | 0 |
+
+- El único Leve es un juego de palabras: «Tall-mato» (tall + tomato) salió como «Altomatada»; mejor «Altomato». Es
+  del modelo: ninguna regla del proceso inventa bien un chiste.
+- La persona dio por buenos varios textos que el revisor automático había marcado como graves («Convergente» para
+  «Merger», «chincheta», «vanilla», «Shift-clic»). Las marcas de un revisor automático sirven para elegir qué mirar,
+  no como nota final.
+- Las ablaciones de cada ola (contexto, tono de libro, perfiles, controles de forma) se midieron una por una en este
+  documento. Ningún componente que quedó en la app empeora la calidad; los que no aportaban se quitaron o quedaron
+  como opción.
+
+**Conclusión:** con Gemini 3.8 Flash, lo que queda por mejorar es del modelo. Para subir más la calidad, el camino es
+un modelo más fuerte, o la revisión de una persona en los textos que la app ya marca como dudosos.
+
 ## Cómo repetirlo
 
 ```
