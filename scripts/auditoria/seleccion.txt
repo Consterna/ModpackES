@@ -1,0 +1,50 @@
+# Corpus de la auditoría de cobertura: un pack por línea (modrinth:slug[@versión] o ftb:id[@versión]).
+# Elegidos para cubrir versiones (1.7.10 a 26.x), loaders y tipos de texto (misiones, libros, scripts, datos, menús).
+# Se baja con: uv run python scripts/auditoria/descargar_packs.py bajar --lista scripts/auditoria/seleccion.txt
+
+# --- FTB: misiones (FTB Quests viejo y con lang/), KubeJS, libros
+ftb:23    # Infinity Evolved · 1.7.10 forge
+ftb:35    # Revelation · 1.12.2 forge
+ftb:1     # Academy 1.12 · 1.12.2 forge
+ftb:5     # Interactions · 1.12.2 forge
+ftb:91    # OceanBlock · 1.16.5 forge
+ftb:86    # Cotton · 1.16.5 fabric
+ftb:100   # StoneBlock 3 · 1.18.2 forge
+ftb:115   # Arcanum Institute · 1.18.2 forge (magia, libros)
+ftb:103   # Skies · 1.19.2 forge
+ftb:102   # Legend of the Eyes · 1.19.2 fabric
+ftb:119   # Direwolf20 1.20 · 1.20.1 neoforge
+ftb:127   # Architect's Exodus · 1.20.1 forge
+ftb:123   # NeoTech · 1.20.4 neoforge
+ftb:125   # Evolution · 1.21.1 neoforge
+ftb:130   # StoneBlock 4 · 1.21.1 neoforge
+ftb:135   # Evolution 2 · 26.1.2 neoforge
+
+# --- Modrinth: contenido variado por versión y loader
+modrinth:galaxy-odyssey               # 1.7.10 forge
+modrinth:the-lost-era                 # 1.7.10 forge
+modrinth:parasites-reloaded           # 1.12.2 forge
+modrinth:supernova-empires-2          # 1.12.2 forge · misiones
+modrinth:the-pixelmon-modpack         # 1.16.5 forge
+modrinth:crazy-craft-chaos            # 1.16.5 forge
+modrinth:new-berks-dawn               # 1.18.2 forge
+modrinth:dark-fantasy                 # 1.18.2 quilt
+modrinth:dwellers-modpack             # 1.19.2 forge · misiones
+modrinth:techmagic                    # 1.19.2 fabric · misiones
+modrinth:taidumcraft                  # 1.19.2 quilt · KubeJS pesado
+modrinth:better-adventures-plus-plus  # quilt / fabric
+modrinth:better-mc-forge-bmc4         # 1.20.1 forge
+modrinth:prominence-2-fabric          # 1.20.1 fabric · misiones, RPG
+modrinth:prehistoric-world-modpack    # 1.20.1 forge · misiones
+modrinth:create-oneblock              # 1.20.1 neoforge
+modrinth:new-origins                  # 1.20.1 fabric · Origins
+modrinth:omnicraft-modpack            # 1.20.1 forge · misiones, kubejs/data
+modrinth:spectral-creation            # 1.20.1 fabric · logros, datos
+modrinth:cobblemon-fabric             # 1.20.1 fabric
+modrinth:create.ultimate              # 1.21.1 neoforge
+modrinth:medieval-mc-neoforge-mmc5    # 1.21.1 neoforge · misiones
+modrinth:cobbleverse                  # 1.21.1 fabric
+modrinth:skyblock-plus                # 1.21.1 fabric
+modrinth:lost-world-the-broken-script # 1.21.1 neoforge · misiones
+modrinth:ba-plus                      # 26.1.2 neoforge
+modrinth:legacies                     # 26.1.2 fabric · logros, funciones
