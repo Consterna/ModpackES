@@ -8,6 +8,19 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Fuentes de texto que antes quedaban en inglés**, encontradas al auditar 47 modpacks reales (ver [docs/cobertura.md](docs/cobertura.md)). Cada una va en su propio módulo, después de los anteriores y sin alimentar el glosario, así que los pedidos de lo que ya se traducía no cambian. Las respuestas grabadas de los bancos de calidad dan exactamente lo mismo que antes.
+  - **Menú principal de FancyMenu y Drippy:** el texto de los botones y de los textos del menú, en los diseños v3 y v2. Se cambia solo el valor de esas líneas. Los marcadores de FancyMenu (`{"placeholder":…}`), los colores `%#…%` y el salto `%n%` vuelven exactos, y lo que ya usa una clave de idioma se deja. Aparece en 24 de los 47 packs.
+  - **Opciones de los shaderpacks** con Iris u Oculus. Su idioma va al resource pack, en un espacio propio: Iris usa una clave del shaderpack solo si el idioma del juego no la tiene. Una clave que dos shaderpacks usan con distinto texto no se traduce, y el español que trae un shaderpack se copia. Aparece en 13 packs, con hasta 2.000 textos cada uno.
+  - **Descripción de cada mod** en la lista de mods, con las claves que leen Mod Menu (`modmenu.descriptionTranslation.<id>`) y NeoForge desde 1.20.4 (`fml.menu.mods.info.description.<id>` y `neoforge.screen.mods.info.description.<id>`). Forge no tiene clave para eso.
+  - **Textos del propio loader (NeoForge o Forge):** sus menús, comandos y los nombres de las etiquetas comunes (espacio `c`). Su jar vive en `libraries/` del launcher, fuera de `mods/`, y se busca ahí (Prism, MultiMC, CurseForge, Modrinth App, ATLauncher, oficial). El español que trae el loader se copia a las variantes que no lo tienen (NeoForge trae `es_es`, no `es_mx`) y se traduce el resto. Lo encontró la sonda dentro del juego: en NeoForge 1.21.1 con `es_mx` había unas 750 claves en inglés.
+  - **Origins:** nombre y descripción de orígenes, poderes y capas, con la clave que usa cada versión (leído en el código de Origins, Apoli y sus ports). Hasta Origins 1.10 y en el port de Forge es el texto mismo; desde 1.13, `origin|power|layer.<espacio>.<ruta>.<campo>`. Todo va al resource pack: no se reescribe ningún archivo de datos.
+- **Auditoría de cobertura** (`scripts/auditoria/`), una herramienta de desarrollo:
+  - un corpus de packs enteros de Modrinth y FTB, verificados por hash;
+  - un inventario de todo el texto que no usa el código de la app;
+  - la comparación con lo que la app recoge, el «antes» medido con otra copia del código;
+  - la foto del corpus traducido con el simulador, con la prueba de que restaurar deja los bytes originales;
+  - una puerta de regresión de la calidad con las respuestas grabadas;
+  - el análisis de lo que vuelca una sonda dentro del juego.
 - **Perfiles de calidad** («Calidad» en la ventana y `--calidad` en `analizar` y `traducir`). El análisis estima el costo de cada uno:
   - **Equilibrado** (por defecto): después de traducir, lo que quedó con dudas (cifras distintas, un paréntesis sin cerrar, usted, inglés, un término del glosario…) se corrige una vez explicando qué falló. La corrección se queda solo si pasa las reglas y un juez a ciegas la prefiere en los dos órdenes; si no, queda la primera, marcada. Cuesta cerca de un 5 % más.
   - **Máximo:** además, cada texto corto (6 palabras o menos: nombres, botones) se traduce tres veces en lotes distintos. Gana la traducción en que coinciden dos; si no coinciden, gana la de mejor promedio entre tres señales (dudas del control de calidad, términos del glosario y parecido con las otras), y el texto queda marcado para revisarlo. También activa la revisión de misiones y libros. Cuesta un 30 % más, más la revisión. Con Gemini 3.8 Flash no mejoró de forma medible (ver [docs/calidad.md](docs/calidad.md)): queda como opción.
@@ -104,6 +117,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Jars anidados que Fabric y Quilt cargan fuera de `META-INF/jars`:** un mod puede declarar en `fabric.mod.json` (`jars[].file`) o en `quilt.mod.json` jars que están en la raíz u otra carpeta (Simple Pipes lo hace), y su idioma quedaba sin leer.
+- **Instancias que nunca se abrieron:** sin `options.txt`, el pack no se puede activar ni elegir el idioma, y el juego seguía en inglés sin aviso. Ahora el informe lo dice y explica cómo activarlo. No se inventa un `options.txt`.
 - **Lo que encontró una revisión de 150 textos con un juez más fuerte (Gemini 3.1 Pro) y un diccionario de español:**
   - Un término del glosario en plural no se reconocía («wither skeletons»). Entonces solo coincidía el corto («Wither», que en el juego es el efecto «Descomposición»), y el modelo escribía «esqueletos de la Descomposición». Ahora los términos aceptan el plural inglés, y uno corto no cuenta dentro de uno largo.
   - Las palabras sueltas de los objetos del juego salen de sus propios nombres, en cada dialecto: «Chestplate» es «Pechera» en es_mx (de «Pechera de hierro», «Pechera de oro»…) y «Peto» en es_es; lo mismo «Helmet» (Yelmo/Casco), «Pickaxe», «Shovel», «Sword», «Ingot» y otras. Antes una misión podía decir «peto» en un texto latinoamericano.

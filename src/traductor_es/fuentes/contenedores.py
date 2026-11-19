@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 _PROFUNDIDAD_MAXIMA = 3
 _CARPETAS_ANIDADAS = ("META-INF/jars/", "META-INF/jarjar/", "META-INF/jarinjar/")
@@ -111,11 +112,40 @@ def abrir_mod(ruta: Path) -> Iterator[Zip]:
     yield from _anidados(principal, principal.nombre, 1)
 
 
+def _declarados(padre: Zip) -> set[str]:
+    """Los jars que el mod declara en `fabric.mod.json` (`jars[].file`) o `quilt.mod.json` (`quilt_loader.jars`).
+
+    Fabric y Quilt los cargan estén donde estén dentro del jar (Simple Pipes los deja en la raíz), no solo en
+    `META-INF/jars/`.
+    """
+    salida: set[str] = set()
+    nombres = set(padre.nombres())
+    for archivo in ("fabric.mod.json", "quilt.mod.json"):
+        if archivo not in nombres:
+            continue
+        try:
+            datos: object = json.loads(padre.leer(archivo).decode("utf-8-sig"))
+        except (KeyError, OSError, ValueError):
+            continue
+        if not isinstance(datos, dict):
+            continue
+        raiz = cast(dict[str, Any], datos)
+        if archivo == "quilt.mod.json":
+            cargador = raiz.get("quilt_loader")
+            raiz = cast(dict[str, Any], cargador) if isinstance(cargador, dict) else {}
+        for jar in cast(list[object], raiz.get("jars")) if isinstance(raiz.get("jars"), list) else []:
+            ruta = cast(dict[str, Any], jar).get("file") if isinstance(jar, dict) else jar
+            if isinstance(ruta, str) and ruta.endswith(".jar") and ruta in nombres:
+                salida.add(ruta)
+    return salida
+
+
 def _anidados(padre: Zip, ruta_padre: str, nivel: int) -> Iterator[Zip]:
     if nivel > _PROFUNDIDAD_MAXIMA:
         return
+    declarados = _declarados(padre)
     for n in padre.nombres():
-        if n.endswith(".jar") and n.startswith(_CARPETAS_ANIDADAS):
+        if n.endswith(".jar") and (n.startswith(_CARPETAS_ANIDADAS) or n in declarados):
             try:
                 hijo = Zip(f"{ruta_padre}!/{n.rsplit('/', 1)[-1]}", zipfile.ZipFile(io.BytesIO(padre.leer(n))))
             except (zipfile.BadZipFile, OSError, KeyError):

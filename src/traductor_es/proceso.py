@@ -16,7 +16,20 @@ from typing import Self, cast
 from . import configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
-from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts
+from .modulos import (
+    crafttweaker,
+    datos,
+    descripciones,
+    fancymenu,
+    libros,
+    loader,
+    misiones,
+    mods,
+    origins,
+    runtime,
+    scripts,
+    shaders,
+)
 from .modulos.base import Contexto, Modulo, Pieza, Resumen, pendientes_de, por_ambito, reunir_pistas
 from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
@@ -201,6 +214,12 @@ def lugares_de(modulo: Modulo, piezas: list[Pieza]) -> list[Lugar]:
     return [Lugar(modulo.nombre, [p.texto for p in piezas])]
 
 
+#: Sin options.txt (una instancia que nunca se abrió) el pack no se puede activar ni poner el idioma.
+AVISO_SIN_OPCIONES = (
+    "Esta instancia todavía no tiene options.txt (nunca se abrió el juego): el juego seguirá en inglés hasta que "
+    "actives «Traduccion_ES» en Opciones ▸ Paquetes de recursos y elijas Español en Idioma. También puedes abrir el "
+    "juego una vez, cerrarlo y volver a traducir: la app lo activa sola."
+)
 #: El dialecto que se traduce aparte con `tambien_es_es`.
 DIALECTO_ESPANA = "es_es"
 #: Lo que se agrega al nombre de un módulo en la segunda pasada.
@@ -368,6 +387,7 @@ class Proceso:
                 por_idioma.append(("libros", libros.Libros(ctx)))
             if "misiones" in self.grupos:
                 por_idioma.append(("misiones", misiones.FTBQuests(ctx)))
+            por_idioma += self._fuentes_nuevas(ctx)
             return [(g, m) for g, m in por_idioma if m.detectar()]
         lista: list[tuple[str, Modulo]] = []
         if "mods" in self.grupos:
@@ -384,7 +404,21 @@ class Proceso:
                 ("scripts", datos.Datos(self.ctx)),
                 ("scripts", crafttweaker.ScriptsCraftTweaker(self.ctx)),
             ]
+        lista += self._fuentes_nuevas(self.ctx)
         return [(g, m) for g, m in lista if m.detectar()]
+
+    def _fuentes_nuevas(self, ctx: Contexto) -> list[tuple[str, Modulo]]:
+        """Fuentes que se agregaron después de medir la calidad: van al final y no alimentan el glosario, así que los
+        pedidos de los módulos de antes no cambian (ver docs/cobertura.md)."""
+        lista: list[tuple[str, Modulo]] = []
+        if "mods" in self.grupos:
+            lista.append(("mods", shaders.Shaders(ctx)))  # un archivo por idioma: también en la versión de España
+            lista.append(("mods", descripciones.Descripciones(ctx)))
+            lista.append(("mods", origins.Origins(ctx)))
+            lista.append(("mods", loader.IdiomaDelLoader(ctx)))
+        if "scripts" in self.grupos and not ctx.solo_por_idioma:  # un solo idioma por archivo, como los scripts
+            lista.append(("scripts", fancymenu.FancyMenu(ctx)))
+        return lista
 
     # ------------------------------------------------------------------ acciones
     def _abrir_memoria(self) -> Memoria:
@@ -531,6 +565,8 @@ class Proceso:
                 )  # fmt: skip
             except ValueError as e:
                 informe.avisos.append(str(e))
+            if not (self.instancia.juego / "options.txt").is_file():
+                informe.avisos.append(AVISO_SIN_OPCIONES)
         return informe
 
     def _traducir_pasada(
