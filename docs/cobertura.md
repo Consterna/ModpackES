@@ -186,6 +186,15 @@ Antes de la sonda, ningún análisis de archivos podía ver esta brecha: es just
 **La calidad no cambió.** `puerta_calidad.py`, con las respuestas grabadas de los bancos de interfaz, libros y misiones, dio
 idéntico a la línea base después de cada arreglo: las mismas traducciones, las mismas métricas y ningún pedido nuevo.
 
+**Lo que ya se traducía sale igual.** `foto_corpus.py` tradujo con el simulador 14 packs representativos. Abarcan de
+1.7.10 a 26.x y todas las fuentes: misiones, libros, scripts, datos, shaders, FancyMenu, descripciones y Origins. Cada pack
+se tradujo dos veces, con el código de `origin/main` y con esta rama.
+- **14 de 14:** cada archivo que la versión anterior escribía sale idéntico. Solo aparecen archivos nuevos de los módulos
+  nuevos, y solo cambian dos metadatos con fecha (la marca del pack y el registro de copias).
+- **`restaurar` deja byte por byte cada archivo que existía.** Por diseño, a un archivo que la app creó le deja un contenido
+  neutro que el juego muestra como el original: `{ }` en el `lang/es_*.snbt` de FTB Quests y el inglés en un libro propio.
+  `options.txt` sigue con el pack activado (eso es una preferencia del jugador, no un archivo del modpack).
+
 **El inventario también se equivocó, y se corrigió.** La primera pasada contaba como texto:
 - los archivos de idioma que el juego no carga (`lang/default/` de Create);
 - libros en otros idiomas;
