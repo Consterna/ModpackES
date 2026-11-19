@@ -21,6 +21,7 @@ import json
 import re
 import sys
 import tempfile
+import zipfile
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -94,8 +95,64 @@ def lado_app(instancia: Path, java: bool) -> LadoApp:
 
 
 def _espacio_de_lang(ruta: str) -> str | None:
+    """`assets/<ns>/lang/x.json` o `resources/<ns>/lang/x.lang` (ResourceLoader) → `<ns>`; si no, None."""
     partes = PurePosixPath(ruta).parts
-    return partes[1] if len(partes) >= 4 and partes[0] == "assets" and partes[2] == "lang" else None
+    if len(partes) >= 3 and partes[-2] == "lang" and partes[0] in ("assets", "resources") and len(partes) == 4:
+        return partes[1]
+    return None
+
+
+def version_de(instancia: Path) -> tuple[int, ...]:
+    """La versión de Minecraft del `mmc-pack.json` que arma el descargador (26.x cuenta como más nueva que 1.x)."""
+    try:
+        datos: dict[str, Any] = json.loads((instancia / "mmc-pack.json").read_text(encoding="utf-8"))
+        version = next(str(c["version"]) for c in datos["components"] if c.get("uid") == "net.minecraft")
+        return tuple(int(x) for x in version.split(".") if x.isdigit())
+    except (OSError, ValueError, StopIteration, KeyError):
+        return ()
+
+
+def lang_que_carga_el_juego(ruta: str, version: tuple[int, ...]) -> bool:
+    """Antes de 1.13 el juego lee `.lang`; desde 1.13, `.json`. El otro formato está en el jar pero no se carga."""
+    if not version:
+        return True
+    legacy = version < (1, 13)
+    return ruta.lower().endswith(".lang") == legacy
+
+
+_DIALECTOS = ("es_es", "es_mx", "es_ar", "es_cl", "es_ec", "es_uy", "es_ve")
+
+
+class Contenedores:
+    """Los nombres de archivo de cada jar o zip del corpus, para saber si un libro ya trae su español."""
+
+    def __init__(self, juego: Path) -> None:
+        self.juego = juego
+        self._nombres: dict[str, set[str]] = {}
+
+    def nombres(self, contenedor: str) -> set[str]:
+        if contenedor not in self._nombres:
+            ruta = self.juego / contenedor
+            try:
+                if "!" in contenedor or not ruta.is_file():
+                    self._nombres[contenedor] = set[str]()
+                else:
+                    with zipfile.ZipFile(ruta) as z:
+                        self._nombres[contenedor] = set(z.namelist())
+            except (OSError, zipfile.BadZipFile):
+                self._nombres[contenedor] = set[str]()
+        return self._nombres[contenedor]
+
+    def ya_en_espanol(self, contenedor: str, ruta: str) -> bool:
+        """¿Hay el mismo archivo en una carpeta de español (`…/en_us/…` → `…/es_mx/…`, o `_es_mx/` en GuideME)?"""
+        if "/en_us/" not in f"/{ruta}":
+            return False
+        nombres = self.nombres(contenedor) if contenedor else set[str]()
+        for d in _DIALECTOS:
+            otra = f"/{ruta}".replace("/en_us/", f"/{d}/", 1)[1:]
+            if otra in nombres or (not contenedor and (self.juego / otra).is_file()):
+                return True
+        return False
 
 
 def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
@@ -104,6 +161,9 @@ def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
     if not inventario.is_file():
         raise SystemExit(f"Falta {inventario}: corre antes inventario.py con ese pack")
     app = lado_app(instancia, java)
+    version = version_de(instancia)
+    contenedores = Contenedores(instancia / "minecraft" if (instancia / "minecraft").is_dir() else instancia)
+    ya_espanol = 0
     lang_total = lang_vistas = 0
     lang_no_vistas: dict[str, list[str]] = defaultdict(list)
     brecha: dict[str, dict[str, Any]] = {}
@@ -112,6 +172,8 @@ def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
         for linea in f:
             t: dict[str, Any] = json.loads(linea)
             if t["clase"] == "lang":
+                if not lang_que_carga_el_juego(t["ruta"], version):
+                    continue
                 ns = _espacio_de_lang(t["ruta"])
                 lang_total += 1
                 if ns is not None and (ns, t["campo"]) in app.claves:
@@ -123,6 +185,10 @@ def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
             if app.cubre(t["texto"]):
                 textos_cubiertos += 1
                 continue
+            if contenedores.ya_en_espanol(t["contenedor"], t["ruta"]):
+                textos_cubiertos += 1  # el libro ya trae su español: la app lo copia sin traducir
+                ya_espanol += 1
+                continue
             grupo = brecha.setdefault(t["patron"], {"textos": 0, "archivos": set(), "ejemplos": []})
             grupo["textos"] += 1
             grupo["archivos"].add(f"{t['contenedor']}::{t['ruta']}")
@@ -133,7 +199,8 @@ def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
         "pack": nombre,
         "lang": {"claves": lang_total, "vistas": lang_vistas,
                  "no_vistas": {k: len(v) for k, v in sorted(lang_no_vistas.items(), key=lambda kv: -len(kv[1]))}},
-        "textos": {"total": textos_total, "cubiertos": textos_cubiertos},
+        "textos": {"total": textos_total, "cubiertos": textos_cubiertos, "ya_en_espanol": ya_espanol},
+        "version": ".".join(map(str, version)),
         "por_modulo": app.por_modulo,
         "cobertura_app": app.cobertura,
         "brecha": {p: {"textos": g["textos"], "archivos": len(g["archivos"]), "ejemplos": g["ejemplos"]}

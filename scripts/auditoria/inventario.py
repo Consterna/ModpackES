@@ -65,7 +65,7 @@ CAMPOS_NO = _palabras(
     "conditions predicate function functions loot_table translate translation score selector nbt keybind "
     "storage entity block fluid biome dimension structure recipe group category_id dependencies target source "
     "op ops mode comment _comment __comment comments author authors credits license version metadata "
-    "mixins refmap package entrypoints"
+    "mixins refmap package entrypoints $comment $schema"
 )
 #: Una clave de configuración que lleva un mensaje para el jugador.
 _CAMPO_DE_MENSAJE = re.compile(
@@ -402,9 +402,28 @@ def _es_lang(ruta: str) -> str | None:
     return None
 
 
-def _sin_texto(ruta: str) -> bool:
+_LOCALE = re.compile(r"^_?[a-z]{2,3}_[a-z]{2,3}$")
+
+
+def _sin_texto(contenedor: str, ruta: str) -> bool:
+    """Lo que nunca es texto visible, o no es la fuente en inglés. Cada regla dice por qué."""
     partes = PurePosixPath(ruta).parts
-    return len(partes) >= 3 and partes[0] in ("assets", "data") and partes[2] in SIN_TEXTO
+    bajas = [x.lower() for x in partes]
+    if len(partes) >= 3 and partes[0] in ("assets", "data") and partes[2] in SIN_TEXTO:
+        return True
+    if len(partes) >= 3 and partes[0] == "assets" and partes[2] == "config":
+        return True  # formas y ajustes que trae un mod (OpenComputers…), no texto
+    if len(partes) == 3 and partes[0] == "assets" and partes[2].endswith(".txt"):
+        return True  # notas sueltas para quien edita el mod («totextureartists.txt»)
+    if "lang" in bajas[:-2]:
+        return True  # `lang/default/*.json` y otras subcarpetas: fuentes de generación, el juego no las carga
+    if any(_LOCALE.match(x) and x.lstrip("_") != "en_us" for x in bajas[:-1]):
+        return True  # libros y guías en otro idioma: no son la fuente en inglés
+    if partes and partes[-1] in ("schema.json", "pack.png"):
+        return True
+    if contenedor.startswith("shaderpacks/") and bajas[:2] != ["shaders", "lang"]:
+        return True  # de un shaderpack solo cuenta su idioma (lo demás son listas de bloques y ajustes)
+    return contenedor.startswith("mods/") and PurePosixPath(ruta).suffix.lower() in (".js", ".ts")
 
 
 def _pares(formato: str, datos: bytes) -> Iterator[tuple[str, str]]:
@@ -427,8 +446,11 @@ def _pares(formato: str, datos: bytes) -> Iterator[tuple[str, str]]:
 def leer_archivo(contenedor: str, ruta: str, datos: bytes) -> Iterator[Texto]:
     nombre = PurePosixPath(ruta).name
     formato = EXTENSIONES.get(PurePosixPath(ruta).suffix.lower())
-    if formato is None or NOMBRES_NO.match(nombre) or len(datos) > TOPE_ARCHIVO or _sin_texto(ruta):
+    if formato is None or NOMBRES_NO.match(nombre) or len(datos) > TOPE_ARCHIVO or _sin_texto(contenedor, ruta):
         return
+    fancymenu = not contenedor and re.match(r"^config/(fancymenu|drippyloadingscreen)/.*\.txt$", ruta, re.I)
+    if fancymenu:
+        formato = "config"  # bloques «clave = valor» de FancyMenu, no párrafos
     patron = patron_de(contenedor, ruta)
     idioma = _es_lang(ruta)
     if idioma is not None:
@@ -437,11 +459,14 @@ def leer_archivo(contenedor: str, ruta: str, datos: bytes) -> Iterator[Texto]:
         return
     metadato = ruta in METADATOS
     config = not contenedor and re.match(r"^(config|defaultconfigs)/", ruta) and not CONFIG_DE_CONTENIDO.match(ruta)
-    for campo, valor in _pares(formato, datos):
+    for campo_crudo, valor in _pares(formato, datos):
+        campo = campo_crudo
         if metadato and _campo_simple(campo) not in ("description", "summary"):
             continue  # del mod solo cuenta su descripción (el nombre es un nombre propio)
         if config and not _CAMPO_DE_MENSAJE.search(campo):
             continue  # en una configuración solo las claves de mensajes («welcomeMessage», «motd»…)
+        if fancymenu and _campo_simple(campo) == "source":
+            campo = "text"  # en FancyMenu «source» es el texto de un elemento de texto (con source_mode = direct)
         if es_frase_inglesa(valor, campo):
             yield Texto(contenedor, ruta, formato, campo, valor, patron)
 

@@ -88,8 +88,9 @@ def diferencias(base: list[dict[str, Any]], nueva: list[dict[str, Any]]) -> list
 
 
 def main() -> int:
-    if isinstance(sys.stdout, io.TextIOWrapper):
-        sys.stdout.reconfigure(encoding="utf-8")  # «✓» y tildes, aunque la consola sea cp1252
+    salida = cast(io.TextIOWrapper, sys.stdout)
+    if hasattr(salida, "reconfigure"):
+        salida.reconfigure(encoding="utf-8")  # «✓» y tildes, aunque la consola sea cp1252
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--guardar", action="store_true", help="medir y guardar como línea base")
     ap.add_argument("--carpeta", type=Path, default=RAIZ / "build" / "base_calidad")
