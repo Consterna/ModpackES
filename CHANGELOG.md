@@ -61,6 +61,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **Fin del plan de calidad:** una revisión de 150 traducciones con un diccionario, un revisor más fuerte y una persona (en los 27 textos que lo necesitaban) dio 26 Bien, 1 Leve y 0 Grave; lo que queda es del modelo. Ver [docs/calidad.md](docs/calidad.md).
 - **Frases partidas con su contexto:**
   - Un texto con estilos mezclados («Use the » + «Wrench» en dorado + « to rotate») se sigue traduciendo por trozos, para no perder los estilos, pero cada trozo va con la frase entera, para que encaje en ella. Vale para las misiones (FTB Quests, Heracles) y los libros.
   - Una línea de una misión o de un libro que no cierra su frase («Right-click the block with») va con el comienzo de la siguiente, además de la anterior y el título que ya llevaba.
