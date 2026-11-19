@@ -114,7 +114,7 @@ def es_frase_inglesa(texto: str, campo: str = "") -> bool:
     if espanol > ingles or re.search(r"[áéíóúñ¿¡]", limpio):
         return False
     simple = _campo_simple(campo)
-    if simple in CAMPOS_NO:
+    if simple in CAMPOS_NO or "comment" in simple:
         return False
     separadas = [w for w in limpio.split() if _PALABRA.search(w)]  # palabras separadas por espacios
     if len(separadas) >= 3:
@@ -274,7 +274,7 @@ class _LectorNBT:
                 self.carga(sub, f"{nombre}[]", profundidad + 1)
         else:  # 10: compuesto
             while (t := self._leer(1)[0]) != 0:
-                self.carga(t, self._cadena(), profundidad + 1)
+                self.carga(t, f"{nombre}.{self._cadena()}" if nombre else self._cadena(), profundidad + 1)
 
     def leer(self) -> list[tuple[str, str]]:
         try:
@@ -291,9 +291,13 @@ def _cadenas_nbt(datos: bytes) -> Iterator[tuple[str, str]]:
     crudo = _descomprimir_nbt(datos)
     if crudo is None:
         return
-    for nombre, valor in _LectorNBT(crudo).leer():
-        if nombre.lower().rstrip("[]") in ETIQUETAS_NBT:
-            yield nombre, valor
+    for ruta, valor in _LectorNBT(crudo).leer():
+        partes = [p.rstrip("[]").lower() for p in ruta.split(".")]
+        hoja, padre = partes[-1], partes[-2] if len(partes) > 1 else ""
+        if hoja in ("name", "lore") and padre != "display":
+            continue  # «Name» suelto es un id de bloque, un modificador o un jugador: solo cuenta display.Name
+        if hoja in ETIQUETAS_NBT:
+            yield ruta, valor
 
 
 _CLAVE_VALOR = re.compile(r'^\s*(?:[A-Z]:)?"?([\w.\- ]+?)"?\s*[=:]\s*(.+?)\s*$')
