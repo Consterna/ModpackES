@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.consterna.modpackes.sonda.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "modpackes_sonda.refmap.json",
+  "client": [
+    "ClientLanguageAccessor",
+    "FontMixin",
+    "LanguageManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

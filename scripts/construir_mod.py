@@ -1,8 +1,11 @@
 """Compila el mod de apoyo (ModpackES Runtime) y deja el jar donde la aplicación lo busca.
 
-Uso:  uv run python scripts/construir_mod.py [<proyecto de mod-runtime/> | todos] [--sin-pruebas]
+Uso:  uv run python scripts/construir_mod.py [<proyecto> | todos | sonda | sonda/<proyecto>] [--sin-pruebas]
 
-Sin nombre compila todos. Cada uno necesita su JDK (Forge: 17, y 8 para compilar 1.16.5; NeoForge y Fabric: 21,
+Sin nombre compila todos los del mod de apoyo. `sonda` compila la sonda de cobertura (`mod-runtime/sonda/`), un mod de
+desarrollo que el instalador no lleva: sus jars quedan en `build/sonda/` y no en la carpeta de la aplicación.
+
+Cada uno necesita su JDK (Forge: 17, y 8 para compilar 1.16.5; NeoForge y Fabric: 21,
 y Fabric 26.x: 25) y su Gradle, que se toman de JAVA_HOME (o JAVA_HOME_<versión>_X64) y de `.herramientas/` si
 existen, y acceso a internet la primera vez, para bajar el loader y Minecraft. El resultado queda en
 `src/traductor_es/recursos/mods/`, que Git ignora. En GitHub Actions el jar lo construye el mismo comando
@@ -44,6 +47,18 @@ PROYECTOS = {
     "fabric-1.21.11": (21, "9.8.2"),
     "fabric-26.1": (25, "9.8.2"),
 }
+#: Sonda de cobertura (`mod-runtime/sonda/`): mide dentro del juego qué texto queda en inglés. Es solo para desarrollo,
+#: así que «todos» no la incluye y su jar no va a `DESTINO`, que es lo que empaqueta el instalador.
+SONDAS = {
+    "sonda/forge-1.20.1": (17, "8.8"),
+    "sonda/neoforge-1.21.1": (21, "9.2.1"),
+    "sonda/fabric-1.20.1": (21, "9.8.2"),
+}
+DESTINO_SONDA = RAIZ / "build" / "sonda"
+
+
+def _versiones(nombre: str) -> tuple[int, str]:
+    return SONDAS[nombre] if nombre in SONDAS else PROYECTOS[nombre]
 
 
 def _herramientas() -> Path:
@@ -77,11 +92,9 @@ def _version_de_java(java: Path) -> str:
     return subprocess.run([str(java), "-version"], capture_output=True, text=True, check=False).stderr
 
 
-def _gradle(proyecto: Path) -> list[str]:
+def _gradle(proyecto: Path, version: str) -> list[str]:
     envoltorio = proyecto / ("gradlew.bat" if os.name == "nt" else "gradlew")
-    local = (
-        HERRAMIENTAS / f"gradle-{PROYECTOS[proyecto.name][1]}" / "bin" / ("gradle.bat" if os.name == "nt" else "gradle")
-    )
+    local = HERRAMIENTAS / f"gradle-{version}" / "bin" / ("gradle.bat" if os.name == "nt" else "gradle")
     return [str(local)] if local.is_file() else [str(envoltorio)]  # el de .herramientas si está; si no, el del proyecto
 
 
@@ -122,7 +135,8 @@ def _ejecutar(orden: list[str], proyecto: Path, entorno: dict[str, str], espera:
 
 def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = None) -> int:
     proyecto = RAIZ / "mod-runtime" / nombre
-    jdk = _jdk(PROYECTOS[nombre][0])
+    java, version_de_gradle = _versiones(nombre)
+    jdk = _jdk(java)
     entorno = {**os.environ, "JAVA_HOME": str(jdk), "PATH": str(jdk / "bin") + os.pathsep + os.environ["PATH"]}
     hosts = HERRAMIENTAS / "hosts-java.txt"
     if hosts.is_file():
@@ -133,7 +147,8 @@ def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = No
         entorno.setdefault("GRADLE_USER_HOME", str(HERRAMIENTAS / "gradle-home"))
     # Con propiedades (`-P`) solo se comprueba que el mismo código compila y pasa sus pruebas con otra versión
     # de Minecraft: no se toca ningún jar.
-    orden = [*_gradle(proyecto), "test" if propiedades else "build", "--no-daemon", "--console=plain"]
+    tarea = "test" if propiedades else "build"
+    orden = [*_gradle(proyecto, version_de_gradle), tarea, "--no-daemon", "--console=plain"]
     orden += [f"-P{p}" for p in propiedades or []]
     if nombre in TOOLCHAINS:  # que Gradle encuentre el JDK de compilación sin bajarlo por su cuenta
         rutas = ",".join(str(_jdk(v)) for v in TOOLCHAINS[nombre])
@@ -143,33 +158,34 @@ def construir(nombre: str, sin_pruebas: bool, propiedades: list[str] | None = No
     codigo = _ejecutar(orden, proyecto, entorno)
     if codigo or propiedades:
         return codigo
+    es_sonda = nombre in SONDAS
+    mod_id = "modpackes_sonda" if es_sonda else "modpackes_runtime"
+    destino = DESTINO_SONDA if es_sonda else DESTINO
     jars = sorted(
-        j
-        for j in (proyecto / "build" / "libs").glob("modpackes_runtime-*.jar")
-        if not j.stem.endswith(("-sources", "-dev"))
+        j for j in (proyecto / "build" / "libs").glob(f"{mod_id}-*.jar") if not j.stem.endswith(("-sources", "-dev"))
     )
     if not jars:
         print(f"{nombre}: la compilación terminó pero no hay jar en build/libs.", file=sys.stderr)
         return 1
-    DESTINO.mkdir(parents=True, exist_ok=True)
-    for viejo in DESTINO.glob(f"modpackes_runtime-{nombre}-*.jar"):
+    destino.mkdir(parents=True, exist_ok=True)
+    for viejo in destino.glob(f"{mod_id}-{proyecto.name}-*.jar"):
         viejo.unlink()
-    final = DESTINO / jars[-1].name
+    final = destino / jars[-1].name
     shutil.copyfile(jars[-1], final)
-    print(f"Mod de apoyo listo: {final}")
+    print(f"Sonda lista: {final}" if es_sonda else f"Mod de apoyo listo: {final}")
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("proyecto", nargs="?", default="todos", choices=[*PROYECTOS, "todos"])
+    ap.add_argument("proyecto", nargs="?", default="todos", choices=[*PROYECTOS, "todos", *SONDAS, "sonda"])
     ap.add_argument("--sin-pruebas", action="store_true", help="compila sin correr las pruebas de Java")
     ap.add_argument(
         "--propiedad", action="append", metavar="CLAVE=VALOR", default=[],
         help="prueba el mismo código con otra versión (p. ej. minecraft_version=1.21.8); no genera jar",
     )  # fmt: skip
     args = ap.parse_args()
-    elegidos = list(PROYECTOS) if args.proyecto == "todos" else [args.proyecto]
+    elegidos = {"todos": list(PROYECTOS), "sonda": list(SONDAS)}.get(args.proyecto, [args.proyecto])
     for nombre in elegidos:
         if (codigo := construir(nombre, args.sin_pruebas, args.propiedad)) != 0:
             return codigo
