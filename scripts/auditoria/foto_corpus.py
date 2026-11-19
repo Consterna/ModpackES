@@ -32,8 +32,8 @@ SOLO_FECHA = (".jar",)
 #: Lo que escribe la app y que restaurar no borra a propósito: el resource pack (basta con desactivarlo) y su carpeta
 #: de copias. Antes y después de cada foto se borran, para que cada pasada empiece igual.
 PROPIO_DE_LA_APP = ("traductor_es/", "resourcepacks/Traduccion_ES/")
-#: Lo que deja `restaurar` en un archivo que la app creó (no existía): vacío o un SNBT vacío.
-NEUTROS = frozenset({b"", b"{ }", b"{}"})
+#: Metadatos que cambian en cada corrida (fecha, índice de cambios con los módulos que hubo): no son traducciones.
+METADATOS = frozenset({"resourcepacks/Traduccion_ES/traductor_es.json", "traductor_es/registro.json"})
 #: Un subconjunto que cubre todas las fuentes (misiones, libros, scripts, datos, shaders, FancyMenu, descripciones,
 #: Origins) y versiones de 1.7.10 a 26.x. Los 47 packs, dos veces, tardan unas 8 horas.
 REPRESENTATIVOS = (
@@ -98,24 +98,29 @@ def foto(pack: Path) -> dict[str, Any]:
     juego = juego_de(pack)
     limpiar(juego)
     antes = huellas(juego)
+    opciones = (juego / "options.txt").read_bytes() if (juego / "options.txt").is_file() else None
     _modpackes("traducir", str(pack), "--simular")
     despues = huellas(juego)
     escritos = {k: v for k, v in despues.items() if antes.get(k) != v}
     _modpackes("restaurar", str(pack))
-    # Un archivo que la app creó (p. ej. lang/es_mx.snbt de FTB Quests) queda con su contenido neutro al restaurar
-    # («{ }»: FTB Quests vuelve al inglés), por diseño de salida/copias.py. Se acepta y se borra, para que el
-    # corpus quede como se bajó.
-    for k in set(huellas(juego)) - set(antes):
-        archivo = juego / k
-        if not k.startswith(PROPIO_DE_LA_APP) and archivo.read_bytes().strip() in NEUTROS:
-            archivo.unlink()
+    # Por diseño (salida/copias.py), un archivo que la app CREÓ no se borra al restaurar: queda con su contenido
+    # neutro (FTB Quests «{ }», un libro propio con su inglés), que el juego muestra como el original. Se anota aparte
+    # y se borra, para que el corpus quede como se bajó. options.txt tampoco se toca al restaurar (el pack sigue
+    # activado): se anota y se devuelve a como estaba.
     final = huellas(juego)
+    creados = sorted(k for k in set(final) - set(antes) if not k.startswith(PROPIO_DE_LA_APP))
+    for k in creados:
+        (juego / k).unlink()
+    opciones_cambiadas = antes.get("options.txt") != final.get("options.txt")
+    if opciones_cambiadas and opciones is not None:
+        (juego / "options.txt").write_bytes(opciones)
     distintos = sorted(
-        k for k in set(antes) | set(final)
-        if antes.get(k) != final.get(k) and not k.startswith(PROPIO_DE_LA_APP)
+        k for k in antes
+        if k != "options.txt" and antes.get(k) != final.get(k) and not k.startswith(PROPIO_DE_LA_APP)
     )  # fmt: skip
     limpiar(juego)
-    return {"pack": pack.name, "escritos": escritos, "no_restaurados": distintos}
+    return {"pack": pack.name, "escritos": escritos, "no_restaurados": distintos, "creados_neutros": creados,
+            "opciones_activadas": opciones_cambiadas}  # fmt: skip
 
 
 def main() -> int:
@@ -147,7 +152,7 @@ def main() -> int:
             destino.write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
         elif destino.is_file():
             base: dict[str, str] = json.loads(destino.read_text(encoding="utf-8"))["escritos"]
-            cambiados = sorted(k for k in base if r["escritos"].get(k) != base[k])
+            cambiados = sorted(k for k in base if r["escritos"].get(k) != base[k] and k not in METADATOS)
             nuevos = sorted(set(r["escritos"]) - set(base))
             if cambiados:
                 problemas.append(f"{len(cambiados)} archivos que ya escribía salen distintos: {cambiados[:5]}")
@@ -160,6 +165,9 @@ def main() -> int:
         fallos += bool(problemas)
         marca = "✗" if problemas else "✓"
         detalle = "; ".join(problemas) or f"{len(r['escritos'])} archivos escritos, restaurado byte por byte"
+        extra = [f"{len(r['creados_neutros'])} creados que quedan neutros"] if r["creados_neutros"] else []
+        extra += ["options.txt con el pack activado"] if r["opciones_activadas"] else []
+        detalle += f" (por diseño: {', '.join(extra)})" if extra else ""
         sys.stdout.buffer.write(f"{marca} {pack.name}: {detalle}\n".encode())
     return 1 if fallos else 0
 
