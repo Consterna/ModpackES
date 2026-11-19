@@ -26,7 +26,7 @@ ADDON = {
             "powers": ["animal:x"],
             "icon": "minecraft:lime_dye",
             "impact": 1,
-        }  # fmt: skip
+        }
     ),
     "data/animal/powers/sub/climb.json": json.dumps(
         {
@@ -34,7 +34,7 @@ ADDON = {
             "name": "Wall Climber",
             "description": "You can climb walls.",
             "condition": {"type": "apoli:sneaking", "name": "fall"},
-        }  # fmt: skip
+        }
     ),
     "data/animal/origin_layers/main.json": json.dumps({"name": {"text": "Animal Layer"}, "origins": []}),
     # ya es una clave de idioma conocida: la traduce el módulo de mods
