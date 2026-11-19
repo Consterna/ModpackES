@@ -122,6 +122,27 @@ def test_el_lector_de_rangos(rango: str, version: str, esperado: bool) -> None:
     assert _acepta(rango, Version.de(version)) is esperado
 
 
+# ------------------------------------------------------------------ codificación de los metadatos del jar
+def _proyectos_con_sonda() -> list[Path]:
+    sondas = PROYECTOS / "sonda"
+    return [PROYECTOS / p for p in _proyectos_de_mod_runtime()] + sorted(
+        p for p in sondas.iterdir() if (p / "build.gradle").is_file()
+    )
+
+
+@pytest.mark.parametrize("proyecto", _proyectos_con_sonda(), ids=lambda p: p.relative_to(PROYECTOS).as_posix())
+def test_las_tildes_llegan_bien_a_los_metadatos(proyecto: Path) -> None:
+    """Gradle lee `gradle.properties` como ISO-8859-1: una «ñ» escrita tal cual llega como «Ã±» a la descripción del mod.
+
+    Por eso las tildes van escapadas (`\\u00f1`), y los metadatos se escriben en UTF-8 sea cual sea el sistema (en
+    Windows con Java 17 saldrían en cp1252).
+    """
+    for n, linea in enumerate((proyecto / "gradle.properties").read_text(encoding="utf-8").splitlines(), 1):
+        if not linea.lstrip().startswith("#"):
+            assert linea.isascii(), f"{proyecto.name}/gradle.properties:{n} tiene tildes sin escapar: {linea[:60]}"
+    assert "filteringCharset = 'UTF-8'" in (proyecto / "build.gradle").read_text(encoding="utf-8")
+
+
 # ------------------------------------------------------------------ reintentos de red al compilar
 def _comando(tmp_path: Path, mensaje: str, falla_primeras: int) -> list[str]:
     """Un «Gradle» de mentira: escribe `mensaje`, cuenta cuántas veces corre y falla las primeras `falla_primeras`."""
