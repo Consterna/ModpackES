@@ -148,6 +148,27 @@ Lo que sí se ve y queda en inglés, ordenado por cuántos packs lo tienen:
 | Menú de **CustomMainMenu** (1.12) y anuncio de BisectHost (`bhmenu-client.toml`) | 8 y 5 | 44 y ≈ 30 | Formatos de un solo mod; poco texto. |
 | `splashes.txt` de mods y packs | 7 | ≈ 85 | Un solo archivo para todos los idiomas: reemplazarlo cambia los splash también para quien juegue en inglés con el pack activo. |
 
+### Dentro del juego · NeoForge 1.21.1 (Create Ultimate, 81 mods)
+
+**Cómo se probó.**
+- La instancia se tradujo con el simulador, así que todo lo que la app tradujo empieza con «ES».
+- Se abrió en un Prism Launcher portátil con la sonda (`mod-runtime/sonda/neoforge-1.21.1`) y el juego en `es_mx`.
+- `analizar_sonda.py --con-app` clasificó cada clave del idioma cargado.
+
+**Lo que costó.** La red de este PC falla a ratos con el DNS. El instalador de NeoForge se quedó en un diálogo de error al no
+poder bajar los mappings de Mojang. `completar_prism.py` los bajó con reintentos y la IP de respaldo, con el sha1
+verificado, sin tocar el DNS ni el archivo hosts del sistema.
+
+| Claves del idioma cargado (34.619) | Cuántas | Qué son |
+|---|---|---|
+| Traducidas por la app (llevan «ES») | 13.159 | |
+| En inglés que la app tenía | 1.341 | El simulador no pasa la regla de «quedó en inglés» (su respuesta repite el original): con un motor real se traducen o se reintentan. |
+| En inglés de archivos que la app ve | 12 | Nombres propios de Ponder («Peter», «Albert») y nombres de logros que el mod deja igual en su español. |
+| Iguales en el español del propio juego | 129 | El `es_mx` oficial de Mojang las deja así («Badlands», «Allium»). Correcto. |
+| **Del loader** (NeoForge y etiquetas `c`) | 281 + ≈ 470 | **Brecha real**: su jar está en `libraries/` del launcher, fuera de `mods/`. NeoForge trae `es_es` pero no `es_mx`, y lo que falta en un idioma cae al inglés. Se arregló con el módulo «Textos del loader». |
+
+Antes de la sonda, ningún análisis de archivos podía ver esta brecha: es justo para lo que se pensó la prueba en el juego.
+
 **La calidad no cambió.** `puerta_calidad.py`, con las respuestas grabadas de los bancos de interfaz, libros y misiones, dio
 idéntico a la línea base después de cada arreglo: las mismas traducciones, las mismas métricas y ningún pedido nuevo.
 

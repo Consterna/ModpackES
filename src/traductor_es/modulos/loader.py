@@ -123,8 +123,9 @@ class IdiomaDelLoader:
             for idioma, textos in por_idioma.items():
                 if idioma.startswith("es_"):
                     destino = self._espanol.setdefault(idioma, {})
-                    # Es la traducción oficial del loader: vale aunque se escriba igual («Mods»), como en el juego
-                    destino.update({k: v for k, v in textos.items() if k in ingles and v.strip()})
+                    # Como en los mods: un «español» idéntico al inglés es un texto que nadie tradujo (el es_es de
+                    # NeoForge trae así sus comandos); se manda al motor, que deja igual lo que se escribe igual
+                    destino.update({k: v for k, v in textos.items() if k in ingles and v.strip() and v != ingles[k]})
         con_espanol = {c for por in self._espanol.values() for c in por}
         return [Pieza(t, PISTA) for c, t in self._ingles.items() if c not in con_espanol]
 

@@ -64,10 +64,11 @@ def test_copia_el_espanol_del_loader_y_traduce_lo_que_falta(tmp_path: Path, memo
     assert es_mx == {
         "commands.neoforge.tps": "Tick medio: %s ms",  # el es_es del loader, copiado sin gastar
         "tag.item.c.ingots": "«ES» Ingots",  # el espacio `c` solo trae inglés: se traduce
-    }  # «Mods» es igual en español: no hace falta
-    # es_es ya lo trae el loader: solo va lo que le falta
+        "fml.menu.mods": "«ES» Mods",  # el es_es lo trae igual al inglés (sin traducir): va al motor
+    }
+    # es_es ya trae lo traducido: solo va lo que le falta o quedó en inglés
     es_es = json.loads((carpeta / "es_es.json").read_text(encoding="utf-8"))
-    assert es_es == {"tag.item.c.ingots": "«ES» Ingots"}
+    assert es_es == {"tag.item.c.ingots": "«ES» Ingots", "fml.menu.mods": "«ES» Mods"}
     assert {p.name for p in carpeta.iterdir()} == {f"{v}.json" for v in VARIANTES}
 
 
