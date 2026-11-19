@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import http.client
+import io
 import json
 import socket
 import ssl
@@ -41,12 +42,13 @@ class _Conexion(http.client.HTTPSConnection):
     """HTTPS a una IP fija, con el nombre del host para SNI y para verificar el certificado."""
 
     def __init__(self, host: str, ip: str, timeout: float) -> None:
-        super().__init__(host, timeout=timeout, context=ssl.create_default_context())
+        self._contexto = ssl.create_default_context()
+        super().__init__(host, timeout=timeout, context=self._contexto)
         self._ip = ip
 
     def connect(self) -> None:
         crudo = socket.create_connection((self._ip, self.port or 443), self.timeout)
-        self.sock = cast(ssl.SSLContext, self._context).wrap_socket(crudo, server_hostname=self.host)  # pyright: ignore[reportAttributeAccessIssue]
+        self.sock = self._contexto.wrap_socket(crudo, server_hostname=self.host)
 
 
 def _bajar(url: str, destino: Path, sha1: str | None, intentos: int = 8) -> bool:
@@ -93,11 +95,18 @@ def _artefactos(meta: dict[str, Any]) -> list[tuple[str, str, str | None]]:
     for lib in cast(list[dict[str, Any]], [*meta.get("libraries", []), *meta.get("mavenFiles", []),
                                            *([meta["mainJar"]] if "mainJar" in meta else [])]):  # fmt: skip
         descargas = cast(dict[str, Any], lib.get("downloads", {}))
-        for art in [descargas.get("artifact"), *cast(dict[str, Any], descargas.get("classifiers", {})).values()]:
-            if isinstance(art, dict) and art.get("url"):
-                a = cast(dict[str, Any], art)
+        candidatos: list[object] = [
+            descargas.get("artifact"),
+            *cast(dict[str, Any], descargas.get("classifiers", {})).values(),
+        ]
+        for art in candidatos:
+            if not isinstance(art, dict):
+                continue
+            a = cast(dict[str, Any], art)
+            if a.get("url"):
                 ruta = a.get("path") or _ruta_maven(str(lib.get("name", "")), str(a["url"]))
-                salida.append((str(a["url"]), str(ruta), a.get("sha1")))
+                sha1 = a.get("sha1")
+                salida.append((str(a["url"]), str(ruta), str(sha1) if sha1 else None))
     return salida
 
 
@@ -131,5 +140,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
+    salida_estandar = cast(io.TextIOWrapper, sys.stdout)
+    if hasattr(salida_estandar, "reconfigure"):
+        salida_estandar.reconfigure(encoding="utf-8")
     raise SystemExit(main())
