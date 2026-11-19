@@ -91,3 +91,45 @@ def test_sin_jar_del_loader_no_hace_nada(tmp_path: Path, mc: str, loader: str) -
         modulo = IdiomaDelLoader(Contexto(inst, Respaldo(juego), pack=PackSalida(inst)))
         assert not modulo.detectar()
         assert modulo.recolectar() == []
+
+
+def _fml(libs: Path, version: str, texto: str) -> None:
+    fabrica.jar(
+        libs / "net" / "neoforged" / "fancymodloader" / "loader" / version / f"loader-{version}.jar",
+        {"lang/en_us.json": json.dumps({"fml.menu.loadingmods": texto}), "lang/es_es.json": "{}"},
+    )
+
+
+def test_fancymodloader_suma_su_idioma_de_la_raiz_del_jar(tmp_path: Path, memoria: Memoria) -> None:
+    juego, libs = _prism(tmp_path)
+    _neoforge(libs, "21.1.250", {"fml.menu.mods": "Mods"}, {})
+    _fml(libs, "4.0.44", "Loading mods")
+    modulo, carpeta = _traducir(juego, memoria)
+    assert modulo._fml is not None  # pyright: ignore[reportPrivateUsage]
+    assert (
+        json.loads((carpeta / "es_mx.json").read_text(encoding="utf-8"))["fml.menu.loadingmods"] == "«ES» Loading mods"
+    )
+
+
+def test_con_varias_versiones_de_fml_usa_la_que_nombra_la_metadata(tmp_path: Path, memoria: Memoria) -> None:
+    juego, libs = _prism(tmp_path)
+    _neoforge(libs, "21.1.250", {"fml.menu.mods": "Mods"}, {})
+    _fml(libs, "4.0.44", "Loading mods (4.0.44)")
+    _fml(libs, "7.0.2", "Loading mods (7.0.2)")
+    meta = libs.parent / "meta" / "net.neoforged" / "21.1.250.json"
+    meta.parent.mkdir(parents=True)
+    meta.write_text(json.dumps({"libraries": [{"name": "net.neoforged.fancymodloader:loader:4.0.44"}],
+                                "version": "21.1.250"}), encoding="utf-8")  # fmt: skip
+    modulo, carpeta = _traducir(juego, memoria)
+    assert modulo._fml is not None and modulo._fml.parent.name == "4.0.44"  # pyright: ignore[reportPrivateUsage]
+    es_mx = json.loads((carpeta / "es_mx.json").read_text(encoding="utf-8"))
+    assert es_mx["fml.menu.loadingmods"] == "«ES» Loading mods (4.0.44)"
+
+
+def test_con_varias_versiones_de_fml_y_sin_metadata_no_adivina(tmp_path: Path, memoria: Memoria) -> None:
+    juego, libs = _prism(tmp_path)
+    _neoforge(libs, "21.1.250", {"fml.menu.mods": "Mods"}, {})
+    _fml(libs, "4.0.44", "A")
+    _fml(libs, "7.0.2", "B")
+    modulo, _ = _traducir(juego, memoria)
+    assert modulo._fml is None  # pyright: ignore[reportPrivateUsage]
