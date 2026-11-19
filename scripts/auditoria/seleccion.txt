@@ -48,3 +48,8 @@ modrinth:skyblock-plus                # 1.21.1 fabric
 modrinth:lost-world-the-broken-script # 1.21.1 neoforge · misiones
 modrinth:ba-plus                      # 26.1.2 neoforge
 modrinth:legacies                     # 26.1.2 fabric · logros, funciones
+
+# --- Origins (el catálogo pide al menos 2 packs por fuente)
+modrinth:ultimate-origins-modpack     # 1.19.2 / 1.20.1 fabric
+modrinth:rpg-origins-rise-of-power    # 1.21.1 fabric
+modrinth:osmp                         # 1.21.x fabric
