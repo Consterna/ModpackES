@@ -46,9 +46,14 @@ EJEMPLOS = 4
 _ESPACIOS = re.compile(r"\s+")
 
 
+_BORDES = re.compile(r"^(?:[#>*+\-|]+\s*|\d+\.\s+)+|[\s\"'“”«»]+$")
+
+
 def normal(texto: str) -> str:
-    """Para comparar: sin códigos de formato, sin espacios de más y en minúscula."""
-    return _ESPACIOS.sub(" ", sin_codigos(texto)).strip().lower()
+    """Para comparar: sin códigos de formato, sin marcas de markdown al inicio, sin comillas en los bordes, sin
+    espacios de más y en minúscula."""
+    limpio = _ESPACIOS.sub(" ", sin_codigos(texto)).strip().lower()
+    return _BORDES.sub("", limpio).strip(" \"'“”«»")
 
 
 @dataclass(slots=True)
@@ -61,7 +66,7 @@ class LadoApp:
 
     def indexar(self) -> None:
         for t in self.textos:
-            for p in set(re.findall(r"[a-z']{4,}", t)):
+            for p in set(re.findall(r"[a-z']{3,}", t)):
                 self._por_palabra[p].append(t)
 
     def cubre(self, texto: str) -> bool:
@@ -69,10 +74,12 @@ class LadoApp:
         n = normal(texto)
         if not n or n in self.textos:
             return True
-        palabras = sorted(set(re.findall(r"[a-z']{4,}", n)), key=len, reverse=True)
-        if not palabras:
-            return False
-        return any(len(t) >= 8 and (t in n or n in t) for t in self._por_palabra.get(palabras[0], ()))
+        # Candidatos por cualquiera de sus palabras: en un componente JSON la más larga suele ser una clave
+        # («underlined», «clickevent»), no el texto
+        for palabra in set(re.findall(r"[a-z']{3,}", n)):
+            if any(len(t) >= 8 and (t in n or n in t) for t in self._por_palabra.get(palabra, ())):
+                return True
+        return False
 
 
 def lado_app(instancia: Path, java: bool) -> LadoApp:
