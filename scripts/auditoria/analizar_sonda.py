@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from inventario import es_frase_inglesa, sin_codigos
 
 MARCA = "«ES»"
+_ESPACIOS = re.compile(r"\s+")
 _CLAVE_CRUDA = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_\-]+){2,}$")
 
 
@@ -69,7 +70,15 @@ def claves_en_archivos(juego: Path) -> set[str]:
     return claves
 
 
-def analizar(instancia: Path) -> dict[str, Any]:
+def textos_de_la_app(instancia: Path) -> set[str]:
+    """Lo que la app recoge para traducir en esa instancia (normalizado): para separar lo que tuvo y el simulador
+    rechazó (su respuesta, «ES» + el original, no pasa la regla de «quedó en inglés») de lo que nunca vio."""
+    from comparar_cobertura import lado_app  # noqa: PLC0415 (importa la app: solo si se pide)
+
+    return lado_app(instancia, java=False).textos
+
+
+def analizar(instancia: Path, con_app: bool = False) -> dict[str, Any]:
     juego = _juego(instancia)
     carpeta = juego / "modpackes-sonda"
     idioma: dict[str, Any] = json.loads((carpeta / "idioma.json").read_text(encoding="utf-8"))
@@ -79,6 +88,8 @@ def analizar(instancia: Path) -> dict[str, Any]:
     en_archivos = claves_en_archivos(juego)
     en_ingles: list[dict[str, str]] = []
     de_ejecucion: list[dict[str, str]] = []
+    rechazadas: list[dict[str, str]] = []
+    de_la_app = textos_de_la_app(instancia) if con_app else set[str]()
     traducidas = 0
     for clave, e in entradas.items():
         valor = str(e.get("valor", ""))
@@ -88,13 +99,17 @@ def analizar(instancia: Path) -> dict[str, Any]:
         if not es_frase_inglesa(valor, "text"):
             continue
         fila = {"clave": clave, "valor": valor[:160]}
-        (en_ingles if clave in en_archivos else de_ejecucion).append(fila)
+        if de_la_app and _ESPACIOS.sub(" ", sin_codigos(valor)).strip().lower() in de_la_app:
+            rechazadas.append(fila)  # la app lo tuvo: lo dejó en inglés la validación (con el simulador)
+        else:
+            (en_ingles if clave in en_archivos else de_ejecucion).append(fila)
     resultado: dict[str, Any] = {
         "idioma_del_juego": idioma.get("idioma"),
         "claves_cargadas": len(entradas),
         "con_marca_de_traduccion": traducidas,
         "en_ingles_de_archivos": len(en_ingles),
         "en_ingles_creadas_al_jugar": len(de_ejecucion),
+        "en_ingles_que_la_app_tenia": len(rechazadas),
         "por_espacio_de_archivos": Counter(f["clave"].split(".")[1] if f["clave"].count(".") else "?"
                                            for f in en_ingles).most_common(25),
         "ejemplos_de_archivos": en_ingles[:40],
@@ -131,8 +146,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("instancia", type=Path)
     ap.add_argument("--salida", type=Path)
+    ap.add_argument("--con-app", action="store_true", help="separar lo que la app recogió (tarda: lee la instancia)")
     args = ap.parse_args()
-    r = analizar(args.instancia)
+    r = analizar(args.instancia, args.con_app)
     texto = json.dumps(r, ensure_ascii=False, indent=2)
     if args.salida:
         args.salida.parent.mkdir(parents=True, exist_ok=True)
