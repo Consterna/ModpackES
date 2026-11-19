@@ -23,10 +23,26 @@ from pathlib import Path
 from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from descargar_corpus import RAIZ as DESCARGAS
 from inventario import es_frase_inglesa, sin_codigos
 
 MARCA = "«ES»"
+#: Claves del propio loader (su jar vive en libraries/, fuera de la instancia).
+PREFIJOS_LOADER = ("fml.", "neoforge.", "commands.neoforge.", "commands.config.", "forge.", "commands.forge.",
+                   "loadwarning.", "fabric.", "modmenu.", "quilt.")  # fmt: skip
+VANILLA = DESCARGAS / "vanilla" / "en_us.json"  # copia local del idioma de Minecraft
+
+
+def claves_del_juego() -> set[str]:
+    """Las claves del idioma de Minecraft (copia local de su en_us), o ninguna si no está."""
+    try:
+        return set(cast(dict[str, Any], json.loads(VANILLA.read_text(encoding="utf-8"))))
+    except (OSError, ValueError):
+        return set()
+
+
 _ESPACIOS = re.compile(r"\s+")
 _CLAVE_CRUDA = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_\-]+){2,}$")
 
@@ -88,6 +104,9 @@ def analizar(instancia: Path, con_app: bool = False) -> dict[str, Any]:
     en_archivos = claves_en_archivos(juego)
     en_ingles: list[dict[str, str]] = []
     de_ejecucion: list[dict[str, str]] = []
+    del_juego: list[dict[str, str]] = []
+    del_loader: list[dict[str, str]] = []
+    vanilla = claves_del_juego()
     rechazadas: list[dict[str, str]] = []
     de_la_app = textos_de_la_app(instancia) if con_app else set[str]()
     traducidas = 0
@@ -101,8 +120,14 @@ def analizar(instancia: Path, con_app: bool = False) -> dict[str, Any]:
         fila = {"clave": clave, "valor": valor[:160]}
         if de_la_app and _ESPACIOS.sub(" ", sin_codigos(valor)).strip().lower() in de_la_app:
             rechazadas.append(fila)  # la app lo tuvo: lo dejó en inglés la validación (con el simulador)
+        elif clave in en_archivos:
+            en_ingles.append(fila)
+        elif clave in vanilla:
+            del_juego.append(fila)  # el español oficial del juego lo deja igual (p. ej. «Badlands» en es_mx)
+        elif clave.startswith(PREFIJOS_LOADER):
+            del_loader.append(fila)
         else:
-            (en_ingles if clave in en_archivos else de_ejecucion).append(fila)
+            de_ejecucion.append(fila)
     resultado: dict[str, Any] = {
         "idioma_del_juego": idioma.get("idioma"),
         "claves_cargadas": len(entradas),
@@ -110,6 +135,9 @@ def analizar(instancia: Path, con_app: bool = False) -> dict[str, Any]:
         "en_ingles_de_archivos": len(en_ingles),
         "en_ingles_creadas_al_jugar": len(de_ejecucion),
         "en_ingles_que_la_app_tenia": len(rechazadas),
+        "igual_en_el_espanol_del_juego": len(del_juego),
+        "en_ingles_del_loader": len(del_loader),
+        "ejemplos_del_loader": del_loader[:30],
         "por_espacio_de_archivos": Counter(f["clave"].split(".")[1] if f["clave"].count(".") else "?"
                                            for f in en_ingles).most_common(25),
         "ejemplos_de_archivos": en_ingles[:40],

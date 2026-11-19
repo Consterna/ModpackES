@@ -22,6 +22,7 @@ from .modulos import (
     descripciones,
     fancymenu,
     libros,
+    loader,
     misiones,
     mods,
     origins,
@@ -414,6 +415,7 @@ class Proceso:
             lista.append(("mods", shaders.Shaders(ctx)))  # un archivo por idioma: también en la versión de España
             lista.append(("mods", descripciones.Descripciones(ctx)))
             lista.append(("mods", origins.Origins(ctx)))
+            lista.append(("mods", loader.IdiomaDelLoader(ctx)))
         if "scripts" in self.grupos and not ctx.solo_por_idioma:  # un solo idioma por archivo, como los scripts
             lista.append(("scripts", fancymenu.FancyMenu(ctx)))
         return lista
