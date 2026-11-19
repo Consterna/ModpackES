@@ -101,6 +101,35 @@ añádela también a `CARPETAS` en `tests/test_corpus_datos.py` y vuelve a bajar
 Las 3 pruebas del corpus que se saltan son modpacks sin texto para el jugador (`technical-electrical`, `supernova-empires-2` y
 los datapacks de `better-mc-neoforge-bmc5`).
 
+### Una fuente nueva no puede cambiar la calidad de lo que ya se traduce
+
+Una fuente de texto que la app no conocía (otro mod, otra carpeta) va en **su propio módulo**. Se agrega al final en
+`Proceso._fuentes_nuevas` (`proceso.py`) y no alimenta el glosario. Así los lotes, las pistas y los pedidos de los módulos
+de antes salen idénticos. Si escribe claves de idioma, que sea en un espacio propio del resource pack
+(`assets/modpackes_<algo>/lang/`), no en el archivo que escribe el módulo de mods. Antes de cada commit:
+
+```
+uv run python scripts/auditoria/puerta_calidad.py     # los bancos con respuestas grabadas: debe salir «idéntico»
+```
+
+La línea base se guarda una vez con `--guardar` (en `build/base_calidad/`) y no se cambia mientras dure el trabajo. Si un
+cambio toca algo que llega al motor (máscara, pistas, glosario, filtros), la puerta lo dice. Entonces se mide como en
+[docs/calidad.md](docs/calidad.md): tres corridas, bootstrap pareado y juez en los dos órdenes.
+
+### Auditoría de cobertura
+
+[docs/cobertura.md](docs/cobertura.md) explica cómo se mide qué texto queda en inglés. Las herramientas están en
+`scripts/auditoria/` y el corpus va en `C:\dev\corpus-modpacks` (o `MODPACKES_CORPUS`), fuera del repositorio:
+
+```
+uv run python scripts/auditoria/descargar_packs.py bajar --lista scripts/auditoria/seleccion.txt
+uv run python -I scripts/auditoria/inventario.py C:/dev/corpus-modpacks/<pack> --salida build/auditoria/<pack>
+uv run python scripts/auditoria/comparar_cobertura.py --todos             # brecha por patrón de ruta
+uv run python scripts/auditoria/foto_corpus.py --guardar --codigo RUTA/src  # foto «antes» con otra copia del código
+uv run python scripts/auditoria/foto_corpus.py                             # lo de antes sale igual y restaurar deja los bytes
+uv run python scripts/auditoria/analizar_sonda.py RUTA_DE_LA_INSTANCIA    # lo que vio la sonda dentro del juego
+```
+
 ## El mod de apoyo (Java)
 
 Cada carpeta de `mod-runtime/` (`forge-1.12.2`, `forge-1.16.5`, `forge-1.17.1`, `forge-1.18.2`, `forge-1.19.2`, `forge-1.20.1`, `neoforge-1.21.1`, `neoforge-1.21.4`, `neoforge-1.21.5`, `neoforge-1.21.11`, `neoforge-26.1`, `fabric-1.19.4`, `fabric-1.20.1`, `fabric-1.20.4`, `fabric-1.20.6`, `fabric-1.21.1`, `fabric-1.21.4`, `fabric-1.21.5`, `fabric-1.21.11`, `fabric-26.1`) es un mod solo de cliente que cambia, al mostrarlos, los textos que otros mods tienen en su código y que están en la tabla de la app. Todos comparten la lógica de tabla y plantillas, que vive en `mod-runtime/comun/` (la tabla es de todos; el reescritor tiene una variante por forma de guardar el texto: `reescritor-literal`, `reescritor-plano` para 1.20.3 en adelante, con `reescritor-plano-1215` solo para sus pruebas desde 1.21.5, donde cambió `ClickEvent`, y `reescritor-sin-reserva` para 1.19.2 `reescritor-texto` para 1.17.1 y 1.18.2, donde el texto aún es `TextComponent`, y `reescritor-1165` para 1.16.5, con los nombres antiguos de las clases, sin tooltips por elementos y en Java 8; por eso `Tabla` evita todo lo posterior a Java 8), y cada proyecto solo trae su gancho con el loader. Forge 1.12.2 se compila con ForgeGradle 2.3, Gradle 4.10.3 y Java 8 (contra Forge 14.23.5.2847, el último con el paquete `userdev` que pide ForgeGradle 2.3; sirve para toda la 14.23.5) y usa `reescritor-1122`, con `TextComponentString` y tooltips como cadenas con códigos «§»; Forge 1.16.5, 1.17.1, 1.18.2, 1.19.2 y 1.20.1 se compilan con ForgeGradle 6 y Java 17 (el de 1.16.5 compila su código con un JDK 8 y el de 1.17.1 pide un JDK 16 para ForgeGradle y genera código para Java 16; `construir_mod.py` se los pasa a Gradle como toolchain); NeoForge 1.21.1, con ModDevGradle, Gradle 9 y Java 21; NeoForge 26.1 (que sirve para 26.1 a 26.3), con Java 25 y un JDK 21 para bajar los assets; Fabric, con Loom 1.17, Gradle 9 y Java 21 (los de 1.19.4, 1.20.1 y 1.20.4 quedan compilados para Java 17; los de 1.20.6 en adelante, para Java 21); Fabric 26.1, con Loom 1.19 sin remapeo (Minecraft 26.x ya no está ofuscado) y Java 25:
