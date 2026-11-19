@@ -169,6 +169,20 @@ verificado, sin tocar el DNS ni el archivo hosts del sistema.
 
 Antes de la sonda, ningún análisis de archivos podía ver esta brecha: es justo para lo que se pensó la prueba en el juego.
 
+**Después del arreglo**, la misma instancia, traducida otra vez y vuelta a abrir:
+
+| | Antes | Después |
+|---|---|---|
+| Claves con la marca de traducción | 13.159 | 13.698 |
+| En inglés del loader | 281 | 71 |
+| En inglés creadas al jugar (etiquetas `c` y otras) | 430 | 2 |
+
+- Las 71 del loader que quedan son de FancyModLoader (`fml.loadingerrorscreen…`, `fml.messages…`), que es otro jar.
+  Solo se ven en la pantalla de error cuando un mod no carga.
+- Las 2 creadas al jugar son atajos de KubeJS («KubeJS», «Kubedex»), que son nombres propios.
+- Lo que quedó «en inglés que la app tenía» (1.331) es del simulador: con un motor real esos textos se traducen o se
+  reintentan.
+
 **La calidad no cambió.** `puerta_calidad.py`, con las respuestas grabadas de los bancos de interfaz, libros y misiones, dio
 idéntico a la línea base después de cada arreglo: las mismas traducciones, las mismas métricas y ningún pedido nuevo.
 
