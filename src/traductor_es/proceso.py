@@ -16,7 +16,7 @@ from typing import Self, cast
 from . import configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
-from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts
+from .modulos import crafttweaker, datos, libros, misiones, mods, runtime, scripts, shaders
 from .modulos.base import Contexto, Modulo, Pieza, Resumen, pendientes_de, por_ambito, reunir_pistas
 from .modulos.cambios import Cambios, Lugar, comparar, indice_de, leer_indice, mezclar, para_la_marca, sin_indice
 from .modulos.cobertura import Hallazgo, hallazgos_de_comandos, hallazgos_de_scripts, revisar_cobertura
@@ -368,6 +368,7 @@ class Proceso:
                 por_idioma.append(("libros", libros.Libros(ctx)))
             if "misiones" in self.grupos:
                 por_idioma.append(("misiones", misiones.FTBQuests(ctx)))
+            por_idioma += self._fuentes_nuevas(ctx)
             return [(g, m) for g, m in por_idioma if m.detectar()]
         lista: list[tuple[str, Modulo]] = []
         if "mods" in self.grupos:
@@ -384,7 +385,16 @@ class Proceso:
                 ("scripts", datos.Datos(self.ctx)),
                 ("scripts", crafttweaker.ScriptsCraftTweaker(self.ctx)),
             ]
+        lista += self._fuentes_nuevas(self.ctx)
         return [(g, m) for g, m in lista if m.detectar()]
+
+    def _fuentes_nuevas(self, ctx: Contexto) -> list[tuple[str, Modulo]]:
+        """Fuentes que se agregaron después de medir la calidad: van al final y no alimentan el glosario, así que los
+        pedidos de los módulos de antes no cambian (ver docs/cobertura.md)."""
+        lista: list[tuple[str, Modulo]] = []
+        if "mods" in self.grupos:
+            lista.append(("mods", shaders.Shaders(ctx)))  # un archivo por idioma: también en la versión de España
+        return lista
 
     # ------------------------------------------------------------------ acciones
     def _abrir_memoria(self) -> Memoria:
