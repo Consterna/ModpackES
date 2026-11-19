@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -28,8 +29,27 @@ CORPUS = Path(r"C:\dev\corpus-modpacks")
 FOTOS = RAIZ / "build" / "base_corpus"
 #: La app nunca toca los jars de mods: con su tamaño y fecha basta (leerlos todos tardaría minutos por pack).
 SOLO_FECHA = (".jar",)
-#: Lo que escribe la app y que restaurar no tiene por qué borrar (su índice, la marca, los informes).
-PROPIO_DE_LA_APP = ("traductor_es/",)
+#: Lo que escribe la app y que restaurar no borra a propósito: el resource pack (basta con desactivarlo) y su carpeta
+#: de copias. Antes y después de cada foto se borran, para que cada pasada empiece igual.
+PROPIO_DE_LA_APP = ("traductor_es/", "resourcepacks/Traduccion_ES/")
+#: Un subconjunto que cubre todas las fuentes (misiones, libros, scripts, datos, shaders, FancyMenu, descripciones,
+#: Origins) y versiones de 1.7.10 a 26.x. Los 47 packs, dos veces, tardan unas 8 horas.
+REPRESENTATIVOS = (
+    "ftb-1",
+    "ftb-100",
+    "ftb-102",
+    "ftb-115",
+    "ftb-125",
+    "ftb-130",
+    "modrinth-better-mc-forge-bmc4",
+    "modrinth-cobbleverse",
+    "modrinth-ultimate-origins-modpack",
+    "modrinth-rpg-origins-rise-of-power",
+    "modrinth-taidumcraft",
+    "modrinth-legacies",
+    "modrinth-spectral-creation",
+    "modrinth-the-lost-era",
+)
 
 
 def huellas(juego: Path) -> dict[str, str]:
@@ -65,9 +85,16 @@ def juego_de(pack: Path) -> Path:
     return pack / "minecraft" if (pack / "minecraft").is_dir() else pack
 
 
+def limpiar(juego: Path) -> None:
+    """Borra lo que la app deja a propósito (el resource pack y las copias): la instancia queda como se bajó."""
+    for carpeta in PROPIO_DE_LA_APP:
+        shutil.rmtree(juego / carpeta, ignore_errors=True)
+
+
 def foto(pack: Path) -> dict[str, Any]:
     """Traduce con el simulador, anota lo que cambió, restaura y comprueba que todo volvió a su estado."""
     juego = juego_de(pack)
+    limpiar(juego)
     antes = huellas(juego)
     _modpackes("traducir", str(pack), "--simular")
     despues = huellas(juego)
@@ -78,6 +105,7 @@ def foto(pack: Path) -> dict[str, Any]:
         k for k in set(antes) | set(final)
         if antes.get(k) != final.get(k) and not k.startswith(PROPIO_DE_LA_APP)
     )  # fmt: skip
+    limpiar(juego)
     return {"pack": pack.name, "escritos": escritos, "no_restaurados": distintos}
 
 
@@ -85,11 +113,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("packs", nargs="*", type=Path)
     ap.add_argument("--guardar", action="store_true")
+    ap.add_argument("--todos", action="store_true", help="los 47 packs del corpus (sin esto, los representativos)")
     ap.add_argument("--codigo", type=Path, help="carpeta `src` de otra copia de la app (p. ej. la del commit base)")
     args = ap.parse_args()
     if args.codigo:
         CODIGO.append(args.codigo.resolve())
-    packs: list[Path] = list(args.packs) or [p for p in sorted(CORPUS.iterdir()) if (p / "_estado.json").is_file()]
+    packs: list[Path] = list(args.packs) or [CORPUS / n for n in REPRESENTATIVOS]
+    if args.todos:
+        packs = [p for p in sorted(CORPUS.iterdir()) if (p / "_estado.json").is_file()]
     FOTOS.mkdir(parents=True, exist_ok=True)
     fallos = 0
     for pack in packs:
