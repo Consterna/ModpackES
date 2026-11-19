@@ -74,6 +74,43 @@ def test_jars_anidados(tmp_path: Path) -> None:
             c.cerrar()
 
 
+def test_jars_anidados_declarados_por_fabric_y_quilt_fuera_de_meta_inf(tmp_path: Path) -> None:
+    """Fabric carga los jars que lista `fabric.mod.json` → `jars` estén donde estén (Simple Pipes los deja en la
+    raíz); Quilt, los de `quilt_loader.jars`. Un jar suelto que nadie declara no se carga y no se lee."""
+    fabric = fabrica.jar(
+        tmp_path / "fabric.jar",
+        {"fabric.mod.json": json.dumps({"id": "pipes", "jars": [{"file": "pipes-base.jar"}]})},
+        {"pipes-base.jar": {"assets/pipes/lang/en_us.json": "{}"}, "suelto.jar": {"assets/x/lang/en_us.json": "{}"}},
+    )
+    quilt = fabrica.jar(
+        tmp_path / "quilt.jar",
+        {"quilt.mod.json": json.dumps({"quilt_loader": {"id": "q", "jars": ["libs/q-base.jar"]}})},
+        {"libs/q-base.jar": {"assets/q/lang/en_us.json": "{}"}},
+    )
+    for ruta, esperado in ((fabric, ["fabric.jar", "fabric.jar!/pipes-base.jar"]),
+                           (quilt, ["quilt.jar", "quilt.jar!/q-base.jar"])):  # fmt: skip
+        contenedores = list(abrir_mod(ruta))
+        try:
+            assert [c.nombre for c in contenedores] == esperado
+        finally:
+            for c in contenedores:
+                c.cerrar()
+
+
+def test_jar_declarado_que_tambien_esta_en_meta_inf_no_se_repite(tmp_path: Path) -> None:
+    ruta = fabrica.jar(
+        tmp_path / "padre.jar",
+        {"fabric.mod.json": json.dumps({"id": "p", "jars": [{"file": "META-INF/jars/hijo.jar"}]})},
+        {"META-INF/jars/hijo.jar": {"a.txt": "x"}},
+    )
+    contenedores = list(abrir_mod(ruta))
+    try:
+        assert [c.nombre for c in contenedores] == ["padre.jar", "padre.jar!/hijo.jar"]
+    finally:
+        for c in contenedores:
+            c.cerrar()
+
+
 def test_jar_corrupto_se_ignora(tmp_path: Path) -> None:
     roto = tmp_path / "roto.jar"
     roto.write_bytes(b"no es un zip")
