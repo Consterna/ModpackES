@@ -80,7 +80,9 @@ class Shaders:
         return self._con_iris() and bool(self._shaders())
 
     def describir(self) -> str:
-        return f"{contar(len(self._por_shader), 'shaderpack')}, {contar(len(self._ingles), 'texto')}"
+        if self._por_shader:  # después de recolectar
+            return f"{contar(len(self._por_shader), 'shaderpack')}, {contar(len(self._ingles), 'texto')}"
+        return contar(len(self._shaders()), "shaderpack")
 
     def recolectar(self) -> list[Pieza]:
         vistos: dict[str, set[str]] = {}

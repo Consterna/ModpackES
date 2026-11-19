@@ -84,6 +84,7 @@ class Descripciones:
     def __init__(self, ctx: Contexto) -> None:
         self.ctx = ctx
         self._descripciones: dict[str, str] = {}  #: id del mod → descripción en inglés (sin espacios en los bordes)
+        self._leidas: dict[str, str] | None = None  #: lo que se leyó de los jars (una vez)
 
     def _claves(self) -> tuple[str, ...]:
         """Las claves que lee la lista de mods de este loader y versión ("" si no hay)."""
@@ -95,10 +96,18 @@ class Descripciones:
         return ()
 
     def detectar(self) -> bool:
-        return bool(self._claves()) and bool(self.ctx.instancia.jars())
+        """Solo si la lista de mods lee una clave y algún mod trae descripción (si no, no hay nada que hacer)."""
+        return bool(self._claves()) and bool(self._leidas_una_vez())
+
+    def _leidas_una_vez(self) -> dict[str, str]:
+        if self._leidas is None:
+            self._leidas = self._leer()
+        return self._leidas
 
     def describir(self) -> str:
-        return contar(len(self._descripciones), "mod")
+        if self._descripciones:  # después de recolectar
+            return contar(len(self._descripciones), "mod")
+        return "lista de mods (Mod Menu)" if self._claves() == (CLAVE_MOD_MENU,) else "lista de mods (NeoForge)"
 
     def _leer(self) -> dict[str, str]:
         lectores = {"fabric.mod.json": _de_fabric, "quilt.mod.json": _de_quilt,
@@ -127,7 +136,7 @@ class Descripciones:
 
     def recolectar(self) -> list[Pieza]:
         claves = self._claves()
-        self._descripciones = self._leer() if claves else {}
+        self._descripciones = dict(self._leidas_una_vez()) if claves else {}
         # El mod que ya trae su descripción en español (en su propio idioma) se respeta
         tabla = self.ctx.instancia.tabla_idiomas()
         buscadas = {c.format(id=ident): ident for ident in self._descripciones for c in claves}

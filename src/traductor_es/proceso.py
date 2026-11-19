@@ -213,6 +213,12 @@ def lugares_de(modulo: Modulo, piezas: list[Pieza]) -> list[Lugar]:
     return [Lugar(modulo.nombre, [p.texto for p in piezas])]
 
 
+#: Sin options.txt (una instancia que nunca se abrió) el pack no se puede activar ni poner el idioma.
+AVISO_SIN_OPCIONES = (
+    "Esta instancia todavía no tiene options.txt (nunca se abrió el juego): el juego seguirá en inglés hasta que "
+    "actives «Traduccion_ES» en Opciones ▸ Paquetes de recursos y elijas Español en Idioma. También puedes abrir el "
+    "juego una vez, cerrarlo y volver a traducir: la app lo activa sola."
+)
 #: El dialecto que se traduce aparte con `tambien_es_es`.
 DIALECTO_ESPANA = "es_es"
 #: Lo que se agrega al nombre de un módulo en la segunda pasada.
@@ -557,6 +563,8 @@ class Proceso:
                 )  # fmt: skip
             except ValueError as e:
                 informe.avisos.append(str(e))
+            if not (self.instancia.juego / "options.txt").is_file():
+                informe.avisos.append(AVISO_SIN_OPCIONES)
         return informe
 
     def _traducir_pasada(

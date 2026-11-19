@@ -122,7 +122,7 @@ class Origins:
         return self._modo is not None
 
     def describir(self) -> str:
-        return contar(len(self._textos), "texto")
+        return contar(len(self._textos), "texto") if self._textos else "orígenes, poderes y capas"
 
     def _archivos(self) -> Iterator[tuple[str, bytes]]:
         """(ruta dentro del pack, contenido) de cada origen, poder y capa: en los jars, en datapacks y en zips."""
