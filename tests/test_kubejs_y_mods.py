@@ -205,3 +205,21 @@ def test_metodos_de_texto_de_kubejs_por_version() -> None:
     assert "notify" not in llamadas_de_texto((1, 16, 5)) and "notify" in llamadas_de_texto((1, 19, 2))
     assert "openChestGUI" not in llamadas_de_texto((1, 19, 2)) and "openChestGUI" in llamadas_de_texto((1, 20, 1))
     assert "openChestGUI" in llamadas_de_texto((26, 1, 0)) and "openChestGUI" in llamadas_de_texto(None)
+
+
+def test_grupos_de_rei_solo_traducen_el_nombre(tmp_path: Path) -> None:
+    """KubeJS `REIGroupEntriesEventJS`: el argumento 0 es el id del grupo y el 1 su nombre; el 2 es un tipo o etiqueta."""
+    from traductor_es.modulos.scripts import es_texto_visible
+
+    src = (
+        "REIEvents.groupEntries(e => {\n"
+        "  e.groupItems('kibe:rei_groups/gliders', 'Gliders', [/glider$/])\n"
+        "  e.groupItemsByTag('kubejs:rei_groups/ingots', 'All the ingots', 'forge:ingots')\n"
+        "})\n"
+        "onEvent('rei.group', event => {\n"
+        "  event.groupEntries(`mekanism:rei_groups/gas`, 'Gas!', 'mekanism:jei_plugin_jei_compat_gasstack', gases)\n"
+        "})\n"
+        "someOther.groupItems('x:y', 'Not REI', [])\n"
+    )
+    elegidas = {c.texto for c in js.escanear(src) if es_texto_visible(c)}
+    assert elegidas == {"Gliders", "All the ingots", "Gas!"}

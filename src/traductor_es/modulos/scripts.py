@@ -38,6 +38,13 @@ EVENTOS_TEXTO = (
     "onEvent:client.generate_assets",
 )  # fmt: skip
 LLAMADAS_EN_EVENTO = frozenset({"add", "addAll", "insert", "addAdvanced", "addItem", "addFluid", "addLang", "addLine"})
+#: Grupos de REI (KubeJS `REIGroupEntriesEventJS`, 1.18.2 a 1.20): en todos, el argumento 0 es el id del grupo y el 1 su
+#: nombre, el que ve el jugador en REI. Solo ese se traduce.
+EVENTOS_GRUPOS_REI = ("REIEvents.groupEntries", "onEvent:rei.group")
+GRUPOS_REI = frozenset({
+    "groupItems", "groupFluids", "groupEntries", "groupSameItem", "groupSameFluid", "groupItemsByTag",
+    "groupFluidsByTag", "groupItemsIf", "groupFluidsIf", "groupEntriesIf", "groupAnyIf",
+})  # fmt: skip
 
 
 def _llamadas_re(llamadas: frozenset[str]) -> str:
@@ -79,6 +86,8 @@ def es_texto_visible(c: javascript.CadenaJs, llamadas: frozenset[str] = LLAMADAS
         return True
     if c.funcion in AYUDAS_TEXTO and c.receptor in RECEPTORES_TEXTO:
         return True
+    if c.funcion in GRUPOS_REI and c.arg == 1 and any(ctx.startswith(EVENTOS_GRUPOS_REI) for ctx in c.contexto):
+        return not parece_clave(c.texto)
     return c.funcion in LLAMADAS_EN_EVENTO and any(ctx.startswith(EVENTOS_TEXTO) for ctx in c.contexto)
 
 
