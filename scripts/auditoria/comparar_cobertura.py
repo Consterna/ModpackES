@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import tempfile
@@ -28,7 +29,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 RAIZ = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(RAIZ / "src"))
+#: Con MODPACKES_CODIGO=<carpeta src de otra copia> se mide con ese código (p. ej. el commit base, para el «antes»).
+sys.path.insert(0, os.environ.get("MODPACKES_CODIGO") or str(RAIZ / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from inventario import sin_codigos  # noqa: E402
@@ -155,7 +157,7 @@ class Contenedores:
         return False
 
 
-def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
+def comparar(instancia: Path, java: bool = False, nombre_salida: str = "brecha") -> dict[str, Any]:
     nombre = instancia.name
     inventario = SALIDA / nombre / "inventario.jsonl"
     if not inventario.is_file():
@@ -178,6 +180,8 @@ def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
                 lang_total += 1
                 if ns is not None and (ns, t["campo"]) in app.claves:
                     lang_vistas += 1
+                elif ns is None and app.cubre(t["texto"]):
+                    lang_vistas += 1  # idioma fuera de assets/ (shaderpacks…) que recoge un módulo propio
                 else:
                     lang_no_vistas[f"{t['contenedor'] or 'instancia'}::{t['ruta']}"].append(t["campo"])
                 continue
@@ -206,7 +210,7 @@ def comparar(instancia: Path, java: bool = False) -> dict[str, Any]:
         "brecha": {p: {"textos": g["textos"], "archivos": len(g["archivos"]), "ejemplos": g["ejemplos"]}
                    for p, g in sorted(brecha.items(), key=lambda kv: -kv[1]["textos"])},
     }  # fmt: skip
-    (SALIDA / nombre / "brecha.json").write_text(json.dumps(resultado, ensure_ascii=False, indent=2), "utf-8")
+    (SALIDA / nombre / f"{nombre_salida}.json").write_text(json.dumps(resultado, ensure_ascii=False, indent=2), "utf-8")
     return resultado
 
 
@@ -245,6 +249,7 @@ def main() -> int:
     ap.add_argument("packs", nargs="*", type=Path)
     ap.add_argument("--todos", action="store_true", help=f"todos los packs de {CORPUS} con inventario")
     ap.add_argument("--java", action="store_true", help="incluir el texto del código de los mods (tarda)")
+    ap.add_argument("--nombre", default="brecha", help="nombre de los archivos de salida (p. ej. brecha_base)")
     args = ap.parse_args()
     packs: list[Path] = list(args.packs)
     if args.todos:
@@ -252,7 +257,7 @@ def main() -> int:
     resultados: list[dict[str, Any]] = []
     for pack in packs:
         try:
-            r = comparar(pack, args.java)
+            r = comparar(pack, args.java, args.nombre)
         except Exception as e:  # un pack que falla se informa y se sigue con el siguiente
             sys.stdout.buffer.write(f"✗ {pack.name}: {type(e).__name__}: {e}\n".encode())
             continue
@@ -260,7 +265,7 @@ def main() -> int:
         sys.stdout.buffer.write((_linea(r) + "\n").encode())
     if len(resultados) > 1:
         t = total(resultados)
-        (SALIDA / "brecha_total.json").write_text(json.dumps(t, ensure_ascii=False, indent=2), "utf-8")
+        (SALIDA / f"{args.nombre}_total.json").write_text(json.dumps(t, ensure_ascii=False, indent=2), "utf-8")
         sys.stdout.buffer.write(f"\nTotal: {_linea({**t, 'pack': f'{t["packs"]} packs'})}\n".encode())
         for patron, g in list(t["brecha"].items())[:40]:
             sys.stdout.buffer.write(f"  {len(g['packs']):>3} packs {g['textos']:>6} textos  {patron}\n".encode())
