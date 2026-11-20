@@ -106,7 +106,13 @@ los datapacks de `better-mc-neoforge-bmc5`).
 Una fuente de texto que la app no conocía (otro mod, otra carpeta) va en **su propio módulo**. Se agrega al final en
 `Proceso._fuentes_nuevas` (`proceso.py`) y no alimenta el glosario. Así los lotes, las pistas y los pedidos de los módulos
 de antes salen idénticos. Si escribe claves de idioma, que sea en un espacio propio del resource pack
-(`assets/modpackes_<algo>/lang/`), no en el archivo que escribe el módulo de mods. Antes de cada commit:
+(`assets/modpackes_<algo>/lang/`), no en el archivo que escribe el módulo de mods.
+
+Si el texto nuevo vive dentro de un archivo que ya traduce otro módulo (el nombre de una recompensa en un capítulo de FTB
+Quests, un campo de plantilla en un libro, un grupo de REI en un script), ese módulo lo recoge, pero con su propio ámbito
+(`Pieza(…, ambito="ui")`) y fuera de `con_vecindad`, y responde `ambito_de`. Así va en un pedido aparte y los lotes de
+antes no cambian. Un texto que el módulo ya tenía con su ámbito se queda solo ahí: se traduce una vez y sirve para los
+dos. Antes de cada commit:
 
 ```
 uv run python scripts/auditoria/puerta_calidad.py     # los bancos con respuestas grabadas: debe salir «idéntico»
