@@ -77,6 +77,16 @@ def _seguro(c: javascript.CadenaJs, traduccion: str) -> bool:
     return c.comilla != "`" or traduccion.count("${") == c.texto.count("${")
 
 
+def es_nombre_de_grupo_rei(c: javascript.CadenaJs) -> bool:
+    """El nombre de un grupo de REI (segundo argumento de `event.groupItems(id, nombre, …)`)."""
+    return c.funcion in GRUPOS_REI and c.arg == 1 and any(ctx.startswith(EVENTOS_GRUPOS_REI) for ctx in c.contexto)
+
+
+#: Los nombres de los grupos de REI van en un pedido aparte, con el tono de la interfaz (son el rótulo de un grupo),
+#: para que los lotes y pistas de los demás textos de los scripts salgan igual que sin ellos
+AMBITO_GRUPO_REI = "ui"
+
+
 def es_texto_visible(c: javascript.CadenaJs, llamadas: frozenset[str] = LLAMADAS_TEXTO) -> bool:
     if c.comparada or not _parece_texto(c.texto):
         return False
@@ -86,7 +96,7 @@ def es_texto_visible(c: javascript.CadenaJs, llamadas: frozenset[str] = LLAMADAS
         return True
     if c.funcion in AYUDAS_TEXTO and c.receptor in RECEPTORES_TEXTO:
         return True
-    if c.funcion in GRUPOS_REI and c.arg == 1 and any(ctx.startswith(EVENTOS_GRUPOS_REI) for ctx in c.contexto):
+    if es_nombre_de_grupo_rei(c):
         return not parece_clave(c.texto)
     return c.funcion in LLAMADAS_EN_EVENTO and any(ctx.startswith(EVENTOS_TEXTO) for ctx in c.contexto)
 
@@ -224,6 +234,7 @@ class ScriptsKubeJS:
         self.ctx = ctx
         self.exhaustivo = exhaustivo
         self._scripts: list[_Script] = []
+        self._ambitos: dict[str, str] = {}
         self.sin_elegir: list[tuple[Path, list[str]]] = []
         #: Por script, los comandos de otros mods con una frase en inglés (no se tocan; van al informe)
         self.comandos_ajenos: list[tuple[Path, list[str]]] = []
@@ -295,12 +306,21 @@ class ScriptsKubeJS:
             ajenos = [c.texto for c in cadenas if c.inicio not in vistas and frase_en_comando_ajeno(c)]
             if ajenos:
                 self.comandos_ajenos.append((ruta, ajenos))
-        return [
-            Pieza(t, f"script: {c.funcion or 'mensaje'}")
+        piezas = [
+            Pieza(t, f"script: {c.funcion or 'mensaje'}", AMBITO_GRUPO_REI if es_nombre_de_grupo_rei(c) else "")
             for s in self._scripts
             for c in s.elegidas
             for t in s.unidades(c)
         ]
+        # Un texto que también se muestra de otra forma se traduce solo con el tono del script (sirve para los dos)
+        propios = {p.texto for p in piezas if not p.ambito}
+        piezas = [p for p in piezas if not p.ambito or p.texto not in propios]
+        self._ambitos = {p.texto: p.ambito for p in piezas if p.ambito}
+        return piezas
+
+    def ambito_de(self, texto: str) -> str:
+        """El ámbito de un texto que juntó `recolectar` («ui» para los nombres de grupos de REI; si no, script)."""
+        return self._ambitos.get(texto, self.ambito)
 
     def lugares(self) -> list[Lugar]:
         """Por script, los textos que se traducen, en orden (tras `recolectar`)."""

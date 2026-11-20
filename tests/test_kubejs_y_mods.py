@@ -223,3 +223,29 @@ def test_grupos_de_rei_solo_traducen_el_nombre(tmp_path: Path) -> None:
     )
     elegidas = {c.texto for c in js.escanear(src) if es_texto_visible(c)}
     assert elegidas == {"Gliders", "All the ingots", "Gas!"}
+
+
+def test_grupos_de_rei_van_en_su_propio_pedido(tmp_path: Path, memoria: Memoria) -> None:
+    """Los nombres de grupo van con el tono de la interfaz y aparte: los lotes de los demás textos no cambian."""
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    ruta = juego / "kubejs" / "client_scripts" / "rei.js"
+    ruta.parent.mkdir(parents=True)
+    original = (
+        "REIEvents.groupEntries(e => {\n"
+        "  e.groupItems('kibe:rei_groups/gliders', 'Gliders', [/glider$/])\n"
+        "  e.groupItems('kibe:rei_groups/both', 'Shiny', [])\n"
+        "})\n"
+        "ItemEvents.tooltip(e => { e.add('minecraft:apple', 'Shiny') })\n"
+    )
+    ruta.write_text(original, encoding="utf-8")
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego))
+        modulo = ScriptsKubeJS(ctx)
+        # «Shiny» también es un tooltip: va solo con el script y su traducción sirve para los dos
+        assert sorted((p.texto, p.ambito) for p in modulo.recolectar()) == [("Gliders", "ui"), ("Shiny", "")]
+        assert modulo.ambito_de("Gliders") == "ui" and modulo.ambito_de("Shiny") == "script"
+        traducir_modulo(modulo, Traductor(Simulador(), memoria, Glosario()))
+        nuevo = ruta.read_text(encoding="utf-8")
+        assert "'«ES» Gliders'" in nuevo and nuevo.count("'«ES» Shiny'") == 2
+        ScriptsKubeJS(ctx).restaurar()
+    assert ruta.read_text(encoding="utf-8") == original
