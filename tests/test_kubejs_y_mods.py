@@ -249,3 +249,11 @@ def test_grupos_de_rei_van_en_su_propio_pedido(tmp_path: Path, memoria: Memoria)
         assert "'«ES» Gliders'" in nuevo and nuevo.count("'«ES» Shiny'") == 2
         ScriptsKubeJS(ctx).restaurar()
     assert ruta.read_text(encoding="utf-8") == original
+
+
+def test_lang_con_saltos_sin_escapar_se_lee_como_en_el_juego() -> None:
+    """Gson acepta un salto de línea literal dentro de una cadena (Shoulder Surfing, Extended Drawers): antes se saltaba
+    el archivo entero y el mod quedaba en inglés."""
+    datos = b'{\n  "a.b": "First line.\n\nSecond line.",\n  "a.c": "Tab\there"\n}\n'
+    assert lang_json.leer(datos) == {"a.b": "First line.\n\nSecond line.", "a.c": "Tab\there"}
+    assert json.loads(lang_json.escribir(lang_json.leer(datos))) == lang_json.leer(datos)  # se escribe escapado

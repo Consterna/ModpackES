@@ -11,10 +11,14 @@ from .lang_legacy import BOM
 
 
 def leer(datos: bytes | str) -> dict[str, str]:
-    """Lee un lang JSON. Acepta comentarios y comas finales (hay mods que los dejan). Solo devuelve textos."""
+    """Lee un lang JSON. Acepta comentarios y comas finales (hay mods que los dejan). Solo devuelve textos.
+
+    Como Gson, el lector del juego, acepta saltos de línea y tabuladores sin escapar dentro de una cadena
+    (Shoulder Surfing y Extended Drawers los traen): si no, se saltaba el mod entero.
+    """
     texto = datos.decode("utf-8-sig", errors="replace") if isinstance(datos, bytes) else datos.lstrip(BOM)
     try:
-        crudo: Any = json.loads(texto)
+        crudo: Any = json.loads(texto, strict=False)
     except json.JSONDecodeError:
         crudo = json5.loads(texto)
     if not isinstance(crudo, dict):
