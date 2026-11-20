@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,7 +22,7 @@ AMBITO_RECOMPENSA = "ui"
 PISTA_RECOMPENSA = "nombre o descripción de un objeto que da una misión de recompensa"
 
 
-def es_nombre_de_recompensa(c: snbt.Cadena) -> bool:
+def es_nombre_de_recompensa(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
     """El nombre o la descripción de un objeto que da una misión como **recompensa**.
 
     Solo bajo `rewards` y nunca bajo `tasks`: en una tarea, FTB Quests compara el NBT del objeto que entrega el
@@ -33,6 +33,11 @@ def es_nombre_de_recompensa(c: snbt.Cadena) -> bool:
     if c.campo in ("Name", "Lore"):
         return "display" in c.ruta[-2:]
     return c.campo in _NOMBRES_DE_OBJETO and "components" in c.ruta
+
+
+def piezas_de_recompensa(nombres: Sequence[snbt.Cadena | nbt.CadenaNbt]) -> list[Pieza]:
+    """Las piezas de los nombres de recompensa: en su propio pedido, con el tono de la interfaz."""
+    return [Pieza(p.texto, p.pista, AMBITO_RECOMPENSA) for c in nombres for p in piezas_de(c.texto, PISTA_RECOMPENSA)]
 
 
 def es_texto_ftbq(c: snbt.Cadena) -> bool:
@@ -221,9 +226,7 @@ class FTBQuests(_Base):
             ],
             _es_titulo,
         )
-        piezas += [
-            Pieza(p.texto, p.pista, AMBITO_RECOMPENSA) for c in nombres for p in piezas_de(c.texto, PISTA_RECOMPENSA)
-        ]
+        piezas += piezas_de_recompensa(nombres)
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             nuevos: dict[int, str] = {}
@@ -296,9 +299,12 @@ class FTBQuests(_Base):
                 self.ctx.registro(f"No pude leer {ruta.name}: se deja igual")
                 continue
             textos = [c for c in nbt.cadenas(arbol) if c.campo in CAMPOS_FTBQ]
-            if not textos:
+            nombres = [c for c in nbt.cadenas(arbol) if c.campo not in CAMPOS_FTBQ and es_nombre_de_recompensa(c)]
+            if not textos and not nombres:
                 continue
+            # Como en SNBT: los nombres de recompensa van aparte, para que los textos de la misión salgan igual
             piezas = con_vecindad([p for c in textos for p in piezas_de(c.texto, f"misión: {c.campo}")], _es_titulo)
+            piezas += piezas_de_recompensa(nombres)
 
             def generar(
                 trad: Mapping[str, str], original: bytes = original, compresion: nbt.Compresion = compresion
@@ -306,7 +312,7 @@ class FTBQuests(_Base):
                 arbol, _ = nbt.leer(original)  # árbol nuevo cada vez: no se acumulan cambios
                 hechos = faltan = 0
                 for c in nbt.cadenas(arbol):
-                    if c.campo in CAMPOS_FTBQ:
+                    if c.campo in CAMPOS_FTBQ or es_nombre_de_recompensa(c):
                         us = unidades(c.texto)
                         hechos += sum(1 for u in us if u in trad)
                         faltan += sum(1 for u in us if u not in trad)

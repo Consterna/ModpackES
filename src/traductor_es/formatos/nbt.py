@@ -209,24 +209,25 @@ class CadenaNbt:
     texto: str
     contenedor: Compuesto | Lista
     posicion: str | int
+    ruta: tuple[str | None, ...] = ()  #: claves de los niveles que la contienen, de afuera hacia adentro
 
 
 def cadenas(raiz: Raiz) -> Iterator[CadenaNbt]:
-    def recorrer(valor: Valor, campo: str | None) -> Iterator[CadenaNbt]:
+    def recorrer(valor: Valor, campo: str | None, ruta: tuple[str | None, ...]) -> Iterator[CadenaNbt]:
         if isinstance(valor, Compuesto):
             for k, (t, v) in valor.hijos.items():
                 if t == STRING and isinstance(v, str):
-                    yield CadenaNbt(k, v, valor, k)
+                    yield CadenaNbt(k, v, valor, k, ruta)
                 else:
-                    yield from recorrer(v, k)
-        elif isinstance(valor, Lista):
+                    yield from recorrer(v, k, (*ruta, k))
+        elif isinstance(valor, Lista):  # los elementos de una lista quedan bajo la clave de la lista
             for i, e in enumerate(valor.elementos):
                 if valor.tipo == STRING and isinstance(e, str):
-                    yield CadenaNbt(campo, e, valor, i)
+                    yield CadenaNbt(campo, e, valor, i, ruta)
                 else:
-                    yield from recorrer(e, campo)
+                    yield from recorrer(e, campo, ruta)
 
-    yield from recorrer(raiz.valor, None)
+    yield from recorrer(raiz.valor, None, ())
 
 
 def poner(cadena: CadenaNbt, texto: str) -> None:
