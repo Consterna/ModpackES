@@ -17,6 +17,7 @@ from . import configuracion
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
 from .modulos import (
+    bisecthost,
     crafttweaker,
     custommainmenu,
     datos,
@@ -420,6 +421,7 @@ class Proceso:
         if "scripts" in self.grupos and not ctx.solo_por_idioma:  # un solo idioma por archivo, como los scripts
             lista.append(("scripts", fancymenu.FancyMenu(ctx)))
             lista.append(("scripts", custommainmenu.CustomMainMenu(ctx)))
+            lista.append(("scripts", bisecthost.BisectHost(ctx)))
         return lista
 
     # ------------------------------------------------------------------ acciones
