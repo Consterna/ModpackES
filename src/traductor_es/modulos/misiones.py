@@ -89,8 +89,10 @@ class _Base:
     def recolectar(self) -> list[Pieza]:
         self._trabajos = list(self._preparar())
         piezas = [p for t in self._trabajos for p in t.piezas]
-        propios = {p.texto for p in piezas if not p.ambito}  # un texto que también es de misión, se queda en misión
-        self._ambitos = {p.texto: p.ambito for p in piezas if p.ambito and p.texto not in propios}
+        # Un texto que también es de una misión se traduce solo como misión (y esa traducción sirve para los dos)
+        propios = {p.texto for p in piezas if not p.ambito}
+        piezas = [p for p in piezas if not p.ambito or p.texto not in propios]
+        self._ambitos = {p.texto: p.ambito for p in piezas if p.ambito}
         return piezas
 
     def ambito_de(self, texto: str) -> str:
