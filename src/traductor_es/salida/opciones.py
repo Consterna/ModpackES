@@ -6,8 +6,11 @@ Hay que hacerlo con el juego cerrado: al salir, Minecraft reescribe options.txt.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
+
+_FIN_DE_LINEA = re.compile(r"\r\n|\r|\n")
 
 
 def _lista_de(linea: str) -> list[str] | None:
@@ -59,7 +62,13 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None, con_prefijo: bool
         return []
     crudo = ruta.read_bytes()
     salto = "\r\n" if b"\r\n" in crudo else "\n"
-    lineas = crudo.decode("utf-8", errors="surrogateescape").splitlines()  # lo que no es UTF-8 se conserva igual
+    texto = crudo.decode("utf-8", errors="surrogateescape")  # lo que no es UTF-8 se conserva igual
+    # Como BufferedReader.readLine del juego: solo CR, LF y CRLF cortan línea (no U+2028 ni \x85), y cada línea
+    # conserva su salto para no tocar las que no cambian
+    lineas = _FIN_DE_LINEA.split(texto)
+    saltos = _FIN_DE_LINEA.findall(texto)
+    if lineas and lineas[-1] == "":
+        lineas.pop()
     cambios: list[str] = []
     vio_packs = vio_idioma = False
     for i, linea in enumerate(lineas):
@@ -85,6 +94,7 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None, con_prefijo: bool
         cambios.append(f"idioma del juego: {idioma}")
     if cambios:
         temporal = ruta.with_name("options.txt.tmp")
-        temporal.write_bytes((salto.join(lineas) + salto).encode("utf-8", errors="surrogateescape"))
+        partes = [linea + (saltos[i] if i < len(saltos) else salto) for i, linea in enumerate(lineas)]
+        temporal.write_bytes("".join(partes).encode("utf-8", errors="surrogateescape"))
         temporal.replace(ruta)
     return cambios
