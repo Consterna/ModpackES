@@ -28,6 +28,8 @@ AMBITO = "ui"
 ESPACIO = "modpackes_loader"
 PISTA = "texto del cargador de mods (NeoForge/Forge): menús, comandos o nombre de una etiqueta de objetos"
 _LANG = re.compile(r"^assets/([^/]+)/lang/([a-z]{2}_[a-z]{2})\.json$")
+#: FancyModLoader (NeoForge) guarda su idioma en la raíz del jar: `lang/<idioma>.json`.
+_LANG_RAIZ = re.compile(r"^lang/([a-z]{2}_[a-z]{2})\.json$")
 #: Dónde guarda cada launcher sus librerías, relativo a una carpeta que contiene la instancia.
 _CARPETAS_LIBRERIAS = ("libraries", "Install/libraries", "meta/libraries", "data/libraries")
 
@@ -66,13 +68,43 @@ def jar_del_loader(librerias: list[Path], loader: str | None, mc: str) -> Path |
     return max(candidatos, key=lambda p: _numeros(p.parent.name), default=None)
 
 
+def jar_de_fml(librerias: list[Path], neoforge: Path) -> Path | None:
+    """El jar de FancyModLoader que usa esa versión de NeoForge (sus menús y la pantalla de error al cargar).
+
+    Si en `libraries/` hay una sola versión, es esa. Si hay varias, se busca la que nombra la metadata del launcher
+    junto a la versión de NeoForge (Prism: `meta/net.neoforged/<versión>.json`; el launcher oficial y CurseForge:
+    `versions/**/*.json`). Si no se sabe, no se adivina: None.
+    """
+    jars = sorted({p for lib in librerias for p in lib.glob("net/neoforged/fancymodloader/loader/*/loader-*.jar")})
+    if len(jars) <= 1:
+        return jars[0] if jars else None
+    version_neoforge = neoforge.parent.name
+    for lib in librerias:
+        raiz = lib.parent
+        metadatas = [raiz / "meta" / "net.neoforged" / f"{version_neoforge}.json", *raiz.glob("versions/*/*.json")]
+        for meta in metadatas:
+            try:
+                texto = meta.read_text(encoding="utf-8", errors="replace") if meta.is_file() else ""
+            except OSError:
+                continue
+            if version_neoforge not in texto:
+                continue
+            if m := re.search(r"net\.neoforged\.fancymodloader:loader:([\w.+-]+)", texto):
+                return next((j for j in jars if j.parent.name == m.group(1)), None)
+    return None
+
+
 def leer_idiomas(jar: Path) -> dict[str, dict[str, dict[str, str]]]:
     """{espacio: {idioma: {clave: texto}}} de los archivos de idioma JSON del jar."""
     salida: dict[str, dict[str, dict[str, str]]] = {}
     try:
         with zipfile.ZipFile(jar) as z:
             for n in z.namelist():
-                if not (m := _LANG.match(n)):
+                if m := _LANG.match(n):
+                    espacio, idioma = m.group(1), m.group(2)
+                elif m := _LANG_RAIZ.match(n):
+                    espacio, idioma = "fml", m.group(1)
+                else:
                     continue
                 try:
                     datos: object = json.loads(z.read(n).decode("utf-8-sig"))
@@ -80,7 +112,7 @@ def leer_idiomas(jar: Path) -> dict[str, dict[str, dict[str, str]]]:
                     continue
                 if isinstance(datos, dict):
                     textos = {str(k): v for k, v in cast(dict[str, Any], datos).items() if isinstance(v, str)}
-                    salida.setdefault(m.group(1), {})[m.group(2)] = textos
+                    salida.setdefault(espacio, {})[idioma] = textos
     except (OSError, zipfile.BadZipFile):
         return {}
     return salida
@@ -93,6 +125,7 @@ class IdiomaDelLoader:
     def __init__(self, ctx: Contexto) -> None:
         self.ctx = ctx
         self._jar: Path | None = None
+        self._fml: Path | None = None  #: FancyModLoader de NeoForge, si se sabe cuál es
         self._ingles: dict[str, str] = {}  #: clave → inglés
         self._espanol: dict[str, dict[str, str]] = {}  #: variante → {clave: español que trae el loader}
         self._buscado = False
@@ -101,7 +134,10 @@ class IdiomaDelLoader:
         if not self._buscado:
             inst = self.ctx.instancia
             if inst.loader in ("neoforge", "forge") and not inst.legacy:
-                self._jar = jar_del_loader(buscar_librerias(inst.juego), inst.loader, inst.version.texto)
+                librerias = buscar_librerias(inst.juego)
+                self._jar = jar_del_loader(librerias, inst.loader, inst.version.texto)
+                if self._jar is not None and self._jar.name.startswith("neoforge-"):
+                    self._fml = jar_de_fml(librerias, self._jar)
             self._buscado = True
         return self._jar
 
@@ -117,7 +153,10 @@ class IdiomaDelLoader:
         jar = self._buscar()
         if jar is None:
             return []
-        for por_idioma in leer_idiomas(jar).values():
+        idiomas: list[dict[str, dict[str, str]]] = list(leer_idiomas(jar).values())
+        if self._fml is not None:
+            idiomas += leer_idiomas(self._fml).values()
+        for por_idioma in idiomas:
             ingles = por_idioma.get("en_us", {})
             self._ingles.update({k: v for k, v in ingles.items() if v.strip() and es_traducible(v)})
             for idioma, textos in por_idioma.items():

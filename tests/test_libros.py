@@ -238,3 +238,49 @@ def test_comentario_de_varias_lineas_no_se_traduce() -> None:
     assert [s.texto for s in segs] == ["Primer párrafo.", "Segundo párrafo.", "Tercero."]
     salida = markdown.reconstruir(lineas, segs, {"Segundo párrafo.": "Second paragraph."})
     assert "esto no lo ve el jugador" in salida and "Second paragraph." in salida
+
+
+def test_plantillas_propias_de_patchouli(tmp_path: Path, memoria: Memoria) -> None:
+    """Los campos que una plantilla del mod muestra como texto («heading», «a.heading» de una incluida) se traducen,
+    en su propio pedido con el tono de la interfaz; los datos (recetas, ids, variables dentro de una frase), no."""
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    base = "assets/bloodmagic/patchouli_books/guide/en_us"
+    altar = {
+        "components": [
+            {"type": "patchouli:header", "text": "#heading", "x": -1, "y": -1},
+            {"type": "patchouli:text", "text": "Cost: #syphon# LP", "y": 80},
+            {"type": "patchouli:text", "text": "#text", "y": 100},
+        ]
+    }
+    doble = {
+        "include": [
+            {"template": "altar", "as": "a"},
+            {"template": "bloodmagic:altar", "as": "b", "using": {"heading": "#titulo", "syphon": "#cost"}},
+        ],
+        "components": [],
+    }
+    entrada = {
+        "name": "Arcane Ashes",
+        "pages": [
+            {"type": "bloodmagic:altar", "heading": "Arcane Ashes", "recipe": "bloodmagic:ash", "syphon": "Many"},
+            {"type": "double", "a.heading": "Speed Array", "a.recipe": "bloodmagic:speed", "titulo": "Updraft Array"},
+            {"type": "patchouli:crafting", "heading": "Not Shown", "recipe": "minecraft:stick"},
+        ],
+    }
+    fabrica.jar(
+        juego / "mods" / "bm.jar",
+        {f"{base}/templates/altar.json": altar, f"{base}/templates/double.json": doble,
+         f"{base}/entries/ashes.json": entrada},
+    )  # fmt: skip
+    with Instancia(juego) as inst:
+        modulo = Libros(Contexto(inst, Respaldo(juego), pack=PackSalida(inst)))
+        piezas = {(p.texto, p.ambito) for p in modulo.recolectar()}
+        # «Arcane Ashes» también es el nombre de la entrada: va solo con el libro y su traducción sirve para los dos
+        assert piezas == {("Arcane Ashes", ""), ("Speed Array", "ui"), ("Updraft Array", "ui")}
+        assert modulo.ambito_de("Speed Array") == "ui" and modulo.ambito_de("Arcane Ashes") == "libro"
+    _, pack, _ = correr(juego, memoria)
+    paginas = json.loads((pack / f"{base}/entries/ashes.json".replace("en_us", "es_mx")).read_text("utf-8"))["pages"]
+    assert paginas[0]["heading"] == "«ES» Arcane Ashes" and paginas[0]["syphon"] == "Many"
+    assert paginas[1]["a.heading"] == "«ES» Speed Array" and paginas[1]["titulo"] == "«ES» Updraft Array"
+    assert paginas[1]["a.recipe"] == "bloodmagic:speed"
+    assert paginas[2]["heading"] == "Not Shown"  # página de Patchouli: sus campos ya son los de siempre

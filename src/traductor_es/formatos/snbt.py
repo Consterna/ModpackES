@@ -23,6 +23,7 @@ class Cadena:
     campo: str | None  #: clave a la que pertenece (o la de la lista que la contiene)
     comilla: str
     texto: str  #: contenido ya sin escapes
+    ruta: tuple[str | None, ...] = ()  #: claves que abrieron cada nivel que la contiene, de afuera hacia adentro
 
 
 def des_escapar(crudo: str, comilla: str) -> str:
@@ -59,6 +60,8 @@ def escanear(src: str) -> list[Cadena]:
     """Todas las cadenas entre comillas que son valores (no claves), con la clave a la que pertenecen."""
     res: list[Cadena] = []
     pila: list[tuple[str, str | None]] = []
+    #: clave de cada nivel abierto para `Cadena.ruta`; un nivel dentro de una lista hereda la clave de la lista
+    claves: list[str | None] = []
     ultima: str | None = None
     i, n = 0, len(src)
     while i < n:
@@ -76,14 +79,16 @@ def escanear(src: str) -> list[Cadena]:
                 ultima = des_escapar(src[i + 1 : j], c)
             else:
                 campo = pila[-1][1] if pila and pila[-1][0] == "[" else ultima
-                res.append(Cadena(i + 1, j, campo, c, des_escapar(src[i + 1 : j], c)))
+                res.append(Cadena(i + 1, j, campo, c, des_escapar(src[i + 1 : j], c), tuple(claves)))
             i = j + 1
         elif c in "{[":
+            claves.append(claves[-1] if pila and pila[-1][0] == "[" else ultima)
             pila.append((c, ultima))
             i += 1
         elif c in "}]":
             if pila:
                 pila.pop()
+                claves.pop()
             i += 1
         elif c.isalnum() or c in "_.+-":
             m = _CLAVE_SIN_COMILLAS.match(src, i)

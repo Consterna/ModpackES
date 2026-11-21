@@ -264,8 +264,14 @@ def _copiar_overrides(mrpack: bytes, juego: Path) -> int:
 
 
 def escribir_mmc_pack(carpeta: Path, dependencias: dict[str, str]) -> None:
-    """El `mmc-pack.json` de Prism con la versión del juego y el loader, que es de donde la app los lee primero."""
-    componentes = [{"uid": UIDS[k], "version": v} for k, v in dependencias.items() if k in UIDS]
+    """El `mmc-pack.json` de Prism con la versión del juego y el loader, que es de donde la app los lee primero.
+
+    Minecraft va primero: Prism aplica los componentes en orden y el último decide con qué arranca el juego. Con el
+    loader antes, la instancia se abre sin mods.
+    """
+    orden = list(UIDS)  # minecraft primero
+    elegidas = sorted((k for k in dependencias if k in UIDS), key=orden.index)
+    componentes = [{"uid": UIDS[k], "version": dependencias[k]} for k in elegidas]
     (carpeta / "mmc-pack.json").write_text(json.dumps({"components": componentes, "formatVersion": 1}, indent=2),
                                            encoding="utf-8")  # fmt: skip
 

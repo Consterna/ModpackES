@@ -46,6 +46,7 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 |---|---|---|---|
 | Patchouli 1.17+ con `use_resource_pack` y 1.20+ | `assets/<ns>/patchouli_books/<libro>/<idioma>/` | ✅ | `modulos/libros.py` |
 | Patchouli con `"i18n": true` y Modonomicon | claves de idioma | ✅ | como libro, con su tono |
+| Plantillas propias de Patchouli (Blood Magic `heading`, `a.heading`) | campos de página de tipo `<mod>:<plantilla>` | ✅ | Se lee la plantilla (`templates/`, en inglés): cuenta como texto el campo que es el valor entero de un componente `patchouli:text`, `header` o `tooltip`, con los nombres de las incluidas (`<as>.<campo>`) y las variables atadas con `using`. Una variable dentro de una frase («Cost: #syphon# LP») no se toca. Van en un pedido aparte con el tono de la interfaz. |
 | Patchouli 1.14–1.19 dentro del jar (`data/<ns>/patchouli_books/…`) | jar | ⛔ | Se carga del classpath. Ni un resource pack ni un datapack lo pisan. «Patchouli Resource Patch» (PRP-Arch, 1.15–1.19) hace que lea primero de assets, pero solo reemplaza archivos que ya existen. Opción: informar y sugerir PRP, o hacer lo mismo en el mod de apoyo. |
 | Libros propios del modpack | `<instancia>/patchouli_books/` | ✅ | se reescriben en su lugar |
 | Mantle, Citadel, Lavender, GuideME | `assets/<ns>/book/…`, `lavender/…`, `<carpeta>/_<idioma>/` | ✅ | |
@@ -56,6 +57,7 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 | Fuente | Dónde vive | Estado | Notas |
 |---|---|---|---|
 | FTB Quests: SNBT, carpeta `lang/` y NBT de 1.12 | `config/ftbquests/quests/` | ✅ | `modulos/misiones.py` |
+| Nombre y descripción de los objetos de **recompensa** de FTB Quests | `rewards[].item`: `tag.display.Name`/`Lore` (hasta 1.20.4, en SNBT y en el NBT de 1.12) o `components` `custom_name`/`item_name`/`lore` (1.20.5+) | ✅ | Nunca bajo `tasks`: ahí FTB Quests compara el NBT del objeto que entrega el jugador, y cambiarle el nombre rompería la misión. El título y la descripción de la misión y de cada tarea se traducen como siempre. Pedido aparte, con el tono de la interfaz. |
 | FTB Quests en otras raíces | `config/ftbquests/normal/` (FTB Interactions Remastered), `config/ftb_quests/`, `defaultconfigs/ftbquests/` | ❌ | por confirmar en el corpus |
 | FTB Quests en JSON5 | `data.json5` y lang `.json5` | ❌ | por confirmar |
 | BetterQuesting | `DefaultQuests.json`, carpeta `DefaultQuests/` | ✅ | |
@@ -67,6 +69,7 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 | Fuente | Estado | Notas |
 |---|---|---|
 | KubeJS: tooltips, nombres, mensajes, JEI/REI/EMI info, comandos de chat | ✅ | API por versión en `formatos/kubejs_api.py` |
+| KubeJS: nombres de grupos de REI (`REIEvents.groupEntries`, `onEvent('rei.group')`) | ✅ | Solo el segundo argumento de `group*` (el primero es el id). Pedido aparte, con el tono de la interfaz, para no cambiar los lotes de los scripts. |
 | KubeJS Ponder (`scene.text`), `addAnnouncement`, `.respond`, `.append` | ❓ | por confirmar en el corpus |
 | CraftTweaker (`.zs`) | ✅ | |
 
@@ -87,11 +90,20 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 |---|---|---|---|
 | FancyMenu v3 (y Drippy) | `config/fancymenu/customization/*.txt` | ✅ | Texto: `label`, `hoverlabel`, `description` de los botones; `source` de los textos con `source_mode = direct`; `slider_label`, `tooltip`. Salto de línea `%n%`. Lo seguro es cambiar el texto por `{"placeholder":"local","values":{"key":"…"}}` y poner la clave en el resource pack. Riesgos: `identifier`, texturas, acciones, `linked_variable`. |
 | FancyMenu v2 | igual | ✅ | `addtext` → `value`; `addbutton` → `label`, `hoverlabel`, `description` (ahí `value` es la **acción**); `%local:<clave>%`. |
-| CustomMainMenu (1.12) | `config/CustomMainMenu/*.json` | ❌ | El `text` de los botones pasa por `I18n` (sirve una clave); las etiquetas no, así que hay que reescribirlas. |
+| CustomMainMenu (1.12) | `config/CustomMainMenu/*.json` | ✅ | Se reescriben en su lugar `buttons.*.text`, `hoverText`, `tooltip`, `labels.*.text`, `hoverText` y los splash de `other.splash-text.texts`. Un valor que ya es clave lo traduce el juego; `web:` y `file:` son fuentes. Los marcadores `#modsloaded#` se protegen. |
+| Anuncio de servidor de BisectHost Menu | `config/bhmenu-client.toml` | ✅ | `title` y `description` de `[modules.server_creator_banner.pack]`, salvo que `use_language_files = true`. Se reescriben línea por línea; el código de un cupón («CODE: LunaPixel») se protege. |
 | CustomNPCs | `<mundo>/customnpcs/dialogs`, `quests` (JSON-NBT con `1b`, `3L`) | ❌ | `DialogTitle`, `DialogText`, `Options[].Title`; `Title`, `Text`, `CompleteText`. No hay mecanismo de idioma: solo reescribir, con un lector tolerante. Riesgo: `DialogCommand`. |
 | Easy NPC | presets `.npc.snbt` en `config/easy_npc/` | ❌ | Un texto con forma de clave con puntos se usa como clave. |
 | Información de EMI | `assets/emi/recipe/additions/*.json` `text` | ❓ | cada texto pasa por `translatable`: sirve una clave |
 | Mensajes en configuración (bienvenida, MOTD…) | `config/*.toml`, `.json5`, `.cfg` | ❓ | depende de cada mod |
+
+### Problemas de otros mods que se ven con la traducción
+
+- **Restricted Portals (Fabric 1.20.1, con Java 17 en Windows)** arma sus logros con el nombre de los objetos de KubeJS y
+  los escribe en la carpeta del mundo con la codificación del sistema (cp1252), no en UTF-8. El juego los lee como UTF-8,
+  así que cualquier tilde, «ñ» o comilla angular sale como `◆`. Lo vio la sonda en Spectral Creation. No es de la app:
+  pasa con cualquier nombre en español. Se arregla en el launcher, agregando `-Dfile.encoding=UTF-8` a los argumentos de
+  Java de la instancia (desde Java 18 ya es así por defecto).
 
 ### Lo que no es texto que se pueda traducir
 
@@ -140,13 +152,12 @@ Lo que sí se ve y queda en inglés, ordenado por cuántos packs lo tienen:
 
 | Brecha | Packs | Textos | Por qué no se hizo ahora |
 |---|---|---|---|
-| Datos con texto literal **dentro de los jars** (logros, loot tables, funciones) | 13 | ≈ 700 | Hace falta un datapack de reemplazo que copia el archivo entero del mod (lo congela en su versión) y solo se carga si el pack tiene KubeJS, Paxi u OpenLoader. Es otro diseño, con su propio riesgo. |
-| Carteles, libros y objetos con nombre en **estructuras `.nbt`** de los jars | 14 | ≈ 1.700 | Igual que lo anterior, más reescribir NBT de estructuras. WTEM sirve de referencia. |
-| Nombres de grupos de **REI en scripts de KubeJS** (`rei_groups.js`) | 11 | 42 | Toca el módulo de KubeJS que ya existe: cambiaría sus lotes. Va aparte, con su medición. |
-| Nombres de objetos de recompensa en **FTB Quests** (`display.Name`) | 10 | 100 | Si el objeto es de una tarea, renombrarlo puede romper la comparación de NBT de la misión. Hay que distinguir recompensas de tareas. |
-| Plantillas propias de **Patchouli** (Blood Magic: `a.heading`) | 9 | ≈ 150 | Hay que leer la plantilla para saber qué variables son texto. |
-| Menú de **CustomMainMenu** (1.12) y anuncio de BisectHost (`bhmenu-client.toml`) | 8 y 5 | 44 y ≈ 30 | Formatos de un solo mod; poco texto. |
+| Datos con texto literal **dentro de los jars** (logros, loot tables, funciones) | 13 | ≈ 700 | **Fuera de alcance (decidido el 19-11).** Hace falta un datapack de reemplazo que copia el archivo entero del mod (lo congela en su versión) y solo se carga si el pack tiene KubeJS, Paxi u OpenLoader. |
+| Carteles, libros y objetos con nombre en **estructuras `.nbt`** de los jars | 14 | ≈ 1.700 | **Fuera de alcance (decidido el 19-11).** Igual que lo anterior, más reescribir NBT de estructuras. WTEM sirve de referencia. |
 | `splashes.txt` de mods y packs | 7 | ≈ 85 | Un solo archivo para todos los idiomas: reemplazarlo cambia los splash también para quien juegue en inglés con el pack activo. |
+
+Lo que esta tabla tenía además (grupos de REI, recompensas de FTB Quests, plantillas de Patchouli, CustomMainMenu y
+BisectHost) quedó hecho en la segunda ronda: ver «Segunda ronda» más abajo.
 
 ### Dentro del juego · NeoForge 1.21.1 (Create Ultimate, 81 mods)
 
@@ -205,3 +216,62 @@ se tradujo dos veces, con el código de `origin/main` y con esta rama.
 El comparador, por su parte, no reconocía trozos cortos ni títulos de markdown («### The Big One»), y daba por faltantes
 textos que la app sí traducía: misiones de FTB Quests con componentes JSON y guías de AE2. Cada caso se revisó con
 ejemplos reales antes de cambiar una regla.
+
+### Segunda ronda · 19 de noviembre de 2026 (rama `feat/cobertura-pendientes`)
+
+Lo que quedaba de la tabla de brechas, más dos huecos que encontró la sonda en el juego.
+
+| Arreglo | Dónde aparece en el corpus | Cómo se cuidó la calidad |
+|---|---|---|
+| Idioma de FancyModLoader (NeoForge) | las instancias de NeoForge | Módulo del loader, espacio propio en el resource pack |
+| Menú de CustomMainMenu (1.12) | 8 packs, ≈ 44 textos | Módulo nuevo al final |
+| Anuncio de BisectHost Menu | 12 packs, 24 textos (el código del cupón protegido) | Módulo nuevo al final |
+| Nombres de grupos de REI en KubeJS | 11 packs, 42 textos | Pedido aparte, con el tono de la interfaz |
+| Nombres de recompensas de FTB Quests | 8 packs, ≈ 80 textos | Pedido aparte; nunca bajo `tasks` |
+| Campos de plantillas propias de Patchouli | Blood Magic, Animus, Enchanted, Mythic Mounts, Bonsai Trees, Extreme Reactors… ≈ 1.300 textos con los jars repetidos | Pedido aparte; solo el valor entero de un componente de texto |
+| **Lang con saltos de línea sin escapar** | 8 jars (Shoulder Surfing en cuatro versiones, Extended Drawers…), 1.268 claves | El juego (Gson) los acepta; la app saltaba el archivo entero sin avisar. Lo vio la sonda en Fabric. |
+
+Un texto nuevo que vive dentro de un archivo que ya traducía otro módulo (un capítulo de FTB Quests, un libro, un script)
+va en un pedido aparte, con su ámbito, para que los lotes y las pistas de lo de antes salgan idénticos (ver
+`CONTRIBUTING.md`). La puerta de calidad dio idéntico a la línea base antes de cada commit.
+
+**Dentro del juego · Forge 1.20.1 (Better MC 4, 366 mods).** La instancia se tradujo con el simulador y se recorrió a mano:
+creativo, logros, libro de misiones y libros guía.
+
+| | Código de `main` | Esta rama |
+|---|---|---|
+| Claves cargadas | 213.402 | 214.610 |
+| Con la marca de traducción | 172.946 | 173.907 |
+| En inglés en archivos que la app ve | 182 | 176 |
+| En inglés que la app tenía (el simulador no pasa la regla de «quedó en inglés») | 6.804 | 6.419 |
+| Del loader | 1 | 1 |
+| Claves crudas en pantalla | 3 | 2 (`enchantment.galosphere.sifting.desc` y `1.20.1`: tampoco existen en el inglés del mod) |
+
+La primera corrida tenía menos mods: el verificador de Better MC instaló 51 que faltaban, así que la segunda columna
+cuenta también los suyos. En pantalla se vio la marca en el menú de Sodium, los logros de When Dungeons Arise, las
+pestañas del creativo, las misiones y sus recompensas. Lo que sigue en inglés y no tiene clave («Search options...» de
+Reese's Sodium Options, «Hide Recipes») está escrito en el código del mod.
+
+**Dentro del juego · Fabric 1.20.1 (Spectral Creation, 367 mods).** La primera vez la instancia arrancó sin Fabric:
+`descargar_packs.py` ponía el loader antes que Minecraft en `mmc-pack.json` (15 packs del corpus; ya está arreglado). La
+sonda tampoco volcaba el idioma, porque Server Translations reemplaza el idioma del juego por su propia clase; ahora lo
+avisa y lo arma desde los recursos.
+
+| | Cuántas |
+|---|---|
+| Claves cargadas | 26.912 |
+| Con la marca de traducción | 10.041 |
+| En inglés en archivos que la app ve | 140 (la mayoría nombres de vanilla que el `es_mx` de Mojang deja iguales: «Allium», «Sculk») |
+| Creadas al jugar | 302 (Amendments arma las descripciones de su configuración; Extended Drawers era el hueco de los saltos de línea, ya arreglado) |
+| En inglés que la app tenía | 1.108 (efecto del simulador) |
+| Claves crudas en pantalla | 0 |
+
+**Lo que ya se traducía sale igual.** `foto_corpus.py` tradujo los 14 packs representativos con el código de `main`
+(PR #46) y con esta rama:
+- **10 de 14** salen idénticos en todo lo que ya se escribía; solo suman archivos nuevos (BisectHost, CustomMainMenu y el
+  idioma de Extended Drawers, MossyLib y ParticleEffects, que antes se descartaban).
+- **4 packs** (ftb-100, ftb-102, ftb-115 y ftb-130) cambian archivos que ya se escribían, porque ahora llevan además los
+  campos nuevos. En ftb-102 y ftb-100 se tradujo con los dos códigos y se comparó campo por campo: lo único distinto son los
+  nombres de recompensa, los `heading` de las plantillas de Blood Magic y los nombres de los grupos de REI. ftb-115 y
+  ftb-130 cambian por las mismas reglas (recompensas, Blood Magic y Bonsai Trees).
+- **14 de 14:** `restaurar` deja byte por byte cada archivo que existía.

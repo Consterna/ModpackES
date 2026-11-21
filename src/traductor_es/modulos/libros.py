@@ -8,11 +8,13 @@ el ámbito de libro (ver `mods.es_clave_de_libro`).
 
 from __future__ import annotations
 
+import json
 import re
 import textwrap
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ..formatos import json_cadenas, markdown
 from ..fuentes.contenedores import Carpeta
@@ -34,6 +36,11 @@ _LAVENDER = re.compile(r"assets/([^/]+)/lavender/(entries|categories)/([^/]+)/(.
 _GUIA = re.compile(r"assets/([^/]+)/([^/]+)/(.+\.md)")
 _NO_GUIA = frozenset({"lavender", "patchouli_books", "book", "lang"})
 _PREFERIDAS = ("es_mx", "es_es")
+#: Componentes de una plantilla de Patchouli que muestran texto, y su campo (`BookTemplate.registerComponent`)
+_COMPONENTES_DE_TEXTO = {"patchouli:text": "text", "patchouli:header": "text", "patchouli:tooltip": "tooltip"}
+#: Una variable que es el valor entero del campo («#heading» o «#heading#»): el texto de la página se ve tal cual
+_VARIABLE_ENTERA = re.compile(r"#([\w.]+)#?")
+AMBITO_PLANTILLA = "ui"
 _CABECERA_GUIDEME = re.compile(rb"\A\s*---\s*\n(?:.*\n)*?\s*(?:navigation|item_ids)\s*:", re.MULTILINE)
 
 
@@ -46,6 +53,46 @@ class _Archivo:
     externo: bool = False
     piezas: list[Pieza] = field(default_factory=list[Pieza])
     generar: Callable[[Mapping[str, str]], tuple[bytes, int, int]] | None = None
+    libro: tuple[str, str] | None = None  #: (espacio, libro) de una entrada de Patchouli, para buscar sus plantillas
+
+
+def variables_de_texto(plantillas: Mapping[str, Any], tipo: str, visitadas: frozenset[str] = frozenset()) -> set[str]:
+    """Los campos de una página con esa plantilla que Patchouli muestra como texto.
+
+    Una variable cuenta si es el valor entero de un componente de texto, encabezado o tooltip. Las de una plantilla
+    incluida se nombran «<as>.<variable>», salvo que `using` las ate a otra variable o a un valor fijo
+    (`TemplateInclusion.qualifyName`). Una variable dentro de una frase («Cost: #syphon# LP») suele ser un número o un
+    dato técnico: no cuenta.
+    """
+    datos = plantillas.get(tipo)
+    if not isinstance(datos, dict) or tipo in visitadas:
+        return set()
+    plantilla: dict[str, Any] = datos  # pyright: ignore[reportUnknownVariableType]
+    variables: set[str] = set()
+    for comp in _lista(plantilla.get("components")):
+        campo = _COMPONENTES_DE_TEXTO.get(str(comp.get("type")))
+        valor = comp.get(campo) if campo else None
+        for v in valor if isinstance(valor, list) else [valor]:  # pyright: ignore[reportUnknownVariableType]
+            if isinstance(v, str) and (m := _VARIABLE_ENTERA.fullmatch(v)):
+                variables.add(m.group(1))
+    espacio = tipo.split(":", 1)[0]
+    for inc in _lista(plantilla.get("include")):
+        hija, como, using = inc.get("template"), inc.get("as"), inc.get("using")
+        if not isinstance(hija, str) or not isinstance(como, str):
+            continue
+        atadas: dict[str, Any] = using if isinstance(using, dict) else {}  # pyright: ignore[reportUnknownVariableType]
+        for v in variables_de_texto(plantillas, hija if ":" in hija else f"{espacio}:{hija}", visitadas | {tipo}):
+            atada = atadas.get(v)
+            if atada is None:
+                variables.add(f"{como}.{v}")
+            elif isinstance(atada, str) and atada.startswith("#"):
+                variables.add(atada[1:])
+    return variables
+
+
+def _lista(valor: object) -> list[dict[str, Any]]:
+    """Los objetos de una lista JSON (lo demás se ignora)."""
+    return [x for x in valor if isinstance(x, dict)] if isinstance(valor, list) else []  # pyright: ignore[reportUnknownVariableType]
 
 
 def _fuentes_ordenadas(fuentes: list[Fuente]) -> Iterator[tuple[str, Callable[[], bytes]]]:
@@ -66,6 +113,9 @@ class Libros:
         self._idiomas = frozenset({"en_us", *ctx.variantes})
         self._archivos: list[_Archivo] = []
         self._grupos: dict[tuple[str, ...], dict[str, bytes]] | None = None
+        #: Plantillas de Patchouli en inglés por libro: {libro: {"espacio:ruta": plantilla}}
+        self._plantillas: dict[str, dict[str, Any]] = {}
+        self._ambitos: dict[str, str] = {}
         self.sin_traducir_posible: list[str] = []  #: libros de Patchouli antiguos (texto en data/, dentro del jar)
 
     # ------------------------------------------------------------------ búsqueda
@@ -78,11 +128,14 @@ class Libros:
     def _leer_grupos(self) -> dict[tuple[str, ...], dict[str, bytes]]:
         grupos: dict[tuple[str, ...], dict[str, bytes]] = {}
         datos_viejos: set[str] = set()
+        self._plantillas = {}
         for nombre, leer in _fuentes_ordenadas(self.ctx.instancia.fuentes()):
             clave: tuple[str, ...] | None = None
             idioma = ""
             if m := _PATCHOULI.fullmatch(nombre):
                 if m.group(4).startswith("templates/"):
+                    if m.group(3) == "en_us":  # Patchouli usa la del idioma del juego o, si no está, la inglesa
+                        self._leer_plantilla(m.group(2), f"{m.group(1)}:{m.group(4)[10:-5]}", leer)
                     continue
                 clave, idioma = ("patchouli", m.group(1), m.group(2), m.group(4)), m.group(3)
             elif m := _BOOK.fullmatch(nombre):
@@ -118,6 +171,21 @@ class Libros:
             if k[0] == "guideme" and "en_us" in v and _CABECERA_GUIDEME.search(v["en_us"][:2000])
         }
         return {k: v for k, v in grupos.items() if k[0] != "guideme" or (k[1], k[2]) in guias}
+
+    def _leer_plantilla(self, libro: str, tipo: str, leer: Callable[[], bytes]) -> None:
+        try:
+            datos = json.loads(leer().decode("utf-8-sig"))
+        except (KeyError, OSError, ValueError):
+            return
+        if isinstance(datos, dict):
+            self._plantillas.setdefault(libro, {})[tipo] = datos
+
+    def _variables_de_pagina(self, libro: tuple[str, str], tipo: str) -> set[str]:
+        """Los campos de texto de una página de ese tipo según su plantilla (vacío si es de Patchouli o no hay)."""
+        plantillas = self._plantillas.get(libro[1], {})
+        if ":" not in tipo:  # sin espacio: el del libro (`BookTemplate.createTemplate`); se prueba el de la entrada
+            tipo = f"{libro[0]}:{tipo}"
+        return set() if tipo.startswith("patchouli:") else variables_de_texto(plantillas, tipo)
 
     def _externos(self) -> dict[tuple[str, ...], dict[str, bytes]]:
         """Libros propios del modpack en <instancia>/patchouli_books/<libro>/<idioma>/.
@@ -161,6 +229,8 @@ class Libros:
                 continue
             sistema = clave[0]
             archivo = _Archivo(sistema, ingles, self._destino(clave), externo=sistema == "externo")
+            if sistema == "patchouli":
+                archivo.libro = (clave[1], clave[2])
             archivo.existentes = {v: por_idioma[v] for v in self.ctx.variantes if v in por_idioma}
             if not archivo.existentes:  # si ya hay alguna variante de español, se copia sin gastar
                 self._preparar(archivo)
@@ -170,7 +240,16 @@ class Libros:
                 "Libros antiguos de Patchouli con el texto dentro del jar (no se traducen sin modificar el mod): "
                 + ", ".join(self.sin_traducir_posible)
             )
-        return [p for a in self._archivos for p in a.piezas]
+        piezas = [p for a in self._archivos for p in a.piezas]
+        # Un texto que también es del libro se traduce solo como libro (y esa traducción sirve para los dos)
+        propios = {p.texto for p in piezas if not p.ambito}
+        piezas = [p for p in piezas if not p.ambito or p.texto not in propios]
+        self._ambitos = {p.texto: p.ambito for p in piezas if p.ambito}
+        return piezas
+
+    def ambito_de(self, texto: str) -> str:
+        """El ámbito de un texto que juntó `recolectar` («ui» para los campos de plantilla; si no, libro)."""
+        return self._ambitos.get(texto, AMBITO)
 
     @staticmethod
     def _destino(clave: tuple[str, ...]) -> Callable[[str], str]:
@@ -211,6 +290,15 @@ class Libros:
             [p for c in elegidas for p in piezas_de(c.texto, f"libro: {c.campo}")],
             lambda p: p.pista in ("libro: name", "libro: title"),
         )
+        # Campos que una plantilla propia muestra como texto («heading» de Blood Magic): van aparte y con el tono de la
+        # interfaz (casi siempre son nombres), para que los lotes y pistas del libro salgan igual que sin ellos
+        extra = self._de_plantilla(a, cadenas, campos)
+        a.piezas += [
+            Pieza(p.texto, p.pista, AMBITO_PLANTILLA)
+            for c in extra
+            for p in piezas_de(c.texto, f"libro: {c.campo} (dato de una página con plantilla)")
+        ]
+        elegidas += extra
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             nuevos = {c.inicio: aplicar(c.texto, trad) for c in elegidas}
@@ -218,6 +306,27 @@ class Libros:
             return json_cadenas.reemplazar(texto, cadenas, nuevos).encode("utf-8"), hechos, len(a.piezas) - hechos
 
         a.generar = generar
+
+    def _de_plantilla(
+        self, a: _Archivo, cadenas: list[json_cadenas.CadenaJson], campos: frozenset[str]
+    ) -> list[json_cadenas.CadenaJson]:
+        if a.libro is None:
+            return []
+        tipos = {
+            c.ruta[1]: c.texto for c in cadenas if len(c.ruta) == 3 and c.ruta[0] == "pages" and c.ruta[2] == "type"
+        }
+        variables = {i: self._variables_de_pagina(a.libro, tipo) for i, tipo in tipos.items()}
+        return [
+            c
+            for c in cadenas
+            if len(c.ruta) == 3
+            and c.ruta[0] == "pages"
+            and isinstance(c.ruta[2], str)
+            and c.ruta[2] not in campos
+            and c.ruta[2] in variables.get(c.ruta[1], ())
+            and not c.texto.strip().startswith("#")
+            and not parece_clave(c.texto)
+        ]
 
     def _preparar_citadel(self, a: _Archivo, texto: str) -> None:
         texto = texto.replace("\r\n", "\n")

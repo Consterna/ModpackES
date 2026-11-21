@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,6 +13,37 @@ from .cambios import Lugar
 AMBITO = "mision"
 #: Campos con texto visible en FTB Quests (1.12 usa «text» para la descripción larga).
 CAMPOS_FTBQ = frozenset({"title", "subtitle", "description", "text", "hover", "lock_message"})
+#: Nombre y descripción de un objeto en su NBT (hasta 1.20.4: display.Name/Lore) o en sus componentes (1.20.5+).
+_NOMBRES_DE_OBJETO = frozenset({"minecraft:custom_name", "minecraft:item_name", "minecraft:lore", "custom_name",
+                                "item_name", "lore"})  # fmt: skip
+
+
+AMBITO_RECOMPENSA = "ui"
+PISTA_RECOMPENSA = "nombre o descripción de un objeto que da una misión de recompensa"
+
+
+def es_nombre_de_recompensa(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
+    """El nombre o la descripción de un objeto que da una misión como **recompensa**.
+
+    Solo bajo `rewards` y nunca bajo `tasks`: en una tarea, FTB Quests compara el NBT del objeto que entrega el
+    jugador, y cambiarle el nombre rompería la misión.
+    """
+    if "rewards" not in c.ruta or "tasks" in c.ruta or c.texto.lstrip().startswith('"'):
+        return False  # una cadena JSON suelta («"Golden Bite"») no se reconstruye: se deja igual
+    if c.campo in ("Name", "Lore"):
+        return "display" in c.ruta[-2:]
+    return c.campo in _NOMBRES_DE_OBJETO and "components" in c.ruta
+
+
+def piezas_de_recompensa(nombres: Sequence[snbt.Cadena | nbt.CadenaNbt]) -> list[Pieza]:
+    """Las piezas de los nombres de recompensa: en su propio pedido, con el tono de la interfaz."""
+    return [Pieza(p.texto, p.pista, AMBITO_RECOMPENSA) for c in nombres for p in piezas_de(c.texto, PISTA_RECOMPENSA)]
+
+
+def es_texto_ftbq(c: snbt.Cadena) -> bool:
+    return c.campo in CAMPOS_FTBQ or es_nombre_de_recompensa(c)
+
+
 _NEUTRO_SNBT = b"{\n}\n"
 
 
@@ -49,6 +80,7 @@ class _Base:
     def __init__(self, ctx: Contexto) -> None:
         self.ctx = ctx
         self._trabajos: list[_Trabajo] = []
+        self._ambitos: dict[str, str] = {}
 
     def detectar(self) -> bool:
         raise NotImplementedError
@@ -61,7 +93,16 @@ class _Base:
 
     def recolectar(self) -> list[Pieza]:
         self._trabajos = list(self._preparar())
-        return [p for t in self._trabajos for p in t.piezas]
+        piezas = [p for t in self._trabajos for p in t.piezas]
+        # Un texto que también es de una misión se traduce solo como misión (y esa traducción sirve para los dos)
+        propios = {p.texto for p in piezas if not p.ambito}
+        piezas = [p for p in piezas if not p.ambito or p.texto not in propios]
+        self._ambitos = {p.texto: p.ambito for p in piezas if p.ambito}
+        return piezas
+
+    def ambito_de(self, texto: str) -> str:
+        """El ámbito de un texto que juntó `recolectar` («ui» para los nombres de recompensa; si no, misión)."""
+        return self._ambitos.get(texto, self.ambito)
 
     def _preparar(self) -> Iterator[_Trabajo]:
         raise NotImplementedError
@@ -164,7 +205,7 @@ class FTBQuests(_Base):
             if original is None:
                 continue
             try:
-                yield self._trabajo_snbt(original.decode("utf-8"), [ruta], lambda c: c.campo in CAMPOS_FTBQ, {})
+                yield self._trabajo_snbt(original.decode("utf-8"), [ruta], es_texto_ftbq, {})
             except (ValueError, UnicodeDecodeError):
                 self.ctx.registro(f"{ruta.name} está dañado: se deja igual")
 
@@ -172,10 +213,20 @@ class FTBQuests(_Base):
         self, src: str, destinos: list[Path], filtro: Callable[[snbt.Cadena], bool], fijos: Mapping[int, str]
     ) -> _Trabajo:
         cadenas = [c for c in snbt.escanear(src) if filtro(c)]
+        # Los nombres de recompensa van aparte (sin vecindad y en el tono de la interfaz, como el nombre de un objeto),
+        # para que los textos de las misiones y sus pistas salgan igual que sin ellos
+        nombres = [c for c in cadenas if c.inicio not in fijos and es_nombre_de_recompensa(c)]
+        de_nombre = {c.inicio for c in nombres}
         piezas = con_vecindad(
-            [p for c in cadenas if c.inicio not in fijos for p in piezas_de(c.texto, f"misión: {c.campo}")],
+            [
+                p
+                for c in cadenas
+                if c.inicio not in fijos and c.inicio not in de_nombre
+                for p in piezas_de(c.texto, f"misión: {c.campo}")
+            ],
             _es_titulo,
         )
+        piezas += piezas_de_recompensa(nombres)
 
         def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
             nuevos: dict[int, str] = {}
@@ -248,9 +299,12 @@ class FTBQuests(_Base):
                 self.ctx.registro(f"No pude leer {ruta.name}: se deja igual")
                 continue
             textos = [c for c in nbt.cadenas(arbol) if c.campo in CAMPOS_FTBQ]
-            if not textos:
+            nombres = [c for c in nbt.cadenas(arbol) if c.campo not in CAMPOS_FTBQ and es_nombre_de_recompensa(c)]
+            if not textos and not nombres:
                 continue
+            # Como en SNBT: los nombres de recompensa van aparte, para que los textos de la misión salgan igual
             piezas = con_vecindad([p for c in textos for p in piezas_de(c.texto, f"misión: {c.campo}")], _es_titulo)
+            piezas += piezas_de_recompensa(nombres)
 
             def generar(
                 trad: Mapping[str, str], original: bytes = original, compresion: nbt.Compresion = compresion
@@ -258,7 +312,7 @@ class FTBQuests(_Base):
                 arbol, _ = nbt.leer(original)  # árbol nuevo cada vez: no se acumulan cambios
                 hechos = faltan = 0
                 for c in nbt.cadenas(arbol):
-                    if c.campo in CAMPOS_FTBQ:
+                    if c.campo in CAMPOS_FTBQ or es_nombre_de_recompensa(c):
                         us = unidades(c.texto)
                         hechos += sum(1 for u in us if u in trad)
                         faltan += sum(1 for u in us if u not in trad)

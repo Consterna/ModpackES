@@ -282,3 +282,80 @@ def test_las_misiones_json_llevan_su_titulo_y_el_texto_anterior(tmp_path: Path) 
         piezas = {p.texto: p.pista for p in HQM(ctx).recolectar()}
     assert "dentro de «Wood»" in piezas["Get some wood"]
     assert "dentro de" not in piezas["Wood"]
+
+
+RECOMPENSAS = r"""{
+	quests: [{
+		title: "Prank"
+		tasks: [{ id: "A1", type: "item", item: { id: "minecraft:paper", tag: { display: { Name: "[{\"text\":\"Secret Note\"}]" } } } }]
+		rewards: [
+			{ id: "B1", type: "item", item: { id: "minecraft:cake", tag: { display: { Name: "[{\"text\":\"Fun Prank\"}]", Lore: ["{\"text\":\"Eat it fast\"}"] } } } }
+			{ id: "B2", type: "item", item: { id: "minecraft:apple", components: { "minecraft:custom_name": "{\"text\":\"Golden Bite\"}", "minecraft:item_name": "\"Plain Json\"" } } }
+			{ id: "B3", type: "item", item: { id: "minecraft:stick", tag: { CustomData: { Name: "keep_me" } } } }
+		]
+	}]
+}
+"""
+
+
+def test_ftbquests_traduce_el_nombre_de_las_recompensas_y_no_el_de_las_tareas(tmp_path: Path, memoria: Memoria) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    capitulo = juego / "config" / "ftbquests" / "quests" / "chapters" / "prank.snbt"
+    capitulo.parent.mkdir(parents=True)
+    capitulo.write_text(RECOMPENSAS, encoding="utf-8")
+    inst, ctx = contexto(juego)
+    with inst:
+        modulo = FTBQuests(ctx)
+        piezas = {p.texto: p.ambito for p in modulo.recolectar()}
+        # La misión va con su tono; los nombres, aparte y en el de la interfaz (los lotes de misiones no cambian)
+        assert piezas == {"Prank": "", "Fun Prank": "ui", "Eat it fast": "ui", "Golden Bite": "ui"}
+        assert modulo.ambito_de("Fun Prank") == "ui" and modulo.ambito_de("Prank") == "mision"
+        ejecutar(FTBQuests(ctx), memoria)
+        textos = [c.texto for c in snbt.escanear(capitulo.read_text(encoding="utf-8"))]
+        assert '[{"text":"Secret Note"}]' in textos  # tarea: FTB Quests compara el NBT, no se toca
+        assert json.loads(next(t for t in textos if "Fun Prank" in t)) == [{"text": "«ES» Fun Prank"}]
+        assert json.loads(next(t for t in textos if "Eat it fast" in t)) == {"text": "«ES» Eat it fast"}
+        assert json.loads(next(t for t in textos if "Golden Bite" in t)) == {"text": "«ES» Golden Bite"}
+        assert '"Plain Json"' in textos  # cadena JSON suelta: no se reconstruye, se deja igual
+        assert "keep_me" in textos  # un «Name» que no está bajo display no es texto
+        FTBQuests(ctx).restaurar()
+    assert capitulo.read_text(encoding="utf-8") == RECOMPENSAS
+
+
+def _objeto_con_nombre(nombre: str, lore: str) -> nbt.Compuesto:
+    display = nbt.Compuesto()
+    display.hijos["Name"] = (nbt.STRING, nombre)
+    display.hijos["Lore"] = (nbt.LISTA, nbt.Lista(nbt.STRING, [lore]))
+    tag = nbt.Compuesto()
+    tag.hijos["display"] = (nbt.COMPUESTO, display)
+    item = nbt.Compuesto()
+    item.hijos["id"] = (nbt.STRING, "minecraft:cake")
+    item.hijos["tag"] = (nbt.COMPUESTO, tag)
+    entrada = nbt.Compuesto()
+    entrada.hijos["item"] = (nbt.COMPUESTO, item)
+    return entrada
+
+
+def test_ftbquests_nbt_de_112_traduce_recompensas_y_no_tareas(tmp_path: Path, memoria: Memoria) -> None:
+    juego = fabrica.prism(tmp_path, "1.12.2")
+    carpeta = juego / "config" / "ftbquests" / "normal" / "chapters" / "abc"
+    carpeta.mkdir(parents=True)
+    c = nbt.Compuesto()
+    c.hijos["title"] = (nbt.STRING, "Party")
+    c.hijos["tasks"] = (nbt.LISTA, nbt.Lista(nbt.COMPUESTO, [_objeto_con_nombre("Secret Note", "Keep it")]))
+    c.hijos["rewards"] = (nbt.LISTA, nbt.Lista(nbt.COMPUESTO, [_objeto_con_nombre("Fun Prank", "Eat it fast")]))
+    original = nbt.escribir(nbt.Raiz(nbt.COMPUESTO, "", c))
+    (carpeta / "q1.nbt").write_bytes(original)
+    inst, ctx = contexto(juego)
+    with inst:
+        modulo = FTBQuests(ctx)
+        assert {(p.texto, p.ambito) for p in modulo.recolectar()} == {
+            ("Party", ""), ("Fun Prank", "ui"), ("Eat it fast", "ui")
+        }  # fmt: skip
+        ejecutar(FTBQuests(ctx), memoria)
+        raiz, _ = nbt.leer((carpeta / "q1.nbt").read_bytes())
+        textos = {(x.ruta[0], x.campo, x.texto) for x in nbt.cadenas(raiz) if x.campo in ("Name", "Lore")}
+        assert textos == {("tasks", "Name", "Secret Note"), ("tasks", "Lore", "Keep it"),  # la tarea no se toca
+                          ("rewards", "Name", "«ES» Fun Prank"), ("rewards", "Lore", "«ES» Eat it fast")}  # fmt: skip
+        FTBQuests(ctx).restaurar()
+    assert gzip.decompress((carpeta / "q1.nbt").read_bytes()) == gzip.decompress(original)

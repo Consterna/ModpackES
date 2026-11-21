@@ -205,3 +205,55 @@ def test_metodos_de_texto_de_kubejs_por_version() -> None:
     assert "notify" not in llamadas_de_texto((1, 16, 5)) and "notify" in llamadas_de_texto((1, 19, 2))
     assert "openChestGUI" not in llamadas_de_texto((1, 19, 2)) and "openChestGUI" in llamadas_de_texto((1, 20, 1))
     assert "openChestGUI" in llamadas_de_texto((26, 1, 0)) and "openChestGUI" in llamadas_de_texto(None)
+
+
+def test_grupos_de_rei_solo_traducen_el_nombre(tmp_path: Path) -> None:
+    """KubeJS `REIGroupEntriesEventJS`: el argumento 0 es el id del grupo y el 1 su nombre; el 2 es un tipo o etiqueta."""
+    from traductor_es.modulos.scripts import es_texto_visible
+
+    src = (
+        "REIEvents.groupEntries(e => {\n"
+        "  e.groupItems('kibe:rei_groups/gliders', 'Gliders', [/glider$/])\n"
+        "  e.groupItemsByTag('kubejs:rei_groups/ingots', 'All the ingots', 'forge:ingots')\n"
+        "})\n"
+        "onEvent('rei.group', event => {\n"
+        "  event.groupEntries(`mekanism:rei_groups/gas`, 'Gas!', 'mekanism:jei_plugin_jei_compat_gasstack', gases)\n"
+        "})\n"
+        "someOther.groupItems('x:y', 'Not REI', [])\n"
+    )
+    elegidas = {c.texto for c in js.escanear(src) if es_texto_visible(c)}
+    assert elegidas == {"Gliders", "All the ingots", "Gas!"}
+
+
+def test_grupos_de_rei_van_en_su_propio_pedido(tmp_path: Path, memoria: Memoria) -> None:
+    """Los nombres de grupo van con el tono de la interfaz y aparte: los lotes de los demás textos no cambian."""
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    ruta = juego / "kubejs" / "client_scripts" / "rei.js"
+    ruta.parent.mkdir(parents=True)
+    original = (
+        "REIEvents.groupEntries(e => {\n"
+        "  e.groupItems('kibe:rei_groups/gliders', 'Gliders', [/glider$/])\n"
+        "  e.groupItems('kibe:rei_groups/both', 'Shiny', [])\n"
+        "})\n"
+        "ItemEvents.tooltip(e => { e.add('minecraft:apple', 'Shiny') })\n"
+    )
+    ruta.write_text(original, encoding="utf-8")
+    with Instancia(juego) as inst:
+        ctx = Contexto(inst, Respaldo(juego))
+        modulo = ScriptsKubeJS(ctx)
+        # «Shiny» también es un tooltip: va solo con el script y su traducción sirve para los dos
+        assert sorted((p.texto, p.ambito) for p in modulo.recolectar()) == [("Gliders", "ui"), ("Shiny", "")]
+        assert modulo.ambito_de("Gliders") == "ui" and modulo.ambito_de("Shiny") == "script"
+        traducir_modulo(modulo, Traductor(Simulador(), memoria, Glosario()))
+        nuevo = ruta.read_text(encoding="utf-8")
+        assert "'«ES» Gliders'" in nuevo and nuevo.count("'«ES» Shiny'") == 2
+        ScriptsKubeJS(ctx).restaurar()
+    assert ruta.read_text(encoding="utf-8") == original
+
+
+def test_lang_con_saltos_sin_escapar_se_lee_como_en_el_juego() -> None:
+    """Gson acepta un salto de línea literal dentro de una cadena (Shoulder Surfing, Extended Drawers): antes se saltaba
+    el archivo entero y el mod quedaba en inglés."""
+    datos = b'{\n  "a.b": "First line.\n\nSecond line.",\n  "a.c": "Tab\there"\n}\n'
+    assert lang_json.leer(datos) == {"a.b": "First line.\n\nSecond line.", "a.c": "Tab\there"}
+    assert json.loads(lang_json.escribir(lang_json.leer(datos))) == lang_json.leer(datos)  # se escribe escapado
