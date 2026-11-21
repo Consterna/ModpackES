@@ -169,3 +169,25 @@ def test_registro_corrupto_no_hace_perder_el_original_si_la_copia_sigue(juego: P
     (juego / "traductor_es" / "registro.json").write_bytes(b"\x00\x00basura")
     # La copia del original sigue en su sitio aunque el registro se dañó
     assert (juego / "traductor_es" / "respaldo" / "kubejs" / "a.js").read_bytes() == b"ORIGINAL"
+
+
+def test_kit_de_servidor_no_mete_archivos_de_fuera_con_un_registro_hostil(juego: Path) -> None:
+    from traductor_es.salida.exportar import exportar_kit_servidor
+
+    secreto = juego.parent / "secreto.txt"
+    secreto.write_bytes(b"datos personales")
+    archivo = juego / "config" / "ftbquests" / "quests" / "a.snbt"
+    archivo.parent.mkdir(parents=True)
+    archivo.write_bytes(b"ORIGINAL")
+    Respaldo(juego).escribir(archivo, b"TRADUCIDO")
+    datos = json.loads((juego / "traductor_es" / "registro.json").read_text(encoding="utf-8"))
+    datos["config/../../secreto.txt"] = {"existia": True, "escrito": "abc"}
+    _registro(juego, datos)
+    destino = juego.parent / "kit.zip"
+    exportar_kit_servidor(juego, destino)
+    import zipfile
+
+    with zipfile.ZipFile(destino) as z:
+        nombres = z.namelist()
+        assert "config/ftbquests/quests/a.snbt" in nombres
+        assert all(b"datos personales" not in z.read(n) for n in nombres)
