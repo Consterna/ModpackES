@@ -124,6 +124,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **«Restaurar» podía escribir fuera de la instancia:** un modpack que trajera su propio 	raductor_es/registro.json con rutas como ../../algo hacía que restaurar copiara o vaciara archivos fuera de la carpeta del juego. Ahora esas rutas se ignoran, y tampoco se siguen enlaces ni uniones que salgan de la instancia.
+- **Un corte justo después de escribir un archivo traducido podía perder el original:** si el registro de copias no se podía guardar (disco lleno, antivirus, cierre de la app en ese instante), la corrida siguiente tomaba la traducción por el original y pisaba la copia; restaurar dejaba el texto en español. Ahora se anota lo que se va a escribir antes de escribirlo.
 - **Mods cuyo archivo de idioma trae un salto de línea sin escapar dentro de un texto** (Shoulder Surfing, Extended Drawers): el juego los lee, pero la app descartaba el archivo entero y el mod quedaba en inglés sin aviso. En los 47 packs de la auditoría eran 8 jars y 1.268 textos.
 - **Jars anidados que Fabric y Quilt cargan fuera de `META-INF/jars`:** un mod puede declarar en `fabric.mod.json` (`jars[].file`) o en `quilt.mod.json` jars que están en la raíz u otra carpeta (Simple Pipes lo hace), y su idioma quedaba sin leer.
 - **Instancias que nunca se abrieron:** sin `options.txt`, el pack no se puede activar ni elegir el idioma, y el juego seguía en inglés sin aviso. Ahora el informe lo dice y explica cómo activarlo. No se inventa un `options.txt`.

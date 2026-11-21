@@ -22,6 +22,16 @@ def _huella(datos: bytes) -> str:
     return hashlib.sha1(datos).hexdigest()
 
 
+def _clave_segura(clave: object) -> bool:
+    """Una ruta relativa que no sale de la instancia: sin «..», sin unidad, sin barra inicial ni barras invertidas.
+
+    El registro vive dentro de la instancia y un modpack puede traer uno fabricado: lo que no cumpla esto se ignora.
+    """
+    if not isinstance(clave, str) or not clave or "\\" in clave or ":" in clave or clave.startswith("/"):
+        return False
+    return all(parte not in ("", ".", "..") for parte in clave.split("/"))
+
+
 class Respaldo:
     def __init__(self, juego: Path) -> None:
         self.juego = juego
@@ -34,7 +44,18 @@ class Respaldo:
             datos: Any = json.loads(self.registro.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
-        return cast(dict[str, dict[str, Any]], datos) if isinstance(datos, dict) else {}
+        if not isinstance(datos, dict):
+            return {}
+        entradas = cast(dict[object, object], datos)
+        return {
+            cast(str, k): cast(dict[str, Any], v)
+            for k, v in entradas.items()
+            if _clave_segura(k) and isinstance(v, dict)
+        }
+
+    def _dentro(self, ruta: Path) -> bool:
+        """La ruta (siguiendo enlaces y uniones) sigue dentro de la instancia."""
+        return ruta.resolve().is_relative_to(self.juego.resolve())
 
     def _guardar(self) -> None:
         self.registro.parent.mkdir(parents=True, exist_ok=True)
@@ -53,7 +74,9 @@ class Respaldo:
         """
         if entrada is None or actual is None:
             return False
-        if entrada.get("escrito") == _huella(actual):
+        huella = _huella(actual)
+        # «pendiente»: la app iba a escribir eso y el proceso se cortó antes de terminar de anotarlo
+        if huella in (entrada.get("escrito"), entrada.get("pendiente")):
             return not entrada.get("existia") or (self.base / clave).is_file()
         neutro = entrada.get("neutro")
         return (
@@ -95,13 +118,17 @@ class Respaldo:
                 entrada = {"existia": True}
             self._datos[clave] = entrada
         assert entrada is not None
-        entrada["escrito"] = _huella(datos)
+        # Primero se anota lo que se va a escribir y después se escribe: si el proceso se corta o el registro no se
+        # puede guardar en medio, el archivo nuevo se sigue reconociendo como de la app y la copia no se pisa.
+        entrada["pendiente"] = _huella(datos)
         entrada["neutro"] = neutro.decode("utf-8", errors="replace") if not entrada.get("existia") else None
         entrada["fecha"] = datetime.now(UTC).isoformat(timespec="seconds")
+        self._guardar()
         ruta.parent.mkdir(parents=True, exist_ok=True)
         temporal = ruta.with_name(ruta.name + ".traductor.tmp")
         temporal.write_bytes(datos)
         temporal.replace(ruta)
+        entrada["escrito"] = entrada.pop("pendiente")
         self._guardar()
 
     def restaurar(self, prefijo: str = "") -> list[Path]:
@@ -113,11 +140,13 @@ class Respaldo:
         hechos: list[Path] = []
         sin_copia: list[str] = []
         for clave, entrada in sorted(self._datos.items()):
-            if not clave.startswith(prefijo) or entrada.get("escrito") is None:
+            if not clave.startswith(prefijo) or (entrada.get("escrito") is None and entrada.get("pendiente") is None):
                 continue
             ruta = self.juego / clave
+            copia = self.base / clave
+            if not (self._dentro(ruta) and self._dentro(copia)):
+                continue  # un enlace o una unión dentro de la instancia que apunta afuera: no se sigue
             if entrada.get("existia"):
-                copia = self.base / clave
                 if not copia.is_file():
                     sin_copia.append(clave)
                     continue
@@ -126,6 +155,7 @@ class Respaldo:
             elif ruta.is_file():
                 ruta.write_bytes(str(entrada.get("neutro") or "").encode("utf-8"))
             entrada["escrito"] = None
+            entrada.pop("pendiente", None)
             hechos.append(ruta)
         self._guardar()
         if sin_copia:
@@ -137,4 +167,6 @@ class Respaldo:
         return hechos
 
     def registrados(self, prefijo: str = "") -> list[str]:
-        return sorted(k for k, e in self._datos.items() if k.startswith(prefijo) and e.get("escrito"))
+        return sorted(
+            k for k, e in self._datos.items() if k.startswith(prefijo) and (e.get("escrito") or e.get("pendiente"))
+        )
