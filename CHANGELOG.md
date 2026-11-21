@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **El glosario propio y las preferencias se podían perder con un corte:** se escribían directamente sobre el archivo, y un apagón o un disco lleno en ese momento lo dejaba a medias; al abrir de nuevo, la app lo tomaba como vacío. Ahora se escriben en un temporal y se ponen en su sitio al terminar.
 - **«Restaurar» podía escribir fuera de la instancia:** un modpack que trajera su propio 	raductor_es/registro.json con rutas como ../../algo hacía que restaurar copiara o vaciara archivos fuera de la carpeta del juego. Ahora esas rutas se ignoran, y tampoco se siguen enlaces ni uniones que salgan de la instancia.
 - **Un corte justo después de escribir un archivo traducido podía perder el original:** si el registro de copias no se podía guardar (disco lleno, antivirus, cierre de la app en ese instante), la corrida siguiente tomaba la traducción por el original y pisaba la copia; restaurar dejaba el texto en español. Ahora se anota lo que se va a escribir antes de escribirlo.
 - **Mods cuyo archivo de idioma trae un salto de línea sin escapar dentro de un texto** (Shoulder Surfing, Extended Drawers): el juego los lee, pero la app descartaba el archivo entero y el mod quedaba en inglés sin aviso. En los 47 packs de la auditoría eran 8 jars y 1.268 textos.
