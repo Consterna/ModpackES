@@ -191,3 +191,22 @@ def test_kit_de_servidor_no_mete_archivos_de_fuera_con_un_registro_hostil(juego:
         nombres = z.namelist()
         assert "config/ftbquests/quests/a.snbt" in nombres
         assert all(b"datos personales" not in z.read(n) for n in nombres)
+
+
+def test_corte_antes_de_crear_un_archivo_nuevo_no_vacia_el_que_trae_despues_el_modpack(
+    juego: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regresión encontrada por la verificación independiente del arreglo de H-002."""
+    nuevo = juego / "config" / "ftbquests" / "lang" / "es_mx.snbt"
+    nuevo.parent.mkdir(parents=True)
+    _cortar_en(monkeypatch, 2)  # 1: el registro con la huella pendiente; 2: el archivo temporal
+    with pytest.raises(Corte):
+        Respaldo(juego).escribir(nuevo, b"TRADUCIDO", neutro=b"{}\n")
+    monkeypatch.undo()
+    for temporal in nuevo.parent.glob("*.tmp"):
+        temporal.unlink()
+    assert not nuevo.exists()
+    nuevo.write_bytes(b"DEL MODPACK ACTUALIZADO")  # una actualización trae ese archivo
+    Respaldo(juego).restaurar()
+    assert nuevo.read_bytes() == b"DEL MODPACK ACTUALIZADO"
+    assert Respaldo(juego).registrados() == []

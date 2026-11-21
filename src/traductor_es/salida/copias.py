@@ -146,6 +146,13 @@ class Respaldo:
             copia = self.base / clave
             if not (self._dentro(ruta) and self._dentro(copia)):
                 continue  # un enlace o una unión dentro de la instancia que apunta afuera: no se sigue
+            if entrada.get("escrito") is None and not (
+                ruta.is_file() and _huella(ruta.read_bytes()) == entrada.get("pendiente")
+            ):
+                # Una escritura cortada antes de terminar: si el archivo no es el que iba a escribir la app (no
+                # llegó a crearlo, o lo trajo después una actualización del modpack), no hay nada que devolver
+                entrada.pop("pendiente", None)
+                continue
             if entrada.get("existia"):
                 if not copia.is_file():
                     sin_copia.append(clave)
