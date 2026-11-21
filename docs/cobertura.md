@@ -57,7 +57,7 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 | Fuente | Dónde vive | Estado | Notas |
 |---|---|---|---|
 | FTB Quests: SNBT, carpeta `lang/` y NBT de 1.12 | `config/ftbquests/quests/` | ✅ | `modulos/misiones.py` |
-| Nombre y descripción de los objetos de **recompensa** de FTB Quests | `rewards[].item`: `tag.display.Name`/`Lore` (hasta 1.20.4) o `components` `custom_name`/`item_name`/`lore` (1.20.5+) | ✅ | Nunca bajo `tasks`: ahí FTB Quests compara el NBT del objeto que entrega el jugador, y cambiarle el nombre rompería la misión. El título y la descripción de la misión y de cada tarea se traducen como siempre. Pedido aparte, con el tono de la interfaz. |
+| Nombre y descripción de los objetos de **recompensa** de FTB Quests | `rewards[].item`: `tag.display.Name`/`Lore` (hasta 1.20.4, en SNBT y en el NBT de 1.12) o `components` `custom_name`/`item_name`/`lore` (1.20.5+) | ✅ | Nunca bajo `tasks`: ahí FTB Quests compara el NBT del objeto que entrega el jugador, y cambiarle el nombre rompería la misión. El título y la descripción de la misión y de cada tarea se traducen como siempre. Pedido aparte, con el tono de la interfaz. |
 | FTB Quests en otras raíces | `config/ftbquests/normal/` (FTB Interactions Remastered), `config/ftb_quests/`, `defaultconfigs/ftbquests/` | ❌ | por confirmar en el corpus |
 | FTB Quests en JSON5 | `data.json5` y lang `.json5` | ❌ | por confirmar |
 | BetterQuesting | `DefaultQuests.json`, carpeta `DefaultQuests/` | ✅ | |
