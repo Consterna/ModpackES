@@ -29,7 +29,7 @@ def cargar(texto: str, literal: bool = False) -> Any | None:
         return None
     try:
         datos: Any = json.loads(texto)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, RecursionError):
         return None
     if isinstance(datos, (list, dict)):
         return cast("list[Any] | dict[str, Any]", datos)

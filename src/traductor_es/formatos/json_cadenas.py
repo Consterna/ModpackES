@@ -48,7 +48,10 @@ def _fin_de_cadena(src: str, i: int) -> int:
 
 def escanear(src: str) -> list[CadenaJson]:
     """Cadenas que son valores (no claves). Valida la sintaxis: un JSON roto lanza ValueError."""
-    json.loads(src)  # que el archivo sea JSON válido antes de tocar nada
+    try:
+        json.loads(src)  # que el archivo sea JSON válido antes de tocar nada
+    except RecursionError as e:  # miles de niveles de anidamiento: se trata como un JSON roto
+        raise ValueError("JSON con demasiados niveles de anidamiento") from e
     res: list[CadenaJson] = []
     pila: list[_Nivel] = []
     i, n = 0, len(src)

@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Un solo archivo roto del modpack podía parar todo el análisis:** un jar dañado (descarga a medias, entrada cifrada) o un JSON con miles de niveles de anidamiento daban «Error no previsto» y no se traducía nada. Ahora ese archivo se salta, el informe lo nombra y lo demás se traduce.
 - **Un texto que ya traía «⟦0⟧» o «⟦⟧» nunca se traducía:** esos corchetes son los que usa la app para proteger códigos, y el texto se descartaba entero. Ahora se protegen como un código más y el texto se traduce.
 - **Un jar trampa podía llenar la memoria:** las entradas de jars y zips se descomprimían enteras, y un jar de pocos KB podía declarar cientos de MB. Ahora lo que pasa de 64 MiB por entrada se salta como si estuviera dañado, el resto se traduce y el informe lo avisa. Ningún archivo real de idioma, libro o script se acerca a ese tamaño.
 - **«Restaurar» podía pisar lo que había cambiado después de traducir:** si actualizabas el modpack (o editabas a mano un archivo traducido) y después restaurabas, volvía la versión vieja encima de la nueva. Ahora solo se restaura lo que sigue tal como lo dejó la app; lo demás se deja y el aviso lo nombra. Un archivo que borraste se sigue recreando.

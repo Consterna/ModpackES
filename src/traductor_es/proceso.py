@@ -262,7 +262,8 @@ class Proceso:
         tambien_es_es: bool = False,
         calidad: str = PERFIL_POR_DEFECTO,
     ) -> None:
-        contenedores.DESCARTADAS.clear()  # el aviso de entradas demasiado grandes es de esta instancia
+        contenedores.DESCARTADAS.clear()  # los avisos de entradas grandes o dañadas son de esta instancia
+        contenedores.DANADAS.clear()
         self.instancia = Instancia(carpeta)
         #: Perfil de calidad (ver `Traductor.perfil`); el máximo incluye la revisión de misiones y libros
         self.calidad = calidad
@@ -451,7 +452,8 @@ class Proceso:
         for grupo, modulo in self.modulos():
             try:
                 piezas = modulo.recolectar()
-            except (ValueError, OSError) as e:  # se deja fuera ese grupo y se avisa: el resto se puede traducir
+            # RecursionError: un archivo del modpack con miles de niveles de anidamiento que se escapó del parser
+            except (ValueError, OSError, RecursionError) as e:  # se deja fuera ese grupo y se avisa
                 informe.avisos.append(f"{modulo.nombre}: no se pudo leer ({e}). Queda fuera de la traducción.")
                 if grupo not in informe.fallidos:
                     informe.fallidos.append(grupo)
@@ -478,7 +480,7 @@ class Proceso:
         for grupo, modulo in self.modulos(self._espana.ctx):
             try:
                 piezas = modulo.recolectar()
-            except (ValueError, OSError):  # ya se avisó en la pasada principal
+            except (ValueError, OSError, RecursionError):  # ya se avisó en la pasada principal
                 continue
             pendientes = pendientes_de(self._espana.traductor, modulo, [p.texto for p in piezas])
             # Sin contar los textos otra vez: son los mismos de la pasada principal
@@ -714,13 +716,22 @@ class Proceso:
     @staticmethod
     def _avisos_de_tamano() -> list[str]:
         """Archivos de jars o zips que no se leyeron por pasar el tope (dañados o «bombas» de compresión)."""
+        avisos: list[str] = []
+        if contenedores.DANADAS:
+            danadas = sorted(contenedores.DANADAS)
+            resto = f" y {len(danadas) - 5} más" if len(danadas) > 5 else ""
+            avisos.append(
+                f"Salté {len(danadas)} archivos dañados dentro de jars o zips (no se pudieron descomprimir): "
+                f"{', '.join(danadas[:5])}{resto}. Si es un mod, vuelve a descargarlo."
+            )
         if not contenedores.DESCARTADAS:
-            return []
+            return avisos
         lista = sorted(contenedores.DESCARTADAS)
         mas = f" y {len(lista) - 5} más" if len(lista) > 5 else ""
         return [
+            *avisos,
             f"Salté {len(lista)} archivos de más de {contenedores.MAXIMO_ENTRADA // 2**20} MiB dentro de jars o "
-            f"zips (puede ser un archivo dañado o hecho para llenar la memoria): {', '.join(lista[:5])}{mas}."
+            f"zips (puede ser un archivo dañado o hecho para llenar la memoria): {', '.join(lista[:5])}{mas}.",
         ]
 
     def _avisos(self) -> list[str]:

@@ -6,6 +6,7 @@ import io
 import json
 import os
 import zipfile
+import zlib
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -19,7 +20,15 @@ MAXIMO_ENTRADA = 64 * 2**20
 DESCARTADAS: set[str] = set()
 
 
-class EntradaDemasiadoGrande(zipfile.BadZipFile):
+#: Entradas que no se pudieron descomprimir (CRC malo, datos rotos, cifradas, compresión rara), para el aviso.
+DANADAS: set[str] = set()
+
+
+class EntradaIlegible(zipfile.BadZipFile, ValueError):
+    """Una entrada que no se puede leer. Es `BadZipFile` y `ValueError`: la saltan los que esperan cualquiera."""
+
+
+class EntradaDemasiadoGrande(EntradaIlegible):
     """Una entrada que pasa `MAXIMO_ENTRADA`: se trata como un archivo dañado (se salta, no se lee)."""
 
 
@@ -30,15 +39,22 @@ def _demasiado_grande(origen: str, info: zipfile.ZipInfo) -> bool:
     return True
 
 
-def leer_entrada(z: zipfile.ZipFile, entrada: str | zipfile.ZipInfo) -> bytes:
+def leer_entrada(z: zipfile.ZipFile, entrada: str | zipfile.ZipInfo, origen: str | None = None) -> bytes:
     """`z.read(entrada)` con el tope de tamaño. Lanza `EntradaDemasiadoGrande` (un `BadZipFile`) si lo pasa.
 
     El tamaño declarado limita lo que entrega `zipfile` (si miente, falla la comprobación CRC): basta con mirarlo.
     """
     info = entrada if isinstance(entrada, zipfile.ZipInfo) else z.getinfo(entrada)
-    if _demasiado_grande(str(z.filename or "zip"), info):
+    if origen is None:  # solo el nombre: el aviso no lleva rutas del PC
+        origen = Path(z.filename).name if z.filename else "zip"
+    if _demasiado_grande(origen, info):
         raise EntradaDemasiadoGrande(f"{info.filename} ocupa {info.file_size // 2**20} MiB: no se lee")
-    return z.read(info)
+    try:
+        return z.read(info)
+    except (zipfile.BadZipFile, zlib.error, RuntimeError, NotImplementedError, EOFError, OSError) as e:
+        # CRC malo o datos rotos (BadZipFile, zlib.error), cifrada (RuntimeError), método raro (NotImplementedError)
+        DANADAS.add(f"{origen}!/{info.filename}")
+        raise EntradaIlegible(f"{info.filename}: no se pudo descomprimir ({e})") from e
 
 
 class Contenedor(Protocol):
@@ -73,7 +89,7 @@ class Zip:
         return self._nombres
 
     def leer(self, ruta: str) -> bytes:
-        return leer_entrada(self._zf, ruta)
+        return leer_entrada(self._zf, ruta, self._nombre)
 
     def cerrar(self) -> None:
         self._zf.close()
