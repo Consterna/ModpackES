@@ -25,3 +25,14 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+
+  # Los mods de apoyo: Loom, ForgeGradle y ModDevGradle van atados a cada versión de Minecraft, así que solo se piden
+  # las actualizaciones de seguridad (open-pull-requests-limit: 0 apaga las de versión).
+  - package-ecosystem: gradle
+    directories: ["/mod-runtime/*"]
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: build
+      include: scope
