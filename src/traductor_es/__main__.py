@@ -348,7 +348,12 @@ _ORDENES: dict[str, Callable[[argparse.Namespace], None]] = {
 def main(argv: Sequence[str] | None = None) -> int:
     cast(Any, sys.stdout).reconfigure(encoding="utf-8", errors="replace")
     args = _argumentos().parse_args(argv)
-    configurar(configuracion.carpeta_datos())
+    datos = configuracion.carpeta_datos()
+    try:
+        configurar(datos)
+    except OSError as e:  # p. ej. TRADUCTOR_ES_DATOS apunta a un archivo o a una carpeta sin permiso
+        _escribir(f"✖ No puedo usar la carpeta de datos {datos} ({e.strerror or e}). Revisa TRADUCTOR_ES_DATOS.")
+        return 1
     LOGGER.info("Línea de comandos: %s", args.orden)
     try:
         if args.orden == "instancias":
