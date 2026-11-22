@@ -172,7 +172,8 @@ def main(argv: list[str] | None = None) -> int:
             salida = salida.with_name(f"{salida.stem}_{repeticion}{salida.suffix}")
         medicion.guardar(resultados, salida)
         print(f"\nDetalle en {salida}")
-        total += sum(m.costo_real or 0.0 for m in resultados)
+        # Las filas de una corrida son acumuladas (la de la revisión incluye la traducción): cuenta la mayor
+        total += max((m.costo_real or 0.0 for m in resultados), default=0.0)
     if total:
         print(f"Gasto real en la API: US$ {total:.4f}")
     return 0
