@@ -56,3 +56,14 @@ def test_lo_que_fija_el_usuario_manda_sobre_todo() -> None:
     g.agregar_pares({"a": "Chest"}, {"a": "Cofre"}, fuente="minecraft", oficial=True)
     g.fijar({"Chest": "Arcón"})
     assert g.todos()["Chest"] == "Arcón"
+
+
+def test_un_termino_ya_decidido_no_se_cae_si_otro_lo_traduce_distinto() -> None:
+    """Así se cortaba la traducción entera del pack ftb-103 («Force Shears»): `descubrir` no guardaba la fuente."""
+    g = Glosario()
+    g.descubrir({"Force Shears": "Tijeras de fuerza"})
+    g.agregar_pares({"k": "Force Shears"}, {"k": "Cizallas de fuerza"})
+    g.agregar_pares({"k": "Force Shears"}, {"k": "Force Shears"}, proteger_iguales=True)
+    assert g.todos()["Force Shears"] == "Tijeras de fuerza"
+    g.agregar_pares({"k": "Force Shears"}, {"k": "Tijeras"}, fuente="minecraft", oficial=True)
+    assert g.todos()["Force Shears"] == "Tijeras"  # lo del juego sigue mandando

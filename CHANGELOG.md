@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **La traducción de un modpack se cortaba con un error** cuando un nombre que la app ya había decidido (uno que se repite en el pack) volvía a llegar, traducido distinto, desde los mods. Pasaba en un pack de FTB real («Force Shears»). Ahora manda lo que ya se decidió y la traducción sigue.
 - **Un `.lang` de 1.12 cuya primera clave empieza con una marca de orden de bytes** perdía esa marca al volver a leerlo, y la clave cambiaba. Ahora el archivo empieza con una línea de comentario.
 - **FTB Quests en 1.21 con carpeta `lang/`:** lo que sigue en los capítulos quedaba en inglés: el texto de una recompensa de aviso, el mensaje de bloqueo de `data.snbt` y los nombres de los objetos de recompensa. Ahora se traducen en su lugar, con copia. El nombre de las **cajas de botín** (`loot_crate.item_name`) no se traducía en ninguna versión; su id (`string_id`) se deja.
 - **FTB Quests 26.x guarda las misiones en JSON5**, que la app todavía no traduce: antes las dejaba en inglés sin decir nada. Ahora el análisis y el registro lo avisan.
