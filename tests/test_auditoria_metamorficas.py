@@ -78,12 +78,13 @@ def _modpack(base: Path, nombre: str = "Pack") -> Path:
 def _foto(juego: Path, con_fechas: bool = False, sin_jars: bool = False) -> dict[str, object]:
     """Huella de cada archivo de la instancia (y, si se pide, su fecha de modificación).
 
+    La copia del registro (`registro.copia.json`) es interna, como el registro.
     `sin_jars`: para comparar dos instancias fabricadas por separado (los jars de prueba llevan la hora en que se
     crearon); que la app no toca los jars se comprueba aparte.
     """
     foto: dict[str, object] = {}
     for ruta in sorted(juego.rglob("*")):
-        if not ruta.is_file() or (sin_jars and ruta.suffix == ".jar"):
+        if not ruta.is_file() or (sin_jars and ruta.suffix == ".jar") or ruta.name == "registro.copia.json":
             continue
         clave = ruta.relative_to(juego).as_posix()
         datos = ruta.read_bytes()

@@ -33,7 +33,9 @@ SOLO_FECHA = (".jar",)
 #: de copias. Antes y después de cada foto se borran, para que cada pasada empiece igual.
 PROPIO_DE_LA_APP = ("traductor_es/", "resourcepacks/Traduccion_ES/")
 #: Metadatos que cambian en cada corrida (fecha, índice de cambios con los módulos que hubo): no son traducciones.
-METADATOS = frozenset({"resourcepacks/Traduccion_ES/traductor_es.json", "traductor_es/registro.json"})
+METADATOS = frozenset(
+    {"resourcepacks/Traduccion_ES/traductor_es.json", "traductor_es/registro.json", "traductor_es/registro.copia.json"}
+)
 #: Un subconjunto que cubre todas las fuentes (misiones, libros, scripts, datos, shaders, FancyMenu, descripciones,
 #: Origins) y versiones de 1.7.10 a 26.x. Los 47 packs, dos veces, tardan unas 8 horas.
 REPRESENTATIVOS = (

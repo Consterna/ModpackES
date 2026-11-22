@@ -2,9 +2,13 @@
 
 - Los originales se guardan en `<instancia>/traductor_es/respaldo/` con la misma ruta relativa.
 - Se registra la huella (SHA-1) de cada archivo escrito. Si al volver el archivo ya no coincide (p. ej. se
-  actualizó el modpack), se toma como nuevo original y se renueva la copia.
-- Restaurar devuelve cada original a su sitio. Los archivos que la app creó y que no existían se dejan con
-  contenido neutro (no se borra nada).
+  actualizó el modpack), se toma como nuevo original y se renueva la copia. La copia vieja nunca se pisa: se aparta
+  en `traductor_es/anteriores/<fecha>/`.
+- Una copia del registro, `registro.copia.json`, se actualiza tras cada escritura terminada: si `registro.json`
+  se daña o se borra, se usa esa.
+- Restaurar devuelve cada original a su sitio, pero solo si el archivo sigue como lo dejó la app; lo que cambió
+  después (una actualización del modpack, una edición a mano) se deja y se avisa. Los archivos que la app creó y
+  que no existían se dejan con contenido neutro (no se borra nada).
 """
 
 from __future__ import annotations
@@ -16,6 +20,10 @@ from pathlib import Path
 from typing import Any, cast
 
 CARPETA = "traductor_es"
+#: Copias que se renovaron (el modpack cambió): se apartan aquí en vez de pisarlas.
+ANTERIORES = "anteriores"
+#: Copia del registro que se actualiza tras cada escritura terminada (por si se daña o se borra el registro).
+REGISTRO_COPIA = "registro.copia.json"
 
 
 def _huella(datos: bytes) -> str:
@@ -32,36 +40,61 @@ def _clave_segura(clave: object) -> bool:
     return all(parte not in ("", ".", "..") for parte in clave.split("/"))
 
 
+def _leer_registro(ruta: Path) -> dict[str, dict[str, Any]] | None:
+    """Las entradas válidas de un registro, o None si no existe o no se puede leer."""
+    try:
+        datos: Any = json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(datos, dict):
+        return None
+    entradas = cast(dict[object, object], datos)
+    return {
+        cast(str, k): cast(dict[str, Any], v) for k, v in entradas.items() if _clave_segura(k) and isinstance(v, dict)
+    }
+
+
+def _escribir_entero(ruta: Path, datos: bytes) -> None:
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    temporal = ruta.with_name(ruta.name + ".traductor.tmp")
+    temporal.write_bytes(datos)
+    temporal.replace(ruta)
+
+
 class Respaldo:
     def __init__(self, juego: Path) -> None:
         self.juego = juego
         self.base = juego / CARPETA / "respaldo"
         self.registro = juego / CARPETA / "registro.json"
+        self.copia_registro = juego / CARPETA / REGISTRO_COPIA
+        #: Lo que el último `restaurar` dejó como estaba porque cambió después de traducir.
+        self.cambiados: list[str] = []
         self._datos: dict[str, dict[str, Any]] = self._cargar()
 
     def _cargar(self) -> dict[str, dict[str, Any]]:
-        try:
-            datos: Any = json.loads(self.registro.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
-        if not isinstance(datos, dict):
-            return {}
-        entradas = cast(dict[object, object], datos)
-        return {
-            cast(str, k): cast(dict[str, Any], v)
-            for k, v in entradas.items()
-            if _clave_segura(k) and isinstance(v, dict)
-        }
+        for ruta in (self.registro, self.copia_registro):
+            datos = _leer_registro(ruta)
+            if datos is not None:
+                return datos
+        return {}
 
     def _dentro(self, ruta: Path) -> bool:
         """La ruta (siguiendo enlaces y uniones) sigue dentro de la instancia."""
         return ruta.resolve().is_relative_to(self.juego.resolve())
 
-    def _guardar(self) -> None:
-        self.registro.parent.mkdir(parents=True, exist_ok=True)
-        temporal = self.registro.with_name("registro.json.tmp")
-        temporal.write_text(json.dumps(self._datos, indent=1, ensure_ascii=False, sort_keys=True), encoding="utf-8")
-        temporal.replace(self.registro)
+    def _exigir_dentro(self, ruta: Path) -> None:
+        if not self._dentro(ruta):
+            raise OSError(
+                f"{ruta} apunta fuera de la instancia (¿un enlace o una unión en {CARPETA}?): no escribo ahí. "
+                f"Mueve o borra la carpeta {self.juego / CARPETA} y vuelve a intentarlo."
+            )
+
+    def _guardar(self, con_copia: bool = True) -> None:
+        """Guarda el registro y, si se pide, también su copia (no en la anotación previa a cada escritura)."""
+        texto = json.dumps(self._datos, indent=1, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        for destino in [self.registro, self.copia_registro] if con_copia else [self.registro]:
+            self._exigir_dentro(destino)
+            _escribir_entero(destino, texto)
 
     def _clave(self, ruta: Path) -> str:
         return ruta.resolve().relative_to(self.juego.resolve()).as_posix()
@@ -101,6 +134,21 @@ class Respaldo:
         # lo de ahora es el original
         return actual
 
+    def _apartar(self, clave: str) -> None:
+        """Mueve la copia que había a `anteriores/<fecha>/`: un original nunca se pierde por renovar la copia."""
+        copia = self.base / clave
+        if not copia.is_file():
+            return
+        sello = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        carpeta = self.juego / CARPETA / ANTERIORES / sello
+        destino, n = carpeta / clave, 1
+        while destino.exists():
+            n += 1
+            destino = carpeta.with_name(f"{sello}-{n}") / clave
+        self._exigir_dentro(destino)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        copia.replace(destino)
+
     def escribir(self, ruta: Path, datos: bytes, neutro: bytes = b"") -> None:
         """Escribe un archivo traducido y lo registra. `neutro` es lo que queda si se restaura y no existía."""
         clave = self._clave(ruta)
@@ -112,9 +160,10 @@ class Respaldo:
                 entrada = {"existia": False}
             else:
                 copia = self.base / clave
+                self._exigir_dentro(copia)
                 if not (copia.is_file() and copia.read_bytes() == actual):
-                    copia.parent.mkdir(parents=True, exist_ok=True)
-                    copia.write_bytes(actual)
+                    self._apartar(clave)
+                    _escribir_entero(copia, actual)
                 entrada = {"existia": True}
             self._datos[clave] = entrada
         assert entrada is not None
@@ -123,22 +172,23 @@ class Respaldo:
         entrada["pendiente"] = _huella(datos)
         entrada["neutro"] = neutro.decode("utf-8", errors="replace") if not entrada.get("existia") else None
         entrada["fecha"] = datetime.now(UTC).isoformat(timespec="seconds")
-        self._guardar()
-        ruta.parent.mkdir(parents=True, exist_ok=True)
-        temporal = ruta.with_name(ruta.name + ".traductor.tmp")
-        temporal.write_bytes(datos)
-        temporal.replace(ruta)
+        self._guardar(con_copia=False)
+        _escribir_entero(ruta, datos)
         entrada["escrito"] = entrada.pop("pendiente")
         self._guardar()
 
     def restaurar(self, prefijo: str = "") -> list[Path]:
         """Devuelve a su estado original los archivos registrados cuya ruta empieza por `prefijo`.
 
+        Solo los que siguen como los dejó la app: si un archivo cambió después de traducir (se actualizó el modpack,
+        se editó a mano, se borró), se deja como está y queda en `cambiados` para avisar.
+
         Si falta la copia de algún archivo (p. ej. se borró `traductor_es/respaldo`), restaura los demás, guarda lo
         hecho y después lanza OSError con los que no pudo devolver (siguen registrados, por si vuelve la copia).
         """
         hechos: list[Path] = []
         sin_copia: list[str] = []
+        self.cambiados = []
         for clave, entrada in sorted(self._datos.items()):
             if not clave.startswith(prefijo) or (entrada.get("escrito") is None and entrada.get("pendiente") is None):
                 continue
@@ -146,21 +196,26 @@ class Respaldo:
             copia = self.base / clave
             if not (self._dentro(ruta) and self._dentro(copia)):
                 continue  # un enlace o una unión dentro de la instancia que apunta afuera: no se sigue
-            if entrada.get("escrito") is None and not (
-                ruta.is_file() and _huella(ruta.read_bytes()) == entrada.get("pendiente")
-            ):
-                # Una escritura cortada antes de terminar: si el archivo no es el que iba a escribir la app (no
-                # llegó a crearlo, o lo trajo después una actualización del modpack), no hay nada que devolver
+            sobrante = ruta.with_name(ruta.name + ".traductor.tmp")
+            if sobrante.is_file():  # lo dejó una escritura cortada: es de la app y no sirve para nada
+                sobrante.unlink()
+            actual = ruta.read_bytes() if ruta.is_file() else None
+            cambiado = actual is not None and _huella(actual) not in (entrada.get("escrito"), entrada.get("pendiente"))
+            if cambiado or (actual is None and entrada.get("escrito") is None):
+                # No es lo que escribió la app. Con «escrito», cambió después de traducir: no se pisa y se avisa.
+                # Con solo «pendiente», fue una escritura cortada que no llegó a hacerse: no hay nada que devolver.
+                if cambiado and entrada.get("escrito") is not None:
+                    self.cambiados.append(clave)
+                entrada["escrito"] = None
                 entrada.pop("pendiente", None)
                 continue
-            if entrada.get("existia"):
+            if entrada.get("existia"):  # también si el usuario lo borró: recrearlo no pisa nada
                 if not copia.is_file():
                     sin_copia.append(clave)
                     continue
-                ruta.parent.mkdir(parents=True, exist_ok=True)
-                ruta.write_bytes(copia.read_bytes())
-            elif ruta.is_file():
-                ruta.write_bytes(str(entrada.get("neutro") or "").encode("utf-8"))
+                _escribir_entero(ruta, copia.read_bytes())
+            elif actual is not None:
+                _escribir_entero(ruta, str(entrada.get("neutro") or "").encode("utf-8"))
             entrada["escrito"] = None
             entrada.pop("pendiente", None)
             hechos.append(ruta)
@@ -172,6 +227,17 @@ class Respaldo:
                 f"Estaba en {self.base}; para esos, vuelve a instalar los archivos originales del modpack."
             )
         return hechos
+
+    def aviso_cambiados(self) -> str | None:
+        """Mensaje para el usuario si el último `restaurar` dejó archivos sin tocar porque cambiaron."""
+        if not self.cambiados:
+            return None
+        lista = ", ".join(self.cambiados[:5]) + (f" y {len(self.cambiados) - 5} más" if len(self.cambiados) > 5 else "")
+        return (
+            f"No restauré {len(self.cambiados)} archivos porque cambiaron después de traducirlos (una actualización "
+            f"del modpack o una edición a mano): {lista}. Quedan como están ahora; las copias viejas siguen en "
+            f"{self.base}."
+        )
 
     def registrados(self, prefijo: str = "") -> list[str]:
         return sorted(

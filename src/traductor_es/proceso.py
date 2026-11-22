@@ -698,8 +698,15 @@ class Proceso:
         return nombre_archivo_lang(self.ctx.dialecto, self.instancia.version.partes)
 
     def restaurar(self) -> list[Path]:
-        """Devuelve misiones, scripts y libros propios del modpack a su versión original."""
-        return self.ctx.respaldo.restaurar("")
+        """Devuelve misiones, scripts y libros propios del modpack a su versión original.
+
+        Lo que cambió después de traducir (p. ej. una actualización del modpack) se deja y se avisa por el registro.
+        """
+        try:
+            return self.ctx.respaldo.restaurar("")
+        finally:
+            if aviso := self.ctx.respaldo.aviso_cambiados():
+                self.registro(aviso)
 
     def _avisos(self) -> list[str]:
         avisos: list[str] = []
