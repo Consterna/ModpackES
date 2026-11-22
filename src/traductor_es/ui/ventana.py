@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import os
 import threading
 import time
@@ -71,6 +72,7 @@ from .componentes import (
     etiqueta,
     icono_en_boton,
     seguir_tema,
+    solo_texto,
 )
 from .informe import DialogoInforme
 from .instancias import Lector, ListaInstancias, traducida
@@ -256,6 +258,7 @@ class Ventana(QMainWindow):
         self._preferencias: dict[str, Any] = configuracion.leer_preferencias()
         self._motor_anterior: str | None = None
         self._construir()
+        solo_texto(self, excepto=(self.novedad, self.creditos))  # nombres y mensajes ajenos, nunca como HTML
         self.actualizar_instancias()
         self._actualizar_estado_clave()
         self._hilo_novedad: QThread | None = None
@@ -448,6 +451,7 @@ class Ventana(QMainWindow):
         self.creditos = etiqueta(
             f'{NOMBRE} {__version__} · © 2026 {AUTOR} · Licencia GPL-3.0 · <a href="{REPOSITORIO}">{REPOSITORIO}</a>',
             "tenue",
+            enriquecida=True,
         )
         self.creditos.setOpenExternalLinks(True)
         self.creditos.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -1403,7 +1407,10 @@ class Ventana(QMainWindow):
         self._fin_novedad()
         if len(datos) == 2:
             version, enlace = datos
-            self.novedad.setText(f'<a href="{enlace}"><b>Versión nueva: {version}</b></a>')
+            # La versión y el enlace vienen de GitHub: escapados, no pueden añadir etiquetas al aviso
+            self.novedad.setText(
+                f'<a href="{html.escape(enlace, quote=True)}"><b>Versión nueva: {html.escape(version)}</b></a>'
+            )
             self.novedad.setToolTip("Abre la página de descarga en GitHub")
             self.novedad.setVisible(True)
             self.escribir(f"Hay una versión nueva de {NOMBRE}: {version} ({enlace})")

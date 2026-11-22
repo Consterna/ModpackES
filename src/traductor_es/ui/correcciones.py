@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from .. import configuracion
 from ..nucleo.memoria import Coincidencia, Memoria
+from .componentes import solo_texto
 
 _AMBITOS = {"ui": "Mods", "mision": "Misión", "libro": "Libro", "script": "Script", "*": "—"}
 
@@ -36,6 +37,7 @@ class DialogoCorrecciones(QDialog):
         self._inyectada = memoria
         self.resultados: list[Coincidencia] = []
         self._construir()
+        solo_texto(self)  # textos de la memoria y mensajes de error: tal cual, nunca como HTML
         self.buscar()
 
     def _construir(self) -> None:
