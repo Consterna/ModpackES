@@ -73,7 +73,8 @@ dentro de los capítulos tienen un solo idioma y quedan con el español elegido.
 2. Cierra Minecraft y abre ModpackES.
 3. Elige la instancia en la barra de la izquierda: cada tarjeta muestra la versión de Minecraft, el loader y
    si ya está traducida. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher, GDLauncher y
-   el launcher oficial; si no aparece, arrastra su carpeta a la ventana o usa «Elegir carpeta…».
+   el launcher oficial, en su carpeta de siempre. Si no aparece (por ejemplo, porque moviste la carpeta de
+   instancias en los ajustes del lanzador), arrastra su carpeta a la ventana o usa «Elegir carpeta…».
 4. Elige el motor con la ficha de arriba a la derecha (ver [Motores](#motores)). Con Gemini, pulsa «Guardar
    clave…» y pega tu clave de [aistudio.google.com/apikey](https://aistudio.google.com/apikey); se guarda en
    el Administrador de credenciales de Windows, nunca en un archivo. Con LM Studio u Ollama no hace falta
