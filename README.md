@@ -195,7 +195,9 @@ El nombre y la versión del modpack se leen de BetterCompatibilityChecker (`conf
 
 Cada archivo que se cambia se guarda antes en `traductor_es/respaldo` dentro de la instancia, y «Más ▸
 Restaurar el original» los devuelve. Una copia nunca se pisa: si el modpack se actualizó, la vieja pasa a
-`traductor_es/anteriores/`. El registro de copias tiene un duplicado (`registro.copia.json`) por si se daña. Los archivos se reescriben sin pérdidas (solo cambian los textos
+`traductor_es/anteriores/`, una carpeta por actualización; al terminar una traducción se borran las que ya
+no hacen falta y siempre quedan las 3 últimas y las de menos de 90 días. El registro de copias tiene un duplicado
+(`registro.copia.json`) por si se daña. Los archivos se reescriben sin pérdidas (solo cambian los textos
 traducidos) y las pruebas validan el resultado con los parsers reales del juego (Gson y el SNBT de FTB
 Library).
 </details>

@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **`traductor_es/anteriores/` crecía sin límite y repartía una actualización en decenas de carpetas** (una por segundo). Ahora cada actualización va en una sola carpeta con un manifiesto que dice por qué se apartó cada archivo, y al terminar una traducción se borran solo las copias que se sabe que son un inglés reemplazado, con uno más nuevo guardado: siempre quedan las 3 últimas actualizaciones, las de menos de 90 días y todo lo que pueda ser el único inglés que queda.
 - **Un mod empaquetado con una versión de ZIP poco común paraba el análisis:** el juego lo carga, pero la app daba «Error no previsto». Ahora se salta con un aviso que lo nombra.
 - **Una misión NBT de 1.12 dañada podía parar las misiones:** si un texto terminaba a mitad de un carácter, el lector fallaba con un error que nadie atrapaba. Ahora ese archivo se deja igual con un aviso, como cualquier NBT roto.
 - **Con `options.txt` de solo lectura, la traducción terminaba en error aunque ya estaba hecha:** ahora es un aviso que dice cómo activar el pack a mano. Y si un archivo está abierto en otro programa (por ejemplo, con el juego abierto), ya no queda un `*.tmp` suelto en la carpeta del modpack.

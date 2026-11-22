@@ -65,7 +65,7 @@ def test_dos_renovaciones_en_el_mismo_segundo_no_se_pisan(tmp_path: Path, monkey
     for version in (1, 2, 3):
         ruta.write_bytes(f"ORIGINAL v{version}".encode())  # el modpack se actualiza cada vez
         Respaldo(tmp_path).escribir(ruta, f"TRADUCIDO v{version}".encode())
-    carpetas = sorted(p.name for p in (tmp_path / CARPETA / ANTERIORES).iterdir())
+    carpetas = sorted(p.name for p in (tmp_path / CARPETA / ANTERIORES).iterdir() if p.is_dir())
     assert carpetas == ["20261121T120000Z", "20261121T120000Z-2"]
     guardados = sorted(p.read_bytes() for p in (tmp_path / CARPETA / ANTERIORES).rglob("a.js"))
     assert guardados == [b"ORIGINAL v1", b"ORIGINAL v2"]

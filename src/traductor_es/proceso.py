@@ -48,6 +48,7 @@ from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import ECONOMICO, EQUILIBRADO, MAXIMO, PERFIL_POR_DEFECTO, Traductor
 from .nucleo.vocabulario import agregar_nucleos, agregar_vocabulario, preparar_sustituciones
+from .registro import LOGGER
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
 from .salida.resource_pack import NOMBRE, PackSalida
@@ -581,7 +582,25 @@ class Proceso:
                 )
             if not (self.instancia.juego / "options.txt").is_file():
                 informe.avisos.append(AVISO_SIN_OPCIONES)
+        self._podar_anteriores()
         return informe
+
+    def _podar_anteriores(self) -> None:
+        """Al terminar bien: borra de `traductor_es/anteriores/` las copias viejas que ya no hacen falta.
+
+        Solo las que se sabe que son un inglés reemplazado por una actualización, con uno más nuevo en `respaldo/`;
+        siempre quedan las 3 últimas actualizaciones y las de menos de 90 días (ver `Respaldo.podar_anteriores`).
+        """
+        try:
+            poda = self.ctx.respaldo.podar_anteriores()
+        except OSError as e:  # un archivo abierto en otro programa: se intenta la próxima vez
+            LOGGER.warning("No pude limpiar las copias de versiones anteriores: %s", e)
+            return
+        if poda.borradas:
+            self.registro(
+                f"Borré {len(poda.borradas)} copias de versiones anteriores del modpack que ya no hacían falta "
+                f"({poda.bytes / 2**20:.1f} MB); quedan las de las últimas actualizaciones."
+            )
 
     def _traducir_pasada(
         self,
