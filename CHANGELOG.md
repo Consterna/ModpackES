@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Un `.lang` de 1.12 cuya primera clave empieza con una marca de orden de bytes** perdía esa marca al volver a leerlo, y la clave cambiaba. Ahora el archivo empieza con una línea de comentario.
 - **FTB Quests en 1.21 con carpeta `lang/`:** lo que sigue en los capítulos quedaba en inglés: el texto de una recompensa de aviso, el mensaje de bloqueo de `data.snbt` y los nombres de los objetos de recompensa. Ahora se traducen en su lugar, con copia. El nombre de las **cajas de botín** (`loot_crate.item_name`) no se traducía en ninguna versión; su id (`string_id`) se deja.
 - **FTB Quests 26.x guarda las misiones en JSON5**, que la app todavía no traduce: antes las dejaba en inglés sin decir nada. Ahora el análisis y el registro lo avisan.
 - **Scripts de KubeJS en Minecraft 1.21 y 26.x:** los tooltips (`ItemEvents.modifyTooltips`, `ItemEvents.dynamicTooltips`), la información del visor de recetas (`RecipeViewerEvents.addInformation`) y los nombres de sus grupos quedaban en inglés, porque KubeJS 7 cambió esos nombres. Ahora se traducen; lo que solo sirve para quitar o igualar una línea (`removeText`, `dynamic`) se deja.
