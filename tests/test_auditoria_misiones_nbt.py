@@ -62,7 +62,7 @@ def test_no_se_traduce_lo_que_esta_dentro_del_objeto_de_una_tarea(tmp_path: Path
         p.ejecutar()
     texto = capitulo.read_text(encoding="utf-8")
     assert 'title: "Secret Orders"' in texto  # el NBT que compara la tarea, intacto
-    assert "author: \"Captain\"" in texto
+    assert 'author: "Captain"' in texto
     assert "«ES» Deliver the orders" in texto  # lo de la misión, traducido
     assert "«ES» Sealed orders" in texto  # el título propio de la tarea sí es texto de la misión
     assert "«ES» Bring the sealed book" in texto
