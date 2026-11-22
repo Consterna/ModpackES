@@ -154,10 +154,12 @@ Gemma «piensa» antes de cada respuesta y va unas 14 veces más lento. Detalle 
 
 ## Costo
 
-Con `gemini-3.8-flash` un modpack grande (unos 800 000 caracteres por traducir) cuesta alrededor de **1,5 a 2
+Con `gemini-3.8-flash` un modpack grande (unos 800 000 caracteres por traducir) cuesta alrededor de **2 a 2,5
 dólares**, y la mitad con la opción «Más barato, pero tarda más» (Batch API), que puede tardar desde minutos
 hasta horas. Un modpack pequeño cuesta centavos. Son estimaciones con los precios de Google de noviembre de
-2026; el botón «Analizar» calcula el de tu modpack antes de gastar nada.
+2026: desde el 1 de enero de 2027 Google cobra el doble por gemini-3.8-flash, y la app ya lo tiene en cuenta. El
+botón «Analizar» calcula el de tu modpack antes de gastar nada, como un rango (la cifra exacta depende de cuánto
+razona el modelo).
 
 La capa gratuita de Gemini sirve para probar, pero tiene límites de peticiones por minuto y por día que un
 modpack grande supera enseguida. Con la facturación activada (nivel 1) se traduce de una vez.
