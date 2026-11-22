@@ -58,6 +58,15 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/traductor_es"]
 
+[tool.hatch.build.targets.sdist]
+# Una lista fija: hatchling respeta .gitignore pero no .git/info/exclude, y así lo local de cada PC no viaja
+only-include = [
+    "src", "tests", "scripts", "mod-runtime", "docs", "instalador", "README.md", "CHANGELOG.md", "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md", "SECURITY.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "uv.lock", ".python-version",
+]
+# Los .gitignore de cada proyecto del mod de apoyo no los lee hatchling: sus cachés y compilaciones, fuera
+exclude = ["**/.gradle", "**/build", "**/run", "**/__pycache__", "src/traductor_es/recursos/mods/*.jar"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py313"
