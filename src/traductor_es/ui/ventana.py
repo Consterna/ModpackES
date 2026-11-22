@@ -58,7 +58,7 @@ from ..motores.compatible import Compatible
 from ..motores.gemini import MODELO_POR_DEFECTO, PRECIOS
 from ..motores.simulador import Simulador
 from ..nucleo.traductor import ECONOMICO, EQUILIBRADO, LARGO_CONTEXTO, MAXIMO, PERFIL_POR_DEFECTO
-from ..proceso import DIALECTO_ESPANA, ETIQUETA_ESPANA, GRUPOS, Informe, Proceso
+from ..proceso import DIALECTO_ESPANA, ETIQUETA_ESPANA, GRUPOS, Informe, Proceso, rango_de_costo
 from ..salida import exportar, mod_apoyo, paquete
 from . import correcciones, iconos, tema
 from .bienvenida import TarjetaBienvenida
@@ -885,7 +885,11 @@ class Ventana(QMainWindow):
         if fabrica.es_local(o["motor"]):
             texto += " Sin costo: el modelo corre en tu PC."
         elif costo is not None:
-            texto += f" Costo estimado con {o['modelo']}{' por lotes' if o['lotes'] else ''}: {_dinero(costo)}."
+            bajo, alto = rango_de_costo(costo)
+            texto += (
+                f" Costo estimado con {o['modelo']}{' por lotes' if o['lotes'] else ''}: ≈ {_dinero(costo)} "
+                f"(entre {_dinero(bajo)} y {_dinero(alto)})."
+            )
         elif o["motor"] != fabrica.GEMINI:
             texto += " El costo depende del proveedor y del modelo: revisa sus precios."
         cambios = self.ultimo_informe.cambios if self.ultimo_informe is not None else None

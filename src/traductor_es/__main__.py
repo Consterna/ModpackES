@@ -24,7 +24,7 @@ from .motores.simulador import Simulador
 from .nucleo.dialectos import DIALECTOS
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import PERFIL_POR_DEFECTO, PERFILES
-from .proceso import GRUPOS, Informe, Proceso
+from .proceso import GRUPOS, Informe, Proceso, rango_de_costo
 from .registro import LOGGER, configurar
 from .salida import exportar, mod_apoyo, paquete
 
@@ -56,7 +56,11 @@ def _mostrar(informe: Informe, args: argparse.Namespace) -> None:
     costo = informe.costo(modelo, lotes, args.motor, args.revisar, getattr(args, "calidad", PERFIL_POR_DEFECTO))
     _escribir(f"Total para el motor: {informe.a_traducir} textos, {informe.caracteres} caracteres")
     if costo is not None:
-        _escribir(f"Costo estimado con {modelo}{' (por lotes)' if lotes else ''}: US$ {costo:.2f}")
+        bajo, alto = rango_de_costo(costo)
+        _escribir(
+            f"Costo estimado con {modelo}{' (por lotes)' if lotes else ''}: ≈ US$ {costo:.2f} "
+            f"(entre {bajo:.2f} y {alto:.2f})"
+        )
     for aviso in informe.avisos:
         _escribir(f"⚠ {aviso}")
     if informe.cambios is not None and informe.cambios.base == "indice":
@@ -330,7 +334,11 @@ def _cambios(args: argparse.Namespace) -> None:
         f"{diferencia.caracteres} caracteres (el resto sale de la memoria)"
     )
     if costo is not None:
-        _escribir(f"Costo estimado con {modelo}{' (por lotes)' if args.lotes else ''}: US$ {costo:.2f}")
+        bajo, alto = rango_de_costo(costo)
+        _escribir(
+            f"Costo estimado con {modelo}{' (por lotes)' if args.lotes else ''}: ≈ US$ {costo:.2f} "
+            f"(entre {bajo:.2f} y {alto:.2f})"
+        )
     _escribir("Para aplicarlo: «modpackes traducir» (lo que ya está en la memoria no se vuelve a pagar).")
 
 
