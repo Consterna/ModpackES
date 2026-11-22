@@ -47,9 +47,9 @@ def _modpack(tmp_path: Path) -> tuple[Path, Path]:
 def test_archivo_abierto_por_otro_programa_da_error_claro_y_no_corrompe(tmp_path: Path, memoria: Memoria) -> None:
     juego, capitulo = _modpack(tmp_path)
     original = capitulo.read_bytes()
-    with capitulo.open("rb"):  # CPython abre sin FILE_SHARE_DELETE: el archivo no se puede reemplazar
-        with pytest.raises(OSError) as error, Proceso(juego, Simulador(), memoria=memoria) as p:
-            p.ejecutar()
+    # CPython abre sin FILE_SHARE_DELETE: mientras está abierto, el archivo no se puede reemplazar
+    with capitulo.open("rb"), pytest.raises(OSError) as error, Proceso(juego, Simulador(), memoria=memoria) as p:
+        p.ejecutar()
     assert capitulo.read_bytes() == original
     assert not list(capitulo.parent.glob("*.tmp"))  # el temporal no se queda… o, si queda, restaurar lo limpia
     assert isinstance(error.value, PermissionError) or getattr(error.value, "winerror", None) in (5, 32)
