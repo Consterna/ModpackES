@@ -40,8 +40,30 @@ def piezas_de_recompensa(nombres: Sequence[snbt.Cadena | nbt.CadenaNbt]) -> list
     return [Pieza(p.texto, p.pista, AMBITO_RECOMPENSA) for c in nombres for p in piezas_de(c.texto, PISTA_RECOMPENSA)]
 
 
+#: Claves bajo las que una tarea guarda el objeto que pide (y su NBT o sus componentes).
+_CLAVES_DE_OBJETO = frozenset({"item", "items", "tag", "components", "nbt"})
+
+
+def en_objeto_de_tarea(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
+    """El texto está dentro del objeto que pide una tarea (p. ej. el `title` de un libro escrito).
+
+    FTB Quests compara ese NBT con el que entrega el jugador (`match_nbt`): traducirlo haría imposible la misión.
+    El título propio de la tarea (`tasks[…].title`) no está dentro del objeto y sí se traduce.
+    """
+    ruta = list(c.ruta)
+    if "tasks" not in ruta:
+        return False
+    despues = ruta[len(ruta) - 1 - ruta[::-1].index("tasks") + 1 :]
+    return any(clave in _CLAVES_DE_OBJETO for clave in despues)
+
+
+def es_campo_ftbq(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
+    """Un campo de texto de la misión (título, descripción…) que no está dentro del objeto de una tarea."""
+    return c.campo in CAMPOS_FTBQ and not en_objeto_de_tarea(c)
+
+
 def es_texto_ftbq(c: snbt.Cadena) -> bool:
-    return c.campo in CAMPOS_FTBQ or es_nombre_de_recompensa(c)
+    return es_campo_ftbq(c) or es_nombre_de_recompensa(c)
 
 
 _NEUTRO_SNBT = b"{\n}\n"
@@ -298,8 +320,8 @@ class FTBQuests(_Base):
             except (ValueError, EOFError, OSError):
                 self.ctx.registro(f"No pude leer {ruta.name}: se deja igual")
                 continue
-            textos = [c for c in nbt.cadenas(arbol) if c.campo in CAMPOS_FTBQ]
-            nombres = [c for c in nbt.cadenas(arbol) if c.campo not in CAMPOS_FTBQ and es_nombre_de_recompensa(c)]
+            textos = [c for c in nbt.cadenas(arbol) if es_campo_ftbq(c)]
+            nombres = [c for c in nbt.cadenas(arbol) if not es_campo_ftbq(c) and es_nombre_de_recompensa(c)]
             if not textos and not nombres:
                 continue
             # Como en SNBT: los nombres de recompensa van aparte, para que los textos de la misión salgan igual
@@ -312,7 +334,7 @@ class FTBQuests(_Base):
                 arbol, _ = nbt.leer(original)  # árbol nuevo cada vez: no se acumulan cambios
                 hechos = faltan = 0
                 for c in nbt.cadenas(arbol):
-                    if c.campo in CAMPOS_FTBQ or es_nombre_de_recompensa(c):
+                    if es_campo_ftbq(c) or es_nombre_de_recompensa(c):
                         us = unidades(c.texto)
                         hechos += sum(1 for u in us if u in trad)
                         faltan += sum(1 for u in us if u not in trad)
