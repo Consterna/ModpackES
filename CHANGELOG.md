@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Scripts de KubeJS en Minecraft 1.21 y 26.x:** los tooltips (`ItemEvents.modifyTooltips`, `ItemEvents.dynamicTooltips`), la información del visor de recetas (`RecipeViewerEvents.addInformation`) y los nombres de sus grupos quedaban en inglés, porque KubeJS 7 cambió esos nombres. Ahora se traducen; lo que solo sirve para quitar o igualar una línea (`removeText`, `dynamic`) se deja.
 - **Las instancias de GDLauncher no aparecían en la lista:** GDLauncher guarda el juego en la subcarpeta `instance/` de cada instancia y la app no la buscaba. Ahora salen, y también se puede soltar su carpeta en la ventana.
 - **Una misión de FTB Quests podía quedar imposible de completar:** si una tarea pedía un objeto con un nombre o un título propio (por ejemplo un libro escrito) y comparaba su NBT, la app traducía ese título y la misión ya no reconocía el objeto. Ahora lo que está dentro del objeto de una tarea no se toca; el título de la tarea y los nombres de las recompensas se siguen traduciendo.
 - **«Desde la última traducción (fecha)» podía mostrar el día siguiente:** la fecha se guardaba y se mostraba en UTC, así que de noche en América salía mañana. Ahora se muestra en la hora del PC.
