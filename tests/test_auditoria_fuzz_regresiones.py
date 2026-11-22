@@ -134,3 +134,29 @@ def test_un_archivo_hostil_no_tumba_el_analisis(tmp_path: Path, caso: str) -> No
     assert "«ES» Iron Plate" in lang.read_text(encoding="utf-8")
     if caso == "jar roto":
         assert any("archivos dañados" in a and "roto.jar!/" in a and ":\\" not in a for a in informe.avisos)
+
+
+# --- NBT con una cadena cortada a mitad de un carácter (IndexError) -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "hexadecimal",
+    [
+        "8f00023eec9a609396b875321f8b0800000002",
+        "00000800000000000000e300000000e362606066e04a492d48",
+        "00000400445ddd6c00",
+    ],
+)
+def test_nbt_con_un_caracter_cortado_es_un_archivo_roto(hexadecimal: str) -> None:
+    from traductor_es.formatos import nbt
+
+    with pytest.raises(ValueError, match="cortada"):
+        nbt.leer(bytes.fromhex(hexadecimal))
+
+
+@pytest.mark.parametrize("datos", [b"\xc3", b"ab\xe2\x82", b"\xe2"])
+def test_utf8_modificado_cortado(datos: bytes) -> None:
+    from traductor_es.formatos import nbt
+
+    with pytest.raises(ValueError):
+        nbt.mutf8_decodificar(datos)

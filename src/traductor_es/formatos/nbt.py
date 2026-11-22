@@ -53,9 +53,13 @@ def mutf8_decodificar(datos: bytes) -> str:
             unidades.append(b)
             i += 1
         elif b >> 5 == 0b110:
+            if i + 1 >= len(datos):  # cadena cortada a mitad de un carácter (archivo dañado)
+                raise ValueError("Cadena NBT cortada a mitad de un carácter")
             unidades.append(((b & 0x1F) << 6) | (datos[i + 1] & 0x3F))
             i += 2
         elif b >> 4 == 0b1110:
+            if i + 2 >= len(datos):
+                raise ValueError("Cadena NBT cortada a mitad de un carácter")
             unidades.append(((b & 0x0F) << 12) | ((datos[i + 1] & 0x3F) << 6) | (datos[i + 2] & 0x3F))
             i += 3
         else:

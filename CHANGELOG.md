@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Una misión NBT de 1.12 dañada podía parar las misiones:** si un texto terminaba a mitad de un carácter, el lector fallaba con un error que nadie atrapaba. Ahora ese archivo se deja igual con un aviso, como cualquier NBT roto.
 - **Con `options.txt` de solo lectura, la traducción terminaba en error aunque ya estaba hecha:** ahora es un aviso que dice cómo activar el pack a mano. Y si un archivo está abierto en otro programa (por ejemplo, con el juego abierto), ya no queda un `*.tmp` suelto en la carpeta del modpack.
 - **Un solo archivo roto del modpack podía parar todo el análisis:** un jar dañado (descarga a medias, entrada cifrada) o un JSON con miles de niveles de anidamiento daban «Error no previsto» y no se traducía nada. Ahora ese archivo se salta, el informe lo nombra y lo demás se traduce.
 - **Un texto que ya traía «⟦0⟧» o «⟦⟧» nunca se traducía:** esos corchetes son los que usa la app para proteger códigos, y el texto se descartaba entero. Ahora se protegen como un código más y el texto se traduce.
