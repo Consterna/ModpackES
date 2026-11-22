@@ -96,5 +96,9 @@ def activar(juego: Path, nombre_pack: str, idioma: str | None, con_prefijo: bool
         temporal = ruta.with_name("options.txt.tmp")
         partes = [linea + (saltos[i] if i < len(saltos) else salto) for i, linea in enumerate(lineas)]
         temporal.write_bytes("".join(partes).encode("utf-8", errors="surrogateescape"))
-        temporal.replace(ruta)
+        try:
+            temporal.replace(ruta)
+        except OSError:  # solo lectura o abierto en otro programa: no queda el temporal
+            temporal.unlink(missing_ok=True)
+            raise
     return cambios

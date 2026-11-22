@@ -76,7 +76,11 @@ def _escribir_entero(ruta: Path, texto: str) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_name(ruta.name + ".tmp")
     temporal.write_text(texto, encoding="utf-8")
-    temporal.replace(ruta)
+    try:
+        temporal.replace(ruta)
+    except OSError:
+        temporal.unlink(missing_ok=True)
+        raise
 
 
 def leer_preferencias() -> dict[str, Any]:

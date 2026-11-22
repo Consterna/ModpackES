@@ -574,6 +574,11 @@ class Proceso:
                 )  # fmt: skip
             except ValueError as e:
                 informe.avisos.append(str(e))
+            except OSError as e:  # options.txt de solo lectura o bloqueado: lo traducido ya está escrito
+                informe.avisos.append(
+                    f"No pude cambiar options.txt ({e.strerror or e}): activa el pack «{NOMBRE}» y el idioma "
+                    "a mano en el juego (Opciones ▸ Paquetes de recursos)."
+                )
             if not (self.instancia.juego / "options.txt").is_file():
                 informe.avisos.append(AVISO_SIN_OPCIONES)
         return informe

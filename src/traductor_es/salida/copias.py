@@ -58,7 +58,11 @@ def _escribir_entero(ruta: Path, datos: bytes) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_name(ruta.name + ".traductor.tmp")
     temporal.write_bytes(datos)
-    temporal.replace(ruta)
+    try:
+        temporal.replace(ruta)
+    except OSError:  # p. ej. el archivo está abierto en otro programa: el temporal no se queda
+        temporal.unlink(missing_ok=True)
+        raise
 
 
 class Respaldo:
