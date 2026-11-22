@@ -20,7 +20,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from ..fuentes.contenedores import abrir_mod
 from ..fuentes.version import Version
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, contar
@@ -113,25 +112,20 @@ class Descripciones:
         lectores = {"fabric.mod.json": _de_fabric, "quilt.mod.json": _de_quilt,
                     "META-INF/neoforge.mods.toml": _de_toml, "META-INF/mods.toml": _de_toml}  # fmt: skip
         salida: dict[str, str] = {}
-        for jar in self.ctx.instancia.jars():
-            contenedores = list(abrir_mod(jar))  # los anidados se leen del padre: se cierran todos al final
-            try:
-                for contenedor in contenedores:
-                    nombres = set(contenedor.nombres())
-                    for archivo, lector in lectores.items():
-                        if archivo not in nombres:
-                            continue
-                        try:
-                            datos = contenedor.leer(archivo)
-                        except (KeyError, OSError):
-                            continue
-                        for ident, descripcion in lector(datos):
-                            limpia = descripcion.strip()
-                            if limpia and es_traducible(limpia):
-                                salida.setdefault(ident, limpia)
-            finally:
-                for contenedor in contenedores:
-                    contenedor.cerrar()
+        # Los mismos jars (y anidados) que ya abrió la instancia: abrirlos otra vez costaba un tercio del análisis
+        for contenedor in self.ctx.instancia.contenedores_mods():
+            nombres = set(contenedor.nombres())
+            for archivo, lector in lectores.items():
+                if archivo not in nombres:
+                    continue
+                try:
+                    datos = contenedor.leer(archivo)
+                except (KeyError, OSError, ValueError):  # ValueError: entrada ilegible o demasiado grande
+                    continue
+                for ident, descripcion in lector(datos):
+                    limpia = descripcion.strip()
+                    if limpia and es_traducible(limpia):
+                        salida.setdefault(ident, limpia)
         return salida
 
     def recolectar(self) -> list[Pieza]:
