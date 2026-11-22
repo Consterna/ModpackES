@@ -153,3 +153,14 @@ def test_union_que_apunta_afuera_no_recibe_copias_ni_registro(juego: Path, cual:
         assert ruta.read_bytes() == b"ORIGINAL v1"
     finally:
         enlace.rmdir()  # quita solo la unión, no lo que hay detrás
+
+
+def test_registro_vaciado_a_mano_se_recupera_con_su_copia(juego: Path) -> None:
+    """Variante que encontró la verificación independiente: un `{}` válido no debe tapar la copia."""
+    ruta = _archivo(juego)
+    Respaldo(juego).escribir(ruta, b"TRADUCIDO 1")
+    Respaldo(juego).escribir(ruta, b"TRADUCIDO 2")
+    (juego / CARPETA / "registro.json").write_text("{}", encoding="utf-8")
+    assert Respaldo(juego).original(ruta) == b"ORIGINAL v1"
+    Respaldo(juego).restaurar()
+    assert ruta.read_bytes() == b"ORIGINAL v1"

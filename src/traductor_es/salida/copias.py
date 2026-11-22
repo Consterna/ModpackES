@@ -76,11 +76,12 @@ class Respaldo:
         self._datos: dict[str, dict[str, Any]] = self._cargar()
 
     def _cargar(self) -> dict[str, dict[str, Any]]:
-        for ruta in (self.registro, self.copia_registro):
-            datos = _leer_registro(ruta)
-            if datos is not None:
-                return datos
-        return {}
+        principal = _leer_registro(self.registro)
+        if principal:
+            return principal
+        # Dañado, borrado o vacío ({}): la app nunca vacía el registro (restaurar deja las entradas), así que si la
+        # copia tiene datos, esa es la buena
+        return _leer_registro(self.copia_registro) or principal or {}
 
     def _dentro(self, ruta: Path) -> bool:
         """La ruta (siguiendo enlaces y uniones) sigue dentro de la instancia."""
