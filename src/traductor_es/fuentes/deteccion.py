@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from .contenedores import leer_entrada
 from .version import Version
 
 LOADERS = ("forge", "neoforge", "fabric", "quilt")
@@ -113,18 +114,18 @@ def _de_mods(jars: Iterable[Path]) -> Deteccion | None:
                 nombres = set(z.namelist())
                 if "META-INF/neoforge.mods.toml" in nombres:
                     loaders["neoforge"] += 1
-                    versiones.update(_toml_mc(z.read("META-INF/neoforge.mods.toml")))
+                    versiones.update(_toml_mc(leer_entrada(z, "META-INF/neoforge.mods.toml")))
                 elif "META-INF/mods.toml" in nombres:
                     loaders["forge"] += 1
-                    versiones.update(_toml_mc(z.read("META-INF/mods.toml")))
+                    versiones.update(_toml_mc(leer_entrada(z, "META-INF/mods.toml")))
                 elif "quilt.mod.json" in nombres:
                     loaders["quilt"] += 1
                 elif "fabric.mod.json" in nombres:
                     loaders["fabric"] += 1
-                    versiones.update(_fabric_mc(z.read("fabric.mod.json")))
+                    versiones.update(_fabric_mc(leer_entrada(z, "fabric.mod.json")))
                 elif "mcmod.info" in nombres:
                     loaders["forge"] += 1
-                    versiones.update(_mcmod_mc(z.read("mcmod.info")))
+                    versiones.update(_mcmod_mc(leer_entrada(z, "mcmod.info")))
         except (zipfile.BadZipFile, OSError, KeyError):
             continue
     if not loaders:

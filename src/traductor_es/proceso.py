@@ -14,6 +14,7 @@ from types import TracebackType
 from typing import Self, cast
 
 from . import configuracion
+from .fuentes import contenedores
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
 from .modulos import (
@@ -261,6 +262,7 @@ class Proceso:
         tambien_es_es: bool = False,
         calidad: str = PERFIL_POR_DEFECTO,
     ) -> None:
+        contenedores.DESCARTADAS.clear()  # el aviso de entradas demasiado grandes es de esta instancia
         self.instancia = Instancia(carpeta)
         #: Perfil de calidad (ver `Traductor.perfil`); el máximo incluye la revisión de misiones y libros
         self.calidad = calidad
@@ -463,6 +465,7 @@ class Proceso:
                               len(pendientes), sum(len(t) for t in pendientes))
             )  # fmt: skip
         informe.avisos.extend(self._avisos_de_cobertura(informe, scripts_leidos))
+        informe.avisos.extend(self._avisos_de_tamano())
         self._comparar_con_la_ultima(informe, leidos)
         self._analizar_espana(informe)
         return informe
@@ -708,8 +711,20 @@ class Proceso:
             if aviso := self.ctx.respaldo.aviso_cambiados():
                 self.registro(aviso)
 
+    @staticmethod
+    def _avisos_de_tamano() -> list[str]:
+        """Archivos de jars o zips que no se leyeron por pasar el tope (dañados o «bombas» de compresión)."""
+        if not contenedores.DESCARTADAS:
+            return []
+        lista = sorted(contenedores.DESCARTADAS)
+        mas = f" y {len(lista) - 5} más" if len(lista) > 5 else ""
+        return [
+            f"Salté {len(lista)} archivos de más de {contenedores.MAXIMO_ENTRADA // 2**20} MiB dentro de jars o "
+            f"zips (puede ser un archivo dañado o hecho para llenar la memoria): {', '.join(lista[:5])}{mas}."
+        ]
+
     def _avisos(self) -> list[str]:
-        avisos: list[str] = []
+        avisos: list[str] = self._avisos_de_tamano()
         opciones = self.instancia.opciones
         sospechosos = [p for p in opciones.packs if "localizer" in p.lower() or "translat" in p.lower()]
         if sospechosos:

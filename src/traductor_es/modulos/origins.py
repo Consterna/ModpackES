@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-from ..fuentes.contenedores import abrir_mod
+from ..fuentes.contenedores import abrir_mod, leer_entrada
 from ..nucleo.mascara import es_traducible
 from . import datos
 from .base import Contexto, Pieza, Resumen, contar
@@ -147,7 +147,7 @@ class Origins:
                     with zipfile.ZipFile(ruta) as z:
                         for n in z.namelist():
                             if _ARCHIVO.match(n):
-                                yield n, z.read(n)
+                                yield n, leer_entrada(z, n)
                 except (zipfile.BadZipFile, OSError):
                     continue
             elif (i := relativa.find("data/")) >= 0 and _ARCHIVO.match(relativa[i:]):

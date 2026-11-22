@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import shutil
 import zipfile
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from ..formatos import comandos, componente
+from ..fuentes.contenedores import leer_entrada
 from ..nucleo.mascara import es_traducible
 from ..salida.resource_pack import NOMBRE as NOMBRE_PACK_SALIDA
 from .base import Contexto, Pieza, Resumen, contar, parece_clave
@@ -314,8 +316,15 @@ def _reescribir_zip(original: bytes, nuevos: Mapping[str, str]) -> bytes:
     salida = io.BytesIO()
     with zipfile.ZipFile(io.BytesIO(original)) as entrada, zipfile.ZipFile(salida, "w") as z:
         for info in entrada.infolist():
-            datos = nuevos[info.filename].encode("utf-8") if info.filename in nuevos else entrada.read(info)
-            z.writestr(info, datos, compress_type=info.compress_type)
+            if info.filename in nuevos:
+                z.writestr(info, nuevos[info.filename].encode("utf-8"), compress_type=info.compress_type)
+                continue
+            # Lo demás se copia por trozos: igual byte a byte, sin cargar en memoria una entrada enorme
+            with (
+                entrada.open(info) as origen,
+                z.open(info, "w", force_zip64=info.file_size > zipfile.ZIP64_LIMIT) as fin,
+            ):
+                shutil.copyfileobj(origen, fin, 2**20)
     return salida.getvalue()
 
 
@@ -361,7 +370,7 @@ class Datos:
                 continue
             try:
                 with zipfile.ZipFile(io.BytesIO(original)) as z:
-                    contenidos = [(n, f, z.read(n)) for n, f in entradas]
+                    contenidos = [(n, f, leer_entrada(z, n)) for n, f in entradas]
             except (zipfile.BadZipFile, OSError, KeyError):
                 self.ctx.registro(f"{ruta.name}: no pude abrirlo, se deja igual")
                 continue

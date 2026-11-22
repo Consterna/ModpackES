@@ -20,6 +20,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+from ..fuentes.contenedores import leer_entrada
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen
 from .cambios import Lugar
@@ -107,7 +108,7 @@ def leer_idiomas(jar: Path) -> dict[str, dict[str, dict[str, str]]]:
                 else:
                     continue
                 try:
-                    datos: object = json.loads(z.read(n).decode("utf-8-sig"))
+                    datos: object = json.loads(leer_entrada(z, n).decode("utf-8-sig"))
                 except ValueError:
                     continue
                 if isinstance(datos, dict):

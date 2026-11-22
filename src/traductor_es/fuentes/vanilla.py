@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from ..formatos import lang_json, lang_legacy
+from .contenedores import leer_entrada
 from .version import Version, formato_desde_jar
 
 
@@ -91,12 +92,12 @@ def cargar(version: Version, idiomas: Iterable[str], raices: Iterable[Path] | No
             with zipfile.ZipFile(jar) as z:
                 nombres = set(z.namelist())
                 if "version.json" in nombres:
-                    vj = z.read("version.json")
+                    vj = leer_entrada(z, "version.json")
                     res.formato_recursos = formato_desde_jar(vj, "resource")
                     res.formato_datos = formato_desde_jar(vj, "data")
                 ingles = "assets/minecraft/lang/en_us.lang" if legacy else "assets/minecraft/lang/en_us.json"
                 if ingles in nombres:
-                    datos = z.read(ingles)
+                    datos = leer_entrada(z, ingles)
                     res.textos["en_us"] = lang_legacy.leer(datos) if legacy else lang_json.leer(datos)
         except (zipfile.BadZipFile, OSError):
             continue

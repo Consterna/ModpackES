@@ -12,6 +12,33 @@ from typing import Any, Protocol, cast
 
 _PROFUNDIDAD_MAXIMA = 3
 _CARPETAS_ANIDADAS = ("META-INF/jars/", "META-INF/jarjar/", "META-INF/jarinjar/")
+#: Tope de lo que se descomprime de una sola entrada de un jar o zip. Ningún archivo de idioma, libro o script real
+#: se acerca; lo que lo pasa (un archivo dañado o una «bomba» de compresión) se salta y se avisa.
+MAXIMO_ENTRADA = 64 * 2**20
+#: Entradas saltadas por pasar el tope («jar!/ruta (N MiB)»), para el aviso del informe.
+DESCARTADAS: set[str] = set()
+
+
+class EntradaDemasiadoGrande(zipfile.BadZipFile):
+    """Una entrada que pasa `MAXIMO_ENTRADA`: se trata como un archivo dañado (se salta, no se lee)."""
+
+
+def _demasiado_grande(origen: str, info: zipfile.ZipInfo) -> bool:
+    if info.file_size <= MAXIMO_ENTRADA:
+        return False
+    DESCARTADAS.add(f"{origen}!/{info.filename} ({info.file_size // 2**20} MiB)")
+    return True
+
+
+def leer_entrada(z: zipfile.ZipFile, entrada: str | zipfile.ZipInfo) -> bytes:
+    """`z.read(entrada)` con el tope de tamaño. Lanza `EntradaDemasiadoGrande` (un `BadZipFile`) si lo pasa.
+
+    El tamaño declarado limita lo que entrega `zipfile` (si miente, falla la comprobación CRC): basta con mirarlo.
+    """
+    info = entrada if isinstance(entrada, zipfile.ZipInfo) else z.getinfo(entrada)
+    if _demasiado_grande(str(z.filename or "zip"), info):
+        raise EntradaDemasiadoGrande(f"{info.filename} ocupa {info.file_size // 2**20} MiB: no se lee")
+    return z.read(info)
 
 
 class Contenedor(Protocol):
@@ -31,7 +58,8 @@ class Zip:
     def __init__(self, nombre: str, zf: zipfile.ZipFile) -> None:
         self._nombre = nombre
         self._zf = zf
-        self._nombres = [n for n in zf.namelist() if not n.endswith("/")]
+        # Lo que pasa el tope ni se ofrece: así ningún módulo intenta leerlo
+        self._nombres = [i.filename for i in zf.infolist() if not i.is_dir() and not _demasiado_grande(nombre, i)]
 
     @classmethod
     def abrir(cls, ruta: Path) -> Zip:
@@ -45,7 +73,7 @@ class Zip:
         return self._nombres
 
     def leer(self, ruta: str) -> bytes:
-        return self._zf.read(ruta)
+        return leer_entrada(self._zf, ruta)
 
     def cerrar(self) -> None:
         self._zf.close()
