@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Las instancias de GDLauncher no aparecían en la lista:** GDLauncher guarda el juego en la subcarpeta `instance/` de cada instancia y la app no la buscaba. Ahora salen, y también se puede soltar su carpeta en la ventana.
 - **Una misión de FTB Quests podía quedar imposible de completar:** si una tarea pedía un objeto con un nombre o un título propio (por ejemplo un libro escrito) y comparaba su NBT, la app traducía ese título y la misión ya no reconocía el objeto. Ahora lo que está dentro del objeto de una tarea no se toca; el título de la tarea y los nombres de las recompensas se siguen traduciendo.
 - **«Desde la última traducción (fecha)» podía mostrar el día siguiente:** la fecha se guardaba y se mostraba en UTC, así que de noche en América salía mañana. Ahora se muestra en la hora del PC.
 - **El costo estimado se quedaba un 25-30 % corto** frente a lo que cobra Google. Ahora se calcula como arma los pedidos el traductor y coincide con lo cobrado en las mediciones; se muestra como un rango («≈ US$ X, entre A y B») y ya conoce los precios nuevos de Google: gemini-3.8-flash y 3.6-flash cuestan el doble desde el 1-1-2027, y 2.5 Flash-Lite se cobra como 3.5 Flash-Lite desde el 1-12-2026.
