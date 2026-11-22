@@ -160,3 +160,33 @@ def test_utf8_modificado_cortado(datos: bytes) -> None:
 
     with pytest.raises(ValueError):
         nbt.mutf8_decodificar(datos)
+
+
+# --- zip con una «versión necesaria para extraer» que Python no admite (NotImplementedError al abrir) -------------
+
+
+def _version_rara(ruta: Path) -> Path:
+    with zipfile.ZipFile(ruta, "w") as z:
+        z.writestr("assets/raro/lang/en_us.json", '{"item.raro.x": "Odd thing"}')
+    datos = bytearray(ruta.read_bytes())
+    datos[datos.index(b"PK\x01\x02") + 6] = 84  # versión 8.4 en el directorio central (Java la abre igual)
+    ruta.write_bytes(bytes(datos))
+    return ruta
+
+
+def test_zip_con_version_rara_se_abre_como_ilegible(tmp_path: Path) -> None:
+    from traductor_es.fuentes.contenedores import abrir_zip
+
+    with pytest.raises(EntradaIlegible):
+        abrir_zip(_version_rara(tmp_path / "raro.jar"))
+    assert "raro.jar" in contenedores.DANADAS
+
+
+def test_jar_con_version_rara_no_tumba_el_analisis(tmp_path: Path) -> None:
+    juego = fabrica.prism(tmp_path, "1.20.1")
+    fabrica.jar(juego / "mods" / "bueno.jar", fabrica.lang("bueno", "en_us", {"item.bueno.x": "Iron Plate"}))
+    _version_rara(juego / "mods" / "raro.jar")
+    with Memoria(":memory:") as m, Proceso(juego, Simulador(), memoria=m) as p:
+        analisis = p.analizar()
+    assert analisis.a_traducir >= 1
+    assert any("raro.jar" in a for a in analisis.avisos)

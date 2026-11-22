@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..fuentes.contenedores import leer_entrada
+from ..fuentes.contenedores import abrir_zip, leer_entrada
 from ..fuentes.instancia import Instancia
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, parece_clave
@@ -170,7 +170,7 @@ def frases_por_mod(
         progreso(i, len(jars))
         frases: list[str] = []
         try:
-            with zipfile.ZipFile(jar) as z:
+            with abrir_zip(jar) as z:
                 for info in z.infolist():
                     if (
                         info.filename.endswith(".class")

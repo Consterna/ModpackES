@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from ..formatos import lang_json, lang_legacy
-from .contenedores import leer_entrada
+from .contenedores import abrir_zip, leer_entrada
 from .version import Version, formato_desde_jar
 
 
@@ -89,7 +89,7 @@ def cargar(version: Version, idiomas: Iterable[str], raices: Iterable[Path] | No
             continue
         res.jar = jar
         try:
-            with zipfile.ZipFile(jar) as z:
+            with abrir_zip(jar) as z:
                 nombres = set(z.namelist())
                 if "version.json" in nombres:
                     vj = leer_entrada(z, "version.json")

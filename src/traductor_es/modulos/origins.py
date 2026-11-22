@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-from ..fuentes.contenedores import Contenedor, abrir_mod, leer_entrada
+from ..fuentes.contenedores import Contenedor, abrir_mod, abrir_zip, leer_entrada
 from ..nucleo.mascara import es_traducible
 from . import datos
 from .base import Contexto, Pieza, Resumen, contar
@@ -141,7 +141,7 @@ class Origins:
             relativa = ruta.relative_to(juego).as_posix()
             if ruta.suffix.lower() == ".zip":
                 try:
-                    with zipfile.ZipFile(ruta) as z:
+                    with abrir_zip(ruta) as z:
                         for n in z.namelist():
                             if _ARCHIVO.match(n):
                                 yield n, leer_entrada(z, n)

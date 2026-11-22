@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from ..formatos import comandos, componente
-from ..fuentes.contenedores import leer_entrada
+from ..fuentes.contenedores import abrir_zip, leer_entrada
 from ..nucleo.mascara import es_traducible
 from ..salida.resource_pack import NOMBRE as NOMBRE_PACK_SALIDA
 from .base import Contexto, Pieza, Resumen, contar, parece_clave
@@ -287,7 +287,7 @@ def entradas_del_zip(ruta: Path) -> list[tuple[str, Formato]]:
     if ruta.stat().st_size > LIMITE_ZIP:
         return []
     try:
-        with zipfile.ZipFile(ruta) as z:
+        with abrir_zip(ruta) as z:
             return [(n, f) for n in z.namelist() if not n.endswith("/") and (f := clasificar(Path(n))) is not None]
     except (zipfile.BadZipFile, OSError):
         return []
@@ -314,7 +314,7 @@ class _Archivo:
 def _reescribir_zip(original: bytes, nuevos: Mapping[str, str]) -> bytes:
     """El mismo .zip con esas entradas cambiadas; las demás, el orden y las fechas quedan igual."""
     salida = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(original)) as entrada, zipfile.ZipFile(salida, "w") as z:
+    with abrir_zip(io.BytesIO(original)) as entrada, zipfile.ZipFile(salida, "w") as z:
         for info in entrada.infolist():
             if info.filename in nuevos:
                 z.writestr(info, nuevos[info.filename].encode("utf-8"), compress_type=info.compress_type)
@@ -369,7 +369,7 @@ class Datos:
             if (original := self.ctx.respaldo.original(ruta)) is None:
                 continue
             try:
-                with zipfile.ZipFile(io.BytesIO(original)) as z:
+                with abrir_zip(io.BytesIO(original)) as z:
                     contenidos = [(n, f, leer_entrada(z, n)) for n, f in entradas]
             except (zipfile.BadZipFile, OSError, KeyError):
                 self.ctx.registro(f"{ruta.name}: no pude abrirlo, se deja igual")

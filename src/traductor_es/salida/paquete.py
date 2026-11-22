@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, cast
 from .. import NOMBRE as NOMBRE_APP
 from .. import __version__, configuracion
 from ..formatos import json_cadenas
-from ..fuentes.contenedores import Contenedor
+from ..fuentes.contenedores import Contenedor, abrir_zip
 from ..fuentes.modpack import DatosModpack, datos_del_modpack
 from ..fuentes.recursos import PRIORIDAD_PACKS, Fuente, abrir_pack, leer_idiomas
 from ..modulos.base import contar, parece_clave, unidades
@@ -187,7 +187,7 @@ def _json(datos: object) -> bytes:
 def es_paquete(ruta: Path) -> bool:
     if not ruta.is_file() or not zipfile.is_zipfile(ruta):
         return False
-    with zipfile.ZipFile(ruta) as zf:
+    with abrir_zip(ruta) as zf:
         return _META in zf.namelist()
 
 
@@ -211,7 +211,7 @@ def _leer(zf: zipfile.ZipFile, nombre: str, maximo: int = _MAX_ARCHIVO) -> Any:
 def leer_metadatos(ruta: Path) -> dict[str, Any]:
     """Los metadatos de un paquete, comprobados. Lanza ValueError si no es un paquete que esta app entienda."""
     try:
-        with zipfile.ZipFile(ruta) as zf:
+        with abrir_zip(ruta) as zf:
             meta = _leer(zf, _META, _MAX_META)
     except (zipfile.BadZipFile, OSError) as e:
         raise ValueError(f"No pude abrir {ruta.name}: {e}") from e
@@ -316,7 +316,7 @@ def importar_paquete(proceso: Proceso, ruta: Path) -> ResumenImportacion:
         raise ValueError(f"El paquete está en {dialecto}: elige ese dialecto para importarlo.")
     resumen = ResumenImportacion("paquete")
     con_espana = dialecto != _ESPANA
-    with zipfile.ZipFile(ruta) as zf:
+    with abrir_zip(ruta) as zf:
         filas = _filas_validas(_leer(zf, _MEMORIA), resumen)
         correcciones = _pares_validos(_leer(zf, _CORRECCIONES), _MAX_TEXTO, resumen)
         glosario = _pares_validos(_leer(zf, _GLOSARIO), _MAX_TERMINO, resumen)

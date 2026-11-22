@@ -9,7 +9,7 @@ import zipfile
 import zlib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import IO, Any, Protocol, cast
 
 _PROFUNDIDAD_MAXIMA = 3
 _CARPETAS_ANIDADAS = ("META-INF/jars/", "META-INF/jarjar/", "META-INF/jarinjar/")
@@ -70,6 +70,18 @@ class Contenedor(Protocol):
     def cerrar(self) -> None: ...
 
 
+def abrir_zip(fuente: str | Path | IO[bytes], nombre: str | None = None) -> zipfile.ZipFile:
+    """`zipfile.ZipFile(fuente)` para leer. Un zip que Python no sabe abrir (una «versión necesaria» rara en el
+    índice, cabeceras imposibles) lanza `EntradaIlegible`, como uno dañado: Java sí los carga, así que se saltan
+    con aviso en vez de parar el análisis."""
+    try:
+        return zipfile.ZipFile(fuente)
+    except (NotImplementedError, ValueError, EOFError, OverflowError) as e:
+        origen = nombre or (Path(fuente).name if isinstance(fuente, (str, Path)) else "zip")
+        DANADAS.add(origen)
+        raise EntradaIlegible(f"{origen}: no se pudo abrir ({e})") from e
+
+
 class Zip:
     def __init__(self, nombre: str, zf: zipfile.ZipFile) -> None:
         self._nombre = nombre
@@ -79,7 +91,7 @@ class Zip:
 
     @classmethod
     def abrir(cls, ruta: Path) -> Zip:
-        return cls(ruta.name, zipfile.ZipFile(ruta))
+        return cls(ruta.name, abrir_zip(ruta))
 
     @property
     def nombre(self) -> str:
@@ -191,7 +203,8 @@ def _anidados(padre: Zip, ruta_padre: str, nivel: int) -> Iterator[Zip]:
     for n in padre.nombres():
         if n.endswith(".jar") and (n.startswith(_CARPETAS_ANIDADAS) or n in declarados):
             try:
-                hijo = Zip(f"{ruta_padre}!/{n.rsplit('/', 1)[-1]}", zipfile.ZipFile(io.BytesIO(padre.leer(n))))
+                nombre_hijo = f"{ruta_padre}!/{n.rsplit('/', 1)[-1]}"
+                hijo = Zip(nombre_hijo, abrir_zip(io.BytesIO(padre.leer(n)), nombre_hijo))
             except (zipfile.BadZipFile, OSError, KeyError):
                 continue
             yield hijo

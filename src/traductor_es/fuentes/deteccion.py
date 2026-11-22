@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from .contenedores import leer_entrada
+from .contenedores import abrir_zip, leer_entrada
 from .version import Version
 
 LOADERS = ("forge", "neoforge", "fabric", "quilt")
@@ -110,7 +110,7 @@ def _de_mods(jars: Iterable[Path]) -> Deteccion | None:
     versiones: Counter[str] = Counter()
     for jar in jars:
         try:
-            with zipfile.ZipFile(jar) as z:
+            with abrir_zip(jar) as z:
                 nombres = set(z.namelist())
                 if "META-INF/neoforge.mods.toml" in nombres:
                     loaders["neoforge"] += 1

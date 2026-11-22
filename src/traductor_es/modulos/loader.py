@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from ..fuentes.contenedores import leer_entrada
+from ..fuentes.contenedores import abrir_zip, leer_entrada
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen
 from .cambios import Lugar
@@ -99,7 +99,7 @@ def leer_idiomas(jar: Path) -> dict[str, dict[str, dict[str, str]]]:
     """{espacio: {idioma: {clave: texto}}} de los archivos de idioma JSON del jar."""
     salida: dict[str, dict[str, dict[str, str]]] = {}
     try:
-        with zipfile.ZipFile(jar) as z:
+        with abrir_zip(jar) as z:
             for n in z.namelist():
                 if m := _LANG.match(n):
                     espacio, idioma = m.group(1), m.group(2)

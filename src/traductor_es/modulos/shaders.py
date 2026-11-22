@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..formatos import propiedades
-from ..fuentes.contenedores import leer_entrada
+from ..fuentes.contenedores import abrir_zip, leer_entrada
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, Pieza, Resumen, contar
 from .cambios import Lugar
@@ -48,7 +48,7 @@ def _leer_shader(ruta: Path) -> _Shader | None:
                 if a.stat().st_size <= TOPE:
                     shader.idiomas[a.stem.lower()] = propiedades.leer(a.read_text(encoding="utf-8", errors="replace"))
         elif ruta.suffix.lower() == ".zip":
-            with zipfile.ZipFile(ruta) as z:
+            with abrir_zip(ruta) as z:
                 for info in z.infolist():
                     if (m := _LANG.match(info.filename)) and info.file_size <= TOPE:
                         texto = leer_entrada(z, info).decode("utf-8", errors="replace")
