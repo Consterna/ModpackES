@@ -80,7 +80,7 @@ def test_insertar_al_principio_no_marca_todo_como_cambiado() -> None:
 def test_sin_cambios_no_hay_lugares() -> None:
     lugares = [("mods", "Mods", [Lugar("m", {"a": "Wrench"})]), ("scripts", "JS", [Lugar("t.js", ["Hi there"])])]
     assert comparar(indice_de(lugares), lugares) == []
-    assert Cambios([], "indice", "2026-01-02T03:04:05+00:00").resumen() == (
+    assert Cambios([], "indice", "2026-01-02T12:04:05+00:00").resumen() == (
         "Desde la última traducción (2026-01-02): no cambió nada."
     )
 
