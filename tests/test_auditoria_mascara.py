@@ -47,8 +47,14 @@ def test_respuesta_alterada_del_motor_nunca_cambia_los_codigos(texto: str, data:
         assert _codigos(vuelta) == Counter(m.tokens), (respuesta, vuelta)
 
 
-@pytest.mark.parametrize("original", ["Use ⟦0⟧ and %s", "⟦1⟧ first %s then %d", "Literal ⟦⟧ %s"])
-def test_texto_que_ya_trae_marcadores_se_descarta(original: str) -> None:
-    """Caracterización (H-011): falla cerrado; el texto queda sin traducir en vez de traducirse mal."""
+@pytest.mark.parametrize("original", ["Use ⟦0⟧ and %s", "⟦1⟧ first %s then %d", "Literal ⟦⟧ %s", "Solo ⟧ suelto"])
+def test_texto_que_ya_trae_marcadores_vuelve_igual(original: str) -> None:
+    """H-011: los corchetes de marcador que ya trae el original se protegen y vuelven tal cual."""
     m = enmascarar(original)
-    assert desenmascarar(m.texto, m.tokens) is None
+    assert desenmascarar(m.texto, m.tokens) == original
+
+
+def test_corchete_de_marcador_que_inventa_el_motor_se_rechaza() -> None:
+    m = enmascarar("Costs %s coins")
+    assert desenmascarar("Cuesta ⟦0⟧ monedas ⟦", m.tokens) is None
+    assert desenmascarar("Cuesta ⟦0⟧ monedas", m.tokens) == "Cuesta %s monedas"

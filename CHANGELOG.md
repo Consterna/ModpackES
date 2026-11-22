@@ -124,6 +124,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Corregido
 
+- **Un texto que ya traía «⟦0⟧» o «⟦⟧» nunca se traducía:** esos corchetes son los que usa la app para proteger códigos, y el texto se descartaba entero. Ahora se protegen como un código más y el texto se traduce.
 - **Un jar trampa podía llenar la memoria:** las entradas de jars y zips se descomprimían enteras, y un jar de pocos KB podía declarar cientos de MB. Ahora lo que pasa de 64 MiB por entrada se salta como si estuviera dañado, el resto se traduce y el informe lo avisa. Ningún archivo real de idioma, libro o script se acerca a ese tamaño.
 - **«Restaurar» podía pisar lo que había cambiado después de traducir:** si actualizabas el modpack (o editabas a mano un archivo traducido) y después restaurabas, volvía la versión vieja encima de la nueva. Ahora solo se restaura lo que sigue tal como lo dejó la app; lo demás se deja y el aviso lo nombra. Un archivo que borraste se sigue recreando.
 - **Si el registro de copias se dañaba o se borraba, la copia del original se pisaba con la traducción:** ahora hay un duplicado del registro (`traductor_es/registro.copia.json`) y una copia vieja nunca se sobrescribe: se aparta en `traductor_es/anteriores/`. Tampoco se escribe nada a través de una unión de carpetas que salga de la instancia, y restaurar borra los temporales que deja una escritura cortada.
