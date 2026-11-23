@@ -75,7 +75,8 @@ def test_las_combinaciones_cubren_todos_los_pares() -> None:
 @pytest.fixture(autouse=True)
 def _aislado(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(vanilla, "raices_de_lanzadores", list)
-    monkeypatch.setenv("TRADUCTOR_ES_DATOS", str(tmp_path / "datos"))
+    # la carpeta de datos de un usuario «José Núñez», con cirílico y kanji: memoria, registro y preferencias
+    monkeypatch.setenv("TRADUCTOR_ES_DATOS", str(tmp_path / "José Núñez Пётр 東京" / "datos"))
 
 
 def _instancia(base: Path, cual: str) -> Path:
@@ -123,7 +124,7 @@ def _argumentos(juego: Path, c: Mapping[str, object]) -> Iterator[str]:
 
 @pytest.mark.parametrize("c", COMBINACIONES, ids=lambda c: "-".join(str(v) for v in c.values()))
 def test_cada_combinacion(tmp_path: Path, c: dict[str, object]) -> None:
-    juego = _instancia(tmp_path / "inst", str(c["instancia"]))
+    juego = _instancia(tmp_path / "Mi Pack (1.20.1) [ES] ñandú", str(c["instancia"]))
     antes = _huellas(juego)
     opciones_antes = (juego / "options.txt").read_text(encoding="utf-8")
     argumentos = list(_argumentos(juego, c))

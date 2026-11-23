@@ -13,6 +13,7 @@ Para una corrida larga: `MODPACKES_ESTADOS=2000 uv run pytest tests/test_auditor
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -215,6 +216,16 @@ _LISTA = st.lists(
 )
 
 
+def _lineas(datos: bytes, con_salto: bool = False) -> list[str]:
+    """Como el juego: solo CR, LF y CRLF cortan línea (`str.splitlines` también corta en \\x0c, \\x1c, U+2028…)."""
+    texto = datos.decode("utf-8", errors="surrogateescape")
+    partes = re.split(r"(\r\n|\r|\n)", texto)
+    lineas = [
+        partes[i] + (partes[i + 1] if con_salto and i + 1 < len(partes) else "") for i in range(0, len(partes), 2)
+    ]
+    return lineas[:-1] if lineas and lineas[-1] == "" else lineas
+
+
 class MaquinaOpciones(RuleBasedStateMachine):
     def __init__(self) -> None:
         super().__init__()
@@ -236,7 +247,7 @@ class MaquinaOpciones(RuleBasedStateMachine):
     def el_jugador_cambia_los_packs(self, packs: list[str]) -> None:
         import json
 
-        lineas = self.ruta.read_bytes().decode("utf-8", errors="surrogateescape").splitlines(keepends=True)
+        lineas = _lineas(self.ruta.read_bytes(), con_salto=True)
         nueva = f"resourcePacks:{json.dumps(packs)}\n"
         lineas = [nueva if linea.startswith("resourcePacks:") else linea for linea in lineas]
         self.ruta.write_bytes("".join(lineas).encode("utf-8", errors="surrogateescape"))
@@ -245,10 +256,10 @@ class MaquinaOpciones(RuleBasedStateMachine):
     def activar(self, idioma: str | None) -> None:
         import json
 
-        antes = self.ruta.read_bytes().decode("utf-8", errors="surrogateescape").splitlines()
+        antes = _lineas(self.ruta.read_bytes())
         opciones.activar(self._tmp, "Traduccion_ES", idioma, con_prefijo=True)
         despues_bytes = self.ruta.read_bytes()
-        despues = despues_bytes.decode("utf-8", errors="surrogateescape").splitlines()
+        despues = _lineas(despues_bytes)
         tocadas = ("resourcePacks:", "incompatibleResourcePacks:") + (("lang:",) if idioma else ())
         assert [x for x in antes if not x.startswith(tocadas)] == [x for x in despues if not x.startswith(tocadas)]
         for linea in despues:
