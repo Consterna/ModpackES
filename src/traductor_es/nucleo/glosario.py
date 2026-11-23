@@ -197,10 +197,15 @@ class Glosario:
         return frozenset(self._en_conflicto)
 
     def descubrir(self, terminos: Mapping[str, str]) -> None:
-        """Términos hallados en esta ejecución (los que se repiten en el modpack): no pisan a los oficiales."""
+        """Términos hallados en esta ejecución (los que se repiten en el modpack): no pisan a los oficiales.
+
+        Su fuente es la de lo traducido en esta ejecución (`agregar_pares` sin fuente): si después llega otra
+        traducción del mismo término, manda la que ya se decidió.
+        """
         for en, es in terminos.items():
             if en.strip() and es.strip():
                 self._terminos.setdefault(en.strip(), es.strip())
+                self._fuente.setdefault(en.strip(), "")
                 self._descubiertos.setdefault(en.strip(), self._terminos[en.strip()])
         self._orden = None
 

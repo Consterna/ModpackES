@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from traductor_es.formatos import javascript, json_cadenas, lang_json, lang_legacy, snbt
@@ -75,6 +75,7 @@ def test_lang_json_ida_y_vuelta_con_textos_hostiles(textos: dict[str, str]) -> N
 
 
 @_AJUSTES
+@example({"\ufeff": ""})  # la clave queda primera: no se puede leer como la marca del archivo
 @given(st.dictionaries(_HOSTIL, _HOSTIL, max_size=6))
 def test_lang_legacy_no_deja_meter_lineas_nuevas(textos: dict[str, str]) -> None:
     """Un valor con salto de línea no puede crear claves nuevas en el .lang: o se rechaza o vuelve igual."""
@@ -145,3 +146,9 @@ def test_scripts_no_acepta_codigo_nuevo_en_una_plantilla(original: str, traducci
 @pytest.mark.parametrize("texto", ["${process.exit()}", "\\${x}", "a`b", "</script>", " ", "\\", "\r\n"])
 def test_js_escapar_y_des_escapar_son_inversos(comilla: str, texto: str) -> None:
     assert javascript.des_escapar(javascript.escapar(texto, comilla)) == texto
+
+
+def test_lang_legacy_clave_con_marca_al_principio() -> None:
+    datos = lang_legacy.escribir({"\ufeffa": "x"})
+    assert datos == "#\n\ufeffa=x\n".encode()
+    assert lang_legacy.leer(datos) == {"\ufeffa": "x"}

@@ -17,8 +17,11 @@ from .version import Version, formato_datos, formato_recursos
 
 
 def resolver_carpeta_juego(carpeta: Path) -> Path | None:
-    """Acepta la carpeta de la instancia o la del juego y devuelve la que tiene mods o config."""
-    for c in (carpeta, carpeta / "minecraft", carpeta / ".minecraft"):
+    """Acepta la carpeta de la instancia o la del juego y devuelve la que tiene mods o config.
+
+    `instance/` es la de GDLauncher (Carbon): `<instancia>/instance.json` y el juego en `<instancia>/instance/`.
+    """
+    for c in (carpeta, carpeta / "minecraft", carpeta / ".minecraft", carpeta / "instance"):
         if (c / "mods").is_dir() or (c / "config").is_dir():
             return c
     return None

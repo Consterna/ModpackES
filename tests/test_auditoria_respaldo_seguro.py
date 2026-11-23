@@ -33,7 +33,8 @@ def _archivo(juego: Path, contenido: bytes = b"ORIGINAL v1") -> Path:
 
 def _anteriores(juego: Path) -> list[bytes]:
     carpeta = juego / CARPETA / ANTERIORES
-    return sorted(p.read_bytes() for p in carpeta.rglob("*") if p.is_file()) if carpeta.is_dir() else []
+    # Solo lo apartado: el manifiesto de cada generación (<fecha>.json) va al lado de su carpeta
+    return sorted(p.read_bytes() for p in carpeta.glob("*/**/*") if p.is_file()) if carpeta.is_dir() else []
 
 
 def test_restaurar_no_pisa_lo_que_actualizo_el_modpack_y_avisa(juego: Path) -> None:

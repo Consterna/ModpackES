@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import csv
+import math
 import re
 import sqlite3
 import threading
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,7 +41,8 @@ from .modulos.mods import es_nombre
 from .motores import fabrica
 from .motores.base import ErrorFatal, Motor
 from .motores.compatible import Compatible
-from .motores.gemini import PRECIOS, Gemini
+from .motores.gemini import Gemini
+from .motores.gemini import precio as precio_de
 from .nucleo.dialectos import DIALECTO_POR_DEFECTO, VARIANTES, nombre_archivo_lang
 from .nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from .nucleo.glosario import Glosario
@@ -48,6 +50,7 @@ from .nucleo.mascara import separar_bordes
 from .nucleo.memoria import Memoria
 from .nucleo.traductor import ECONOMICO, EQUILIBRADO, MAXIMO, PERFIL_POR_DEFECTO, Traductor
 from .nucleo.vocabulario import agregar_nucleos, agregar_vocabulario, preparar_sustituciones
+from .registro import LOGGER
 from .salida import opciones as opciones_salida
 from .salida.copias import Respaldo
 from .salida.resource_pack import NOMBRE, PackSalida
@@ -58,8 +61,11 @@ GRUPOS = ("mods", "libros", "misiones", "scripts")
 #: Grupos que pasan por la revisión automática: textos largos donde un error se nota y cambia el sentido.
 GRUPOS_REVISADOS = ("misiones", "libros")
 _ESTADOS = {"JOB_STATE_PENDING": "en cola", "JOB_STATE_RUNNING": "procesando"}
-#: Tokens por carácter y sobrecarga por lote, medidos a ojo con textos de mods: solo para estimar.
+#: Tokens por carácter y sobrecarga por lote (las instrucciones se repiten en cada pedido): solo para estimar.
 _CARACTERES_POR_TOKEN, _TOKENS_POR_LOTE = 3.5, 450
+#: Tokens por texto además del texto (id, pista y clave del JSON de la respuesta). Calibrados con la API real el
+#: 2026-11-21 (gemini-3.8-flash, banco de 148 textos): antes la estimación se quedaba un 25-31 % corta.
+_TOKENS_ENTRADA_POR_TEXTO, _TOKENS_SALIDA_POR_TEXTO = 1, 5
 #: Motores que no se anotan en los créditos del pack: no traducen de verdad.
 _SIN_CREDITO = frozenset({"simulador"})
 
@@ -123,10 +129,10 @@ class Informe:
         """
         if fabrica.es_local(motor):
             return 0.0
-        precio = PRECIOS.get(modelo) if motor == fabrica.GEMINI else None
+        precio = precio_de(modelo) if motor == fabrica.GEMINI else None
         if precio is None:
             return None
-        total = _costo_traduccion(self.caracteres, self.a_traducir, precio)
+        total = _costo_traduccion([(m.caracteres, m.a_traducir) for m in self.modulos], precio)
         total = total / 2 if por_lotes else total
         total *= _COSTO_DEL_PERFIL.get(calidad, 1.0)
         if revisar or calidad == MAXIMO:  # la revisión va en modo normal aunque la traducción vaya por lotes
@@ -136,8 +142,18 @@ class Informe:
             tokens = caracteres / _CARACTERES_POR_TOKEN
             # leer original y traducción, contestar unas palabras por texto y rehacer más o menos 1 de cada 7
             total += (tokens * 2.4 * precio[0] + textos * 12 * precio[1]) / 1e6
-            total += 0.15 * _costo_traduccion(caracteres, textos, precio)
+            total += 0.15 * _costo_traduccion([(m.caracteres, m.a_traducir) for m in revisados], precio)
         return total
+
+
+#: Margen del costo estimado: lo que razona el modelo varía entre corridas y entre packs (medido el 2026-11-21:
+#: ±3 % entre 5 corridas iguales; el resto cubre packs con otra mezcla de textos, reintentos y rechazos).
+MARGEN_DEL_COSTO = (0.85, 1.25)
+
+
+def rango_de_costo(costo: float) -> tuple[float, float]:
+    """De cuánto a cuánto puede salir de verdad un costo estimado."""
+    return costo * MARGEN_DEL_COSTO[0], costo * MARGEN_DEL_COSTO[1]
 
 
 #: Cuánto más cuesta la traducción con cada perfil, medido con Gemini 3.8 Flash: lo dudoso es poco, y el máximo
@@ -199,13 +215,18 @@ def aviso_de_dudosos(dudosos: Mapping[str, tuple[str, str]], archivo: Path | Non
     )
 
 
-def _costo_traduccion(caracteres: int, textos: int, precio: tuple[float, float]) -> float:
-    if not caracteres:
-        return 0.0
-    tokens = caracteres / _CARACTERES_POR_TOKEN
-    lotes = max(1, textos // 50)
-    entrada = tokens * 1.6 + lotes * _TOKENS_POR_LOTE
-    salida = tokens * 1.4  # traducción (el español es algo más largo) más algo de razonamiento
+def _costo_traduccion(partes: Iterable[tuple[int, int]], precio: tuple[float, float]) -> float:
+    """Costo de traducir esas partes (caracteres, textos), cada una en sus propios lotes como hace el traductor."""
+    entrada = salida = 0.0
+    caracteres_max, textos_max = fabrica.LIMITES_NORMALES
+    for caracteres, textos in partes:
+        if not caracteres:
+            continue
+        tokens = caracteres / _CARACTERES_POR_TOKEN
+        lotes = max(math.ceil(caracteres / caracteres_max), math.ceil(textos / textos_max), 1)
+        entrada += tokens * 1.6 + lotes * _TOKENS_POR_LOTE + textos * _TOKENS_ENTRADA_POR_TEXTO
+        # traducción (el español es algo más largo), algo de razonamiento y la clave de cada texto en el JSON
+        salida += tokens * 1.4 + textos * _TOKENS_SALIDA_POR_TEXTO
     return (entrada * precio[0] + salida * precio[1]) / 1e6
 
 
@@ -581,7 +602,25 @@ class Proceso:
                 )
             if not (self.instancia.juego / "options.txt").is_file():
                 informe.avisos.append(AVISO_SIN_OPCIONES)
+        self._podar_anteriores()
         return informe
+
+    def _podar_anteriores(self) -> None:
+        """Al terminar bien: borra de `traductor_es/anteriores/` las copias viejas que ya no hacen falta.
+
+        Solo las que se sabe que son un inglés reemplazado por una actualización, con uno más nuevo en `respaldo/`;
+        siempre quedan las 3 últimas actualizaciones y las de menos de 90 días (ver `Respaldo.podar_anteriores`).
+        """
+        try:
+            poda = self.ctx.respaldo.podar_anteriores()
+        except OSError as e:  # un archivo abierto en otro programa: se intenta la próxima vez
+            LOGGER.warning("No pude limpiar las copias de versiones anteriores: %s", e)
+            return
+        if poda.borradas:
+            self.registro(
+                f"Borré {len(poda.borradas)} copias de versiones anteriores del modpack que ya no hacían falta "
+                f"({poda.bytes / 2**20:.1f} MB); quedan las de las últimas actualizaciones."
+            )
 
     def _traducir_pasada(
         self,

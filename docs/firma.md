@@ -21,8 +21,26 @@ No sé cuánto tarda la aprobación ni si aceptan proyectos de una sola persona:
 Cuando aprueben el proyecto, en SignPath:
 
 1. Agrega el sistema de compilación de confianza **GitHub.com** a la organización y vincúlalo al proyecto.
-2. Crea una configuración de artefacto cuya raíz sea un `<zip-file>` con dos `<pe-file>` a firmar:
-   `ModpackES.exe` y `ModpackES-instalador.exe` (el artefacto que sube el CI es un zip con los dos).
+2. Crea una configuración de artefacto. El artefacto que sube el CI es un zip con el instalador y el zip del
+   portátil, y dentro del portátil está el programa en `ModpackES/ModpackES.exe`. Hay que firmar los dos `.exe`:
+
+   ```xml
+   <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+     <zip-file>
+       <pe-file path="ModpackES-instalador.exe">
+         <authenticode-sign />
+       </pe-file>
+       <zip-file path="ModpackES-portable.zip">
+         <pe-file path="ModpackES/ModpackES.exe">
+           <authenticode-sign />
+         </pe-file>
+       </zip-file>
+     </zip-file>
+   </artifact-configuration>
+   ```
+
+   El `ModpackES.exe` que va dentro del instalador sale de la misma carpeta, pero sin firmar: el instalador se
+   arma antes de firmar.
 3. Crea una política de firma (por ejemplo `release-signing`) y un token de API para el CI.
 
 Guía oficial: [docs.signpath.io/trusted-build-systems/github](https://docs.signpath.io/trusted-build-systems/github).
@@ -38,8 +56,8 @@ En GitHub → *Settings* → *Secrets and variables* → *Actions*:
 | Variable | `SIGNPATH_PROJECT_SLUG` | El slug del proyecto (por ejemplo `ModpackES`) |
 | Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | El slug de la política (por ejemplo `release-signing`) |
 
-Con eso, la próxima etiqueta `v*` publica el `.exe` firmado. La atestación y el SHA-256 se calculan sobre el
-archivo ya firmado.
+Con eso, la próxima etiqueta `v*` publica el instalador y el portátil firmados. La atestación y el SHA-256 se
+calculan sobre los archivos ya firmados.
 
 ## 4. Atribución
 

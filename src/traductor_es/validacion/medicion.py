@@ -22,7 +22,7 @@ from typing import Any, cast
 
 from ..motores import fabrica
 from ..motores.base import Motor
-from ..motores.gemini import PRECIOS
+from ..motores.gemini import precio as precio_de
 from ..nucleo import terminos as terminos_repetidos
 from ..nucleo.ejemplos import CANTIDAD_EN_LA_APP, Ejemplos
 from ..nucleo.glosario import Glosario
@@ -316,7 +316,7 @@ def _gasto(motor: Motor, antes: list[int], modelo: str) -> tuple[tuple[int, int]
         return None, None
     ahora = _uso(motor)
     tokens = (ahora[0] - antes[0], ahora[1] - antes[1])
-    precio = PRECIOS.get(modelo)
+    precio = precio_de(modelo)
     return tokens, (None if precio is None else (tokens[0] * precio[0] + tokens[1] * precio[1]) / 1e6)
 
 

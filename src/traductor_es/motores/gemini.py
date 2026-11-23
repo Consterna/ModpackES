@@ -15,6 +15,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Sequence
+from datetime import date
 from typing import Any, cast
 
 import httpx
@@ -35,6 +36,28 @@ PRECIOS: dict[str, tuple[float, float]] = {
     "gemini-3-flash-preview": (0.50, 3.00),
     "gemini-2.5-flash-lite": (0.10, 0.40),
 }
+#: Cambios de precio anunciados (desde la fecha, inclusive), según la página de precios de Google (noviembre de 2026):
+#: 3.8 y 3.6 Flash pasan al doble el 1-1-2027, y desde el 1-12-2026 los pedidos a 2.5 Flash-Lite se atienden con
+#: 3.5 Flash-Lite, que es lo que se cobra.
+_CAMBIOS_DE_PRECIO: dict[str, tuple[tuple[date, tuple[float, float]], ...]] = {
+    "gemini-3.8-flash": ((date(2027, 1, 1), (1.50, 7.50)),),
+    "gemini-3.6-flash": ((date(2027, 1, 1), (1.50, 7.50)),),
+    "gemini-2.5-flash-lite": ((date(2026, 12, 1), (0.30, 2.50)),),
+}
+
+
+def precio(modelo: str, hoy: date | None = None) -> tuple[float, float] | None:
+    """US$ por millón de tokens (entrada, salida) del modelo en esa fecha (hoy si no se dice); None si no se conoce."""
+    actual = PRECIOS.get(modelo)
+    if actual is None:
+        return None
+    dia = hoy or date.today()
+    for desde, nuevo in _CAMBIOS_DE_PRECIO.get(modelo, ()):
+        if dia >= desde:
+            actual = nuevo
+    return actual
+
+
 #: Nivel de razonamiento más bajo que acepta cada modelo, según la documentación de Google (noviembre de 2026):
 #: 3.8 Flash y la familia 4 no admiten «minimal»; 2.5 Flash-Lite piensa solo si se le pide, así que no se configura.
 _RAZONAMIENTO_MINIMO: dict[str, str | None] = {"gemini-3.8-flash": "LOW", "gemini-2.5-flash-lite": None}

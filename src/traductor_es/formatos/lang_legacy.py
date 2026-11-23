@@ -26,4 +26,7 @@ def escribir(textos: dict[str, str]) -> bytes:
         if _FIN_DE_LINEA.search(clave) or "=" in clave or _FIN_DE_LINEA.search(valor):
             raise ValueError(f"Texto con salto de línea real no se puede guardar en .lang: {clave!r}")
         lineas.append(f"{clave}={valor}")
+    if lineas and lineas[0].startswith(BOM):
+        # Al principio del archivo se leería como su marca y la clave cambiaría: un comentario delante lo evita
+        lineas.insert(0, "#")
     return ("\n".join(lineas) + "\n").encode("utf-8")

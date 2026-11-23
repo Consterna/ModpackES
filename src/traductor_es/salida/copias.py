@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+import shutil
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -54,6 +56,29 @@ def _leer_registro(ruta: Path) -> dict[str, dict[str, Any]] | None:
     }
 
 
+_FORMATO_SELLO = "%Y%m%dT%H%M%SZ"
+
+
+@dataclass
+class Poda:
+    """Lo que borró (o borraría, al simular) `Respaldo.podar_anteriores`."""
+
+    borradas: list[str] = field(default_factory=list[str])
+    conservadas: list[str] = field(default_factory=list[str])
+    bytes: int = 0
+
+
+def _leer_manifiesto(ruta: Path) -> dict[str, Any] | None:
+    try:
+        datos: Any = json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(datos, dict):
+        return None
+    manifiesto = cast(dict[str, Any], datos)
+    return manifiesto if isinstance(manifiesto.get("archivos"), dict) else None
+
+
 def _escribir_entero(ruta: Path, datos: bytes) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_name(ruta.name + ".traductor.tmp")
@@ -71,6 +96,7 @@ class Respaldo:
         self.base = juego / CARPETA / "respaldo"
         self.registro = juego / CARPETA / "registro.json"
         self.copia_registro = juego / CARPETA / REGISTRO_COPIA
+        self._sello: str | None = None  #: carpeta de `anteriores/` de esta corrida
         #: Lo que el último `restaurar` dejó como estaba porque cambió después de traducir.
         self.cambiados: list[str] = []
         self._datos: dict[str, dict[str, Any]] = self._cargar()
@@ -139,20 +165,96 @@ class Respaldo:
         # lo de ahora es el original
         return actual
 
-    def _apartar(self, clave: str) -> None:
-        """Mueve la copia que había a `anteriores/<fecha>/`: un original nunca se pierde por renovar la copia."""
+    def _generacion(self) -> Path:
+        """La carpeta de `anteriores/` de esta corrida: una sola por actualización, no una por segundo."""
+        if self._sello is None:
+            sello = base = datetime.now(UTC).strftime(_FORMATO_SELLO)
+            n = 1
+            while (self.juego / CARPETA / ANTERIORES / sello).exists():  # otra corrida en el mismo segundo
+                n += 1
+                sello = f"{base}-{n}"
+            self._sello = sello
+        return self.juego / CARPETA / ANTERIORES / self._sello
+
+    def _apartar(self, clave: str, motivo: str) -> None:
+        """Mueve la copia que había a `anteriores/<fecha>/`: un original nunca se pierde por renovar la copia.
+
+        `motivo`: `actualizacion` si la app sabe que escribió el archivo y después cambió por fuera (lo apartado es un
+        inglés viejo y hay uno nuevo en `respaldo/`), `sin_registro` si no había registro (lo apartado puede ser el
+        único inglés que queda). Se anota en `anteriores/<fecha>.json`, que usa `podar_anteriores`.
+        """
         copia = self.base / clave
         if not copia.is_file():
             return
-        sello = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        carpeta = self.juego / CARPETA / ANTERIORES / sello
-        destino, n = carpeta / clave, 1
-        while destino.exists():
-            n += 1
-            destino = carpeta.with_name(f"{sello}-{n}") / clave
+        carpeta = self._generacion()
+        destino = carpeta / clave
         self._exigir_dentro(destino)
         destino.parent.mkdir(parents=True, exist_ok=True)
+        huella = _huella(copia.read_bytes())
         copia.replace(destino)
+        manifiesto = carpeta.with_name(carpeta.name + ".json")
+        datos = _leer_manifiesto(manifiesto) or {
+            "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
+            "archivos": {},
+        }
+        cast(dict[str, Any], datos["archivos"])[clave] = {"sha1": huella, "motivo": motivo}
+        _escribir_entero(manifiesto, json.dumps(datos, indent=1, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+
+    def podar_anteriores(self, conservar: int = 3, dias: int = 90, simular: bool = False) -> Poda:
+        """Borra de `anteriores/` solo lo que se puede probar que sobra; el resto queda.
+
+        Una generación se conserva si cumple **cualquiera** de estas condiciones (como `restic forget`):
+        - está entre las `conservar` más recientes (al menos una, aunque se pida 0);
+        - tiene menos de `dias` días;
+        - no tiene manifiesto (de una versión anterior de la app) o algún archivo suyo no es `actualizacion`;
+        - para algún archivo suyo ya no hay un inglés más nuevo en `respaldo/`, o el de `respaldo/` es lo que
+          escribió la app (entonces lo apartado es el único inglés).
+        Con `simular` no borra nada: dice qué borraría.
+        """
+        raiz = self.juego / CARPETA / ANTERIORES
+        poda = Poda()
+        if not raiz.is_dir():
+            return poda
+        generaciones = sorted((p for p in raiz.iterdir() if p.is_dir()), key=lambda p: p.name, reverse=True)
+        limite = datetime.now(UTC) - timedelta(days=dias)
+        for i, carpeta in enumerate(generaciones):
+            if not self._dentro(carpeta):
+                continue
+            if i < max(1, conservar) or self._reciente(carpeta.name, limite) or not self._sobra(carpeta):
+                poda.conservadas.append(carpeta.name)
+                continue
+            poda.borradas.append(carpeta.name)
+            poda.bytes += sum(f.stat().st_size for f in carpeta.rglob("*") if f.is_file())
+            if not simular:
+                shutil.rmtree(carpeta)
+                carpeta.with_name(carpeta.name + ".json").unlink(missing_ok=True)
+        return poda
+
+    @staticmethod
+    def _reciente(nombre: str, limite: datetime) -> bool:
+        try:
+            fecha = datetime.strptime(nombre.split("-", 1)[0], _FORMATO_SELLO).replace(tzinfo=UTC)
+        except ValueError:
+            return True  # un nombre que no es de la app: no se toca
+        return fecha >= limite
+
+    def _sobra(self, carpeta: Path) -> bool:
+        """Todo lo de esta generación es un inglés viejo reemplazado y hay uno más nuevo en `respaldo/`."""
+        datos = _leer_manifiesto(carpeta.with_name(carpeta.name + ".json"))
+        if datos is None:
+            return False
+        archivos = cast(dict[str, Any], datos.get("archivos") or {})
+        en_disco = {f.relative_to(carpeta).as_posix() for f in carpeta.rglob("*") if f.is_file()}
+        if not archivos or en_disco - set(archivos):  # algo que el manifiesto no explica: se deja
+            return False
+        for clave, info in archivos.items():
+            if not isinstance(info, dict) or cast(dict[str, Any], info).get("motivo") != "actualizacion":
+                return False
+            copia = self.base / clave
+            entrada = self._datos.get(clave) or {}
+            if not copia.is_file() or _huella(copia.read_bytes()) in (entrada.get("escrito"), entrada.get("pendiente")):
+                return False
+        return True
 
     def escribir(self, ruta: Path, datos: bytes, neutro: bytes = b"") -> None:
         """Escribe un archivo traducido y lo registra. `neutro` es lo que queda si se restaura y no existía."""
@@ -161,13 +263,14 @@ class Respaldo:
         actual = ruta.read_bytes() if ruta.is_file() else None
         if not self._nuestro(clave, entrada, actual):
             # El archivo no está como lo dejó la app: lo que hay ahora es el original.
+            motivo = "sin_registro" if entrada is None else "actualizacion"
             if actual is None:
                 entrada = {"existia": False}
             else:
                 copia = self.base / clave
                 self._exigir_dentro(copia)
                 if not (copia.is_file() and copia.read_bytes() == actual):
-                    self._apartar(clave)
+                    self._apartar(clave, motivo)
                     _escribir_entero(copia, actual)
                 entrada = {"existia": True}
             self._datos[clave] = entrada

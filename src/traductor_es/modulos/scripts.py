@@ -32,12 +32,18 @@ AYUDAS_TEXTO = frozenset({
 })  # fmt: skip
 RECEPTORES_TEXTO = frozenset({"Text", "Component"})
 #: Dentro de estos eventos, `add`, `addAll`… reciben líneas de tooltip, textos de idioma o de información.
+#: KubeJS 7 (1.21 y 26.x) cambió los nombres: `ItemEvents.modifyTooltips`, `ItemEvents.dynamicTooltips` y
+#: `RecipeViewerEvents.addInformation`, que reemplaza a los de JEI, REI y EMI.
 EVENTOS_TEXTO = (
     "ItemEvents.tooltip", "ClientEvents.lang", "JEIEvents.information", "REIEvents.information",
     "EMIEvents.information", "onEvent:item.tooltip", "onEvent:jei.information", "onEvent:rei.information",
-    "onEvent:client.generate_assets",
+    "onEvent:client.generate_assets", "ItemEvents.modifyTooltips", "ItemEvents.dynamicTooltips",
+    "RecipeViewerEvents.addInformation",
 )  # fmt: skip
-LLAMADAS_EN_EVENTO = frozenset({"add", "addAll", "insert", "addAdvanced", "addItem", "addFluid", "addLang", "addLine"})
+#: `removeText`, `removeExactText` y `dynamic` no están a propósito: reciben el texto que hay que igualar o un id.
+LLAMADAS_EN_EVENTO = frozenset({
+    "add", "addAll", "insert", "addAdvanced", "addItem", "addFluid", "addLang", "addLine", "addToAll",
+})  # fmt: skip
 #: Grupos de REI (KubeJS `REIGroupEntriesEventJS`, 1.18.2 a 1.20): en todos, el argumento 0 es el id del grupo y el 1 su
 #: nombre, el que ve el jugador en REI. Solo ese se traduce.
 EVENTOS_GRUPOS_REI = ("REIEvents.groupEntries", "onEvent:rei.group")
@@ -77,8 +83,15 @@ def _seguro(c: javascript.CadenaJs, traduccion: str) -> bool:
     return c.comilla != "`" or traduccion.count("${") == c.texto.count("${")
 
 
+#: KubeJS 7: `RecipeViewerEvents.groupEntries(tipo, e => e.group(filtro, id, nombre))`: el nombre es el argumento 2.
+EVENTO_GRUPOS_VISOR = "RecipeViewerEvents.groupEntries"
+
+
 def es_nombre_de_grupo_rei(c: javascript.CadenaJs) -> bool:
-    """El nombre de un grupo de REI (segundo argumento de `event.groupItems(id, nombre, …)`)."""
+    """El nombre de un grupo de REI (segundo argumento de `event.groupItems(id, nombre, …)`) o, en KubeJS 7, del
+    visor de recetas (tercer argumento de `event.group(filtro, id, nombre)`)."""
+    if c.funcion == "group" and c.arg == 2:
+        return any(ctx.startswith(EVENTO_GRUPOS_VISOR) for ctx in c.contexto)
     return c.funcion in GRUPOS_REI and c.arg == 1 and any(ctx.startswith(EVENTOS_GRUPOS_REI) for ctx in c.contexto)
 
 

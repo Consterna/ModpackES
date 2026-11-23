@@ -18,6 +18,7 @@ import difflib
 import hashlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, cast
 
 #: Versión del formato del índice. Si cambia, un índice viejo se ignora (se compara con la memoria).
@@ -87,6 +88,14 @@ def leer_indice(marca: Mapping[str, Any]) -> tuple[Indice, str] | None:
         if isinstance(entrada, dict) and isinstance(cast(dict[str, Any], entrada).get("lugares"), dict):
             limpio[str(nombre)] = cast(dict[str, Any], entrada)
     return limpio, str(datos.get("fecha", ""))
+
+
+def fecha_local(iso: str) -> str:
+    """AAAA-MM-DD en la hora del PC: la marca guarda la fecha en UTC, y de noche en América sería el día siguiente."""
+    try:
+        return datetime.fromisoformat(iso).astimezone().date().isoformat()
+    except ValueError:
+        return iso[:10]
 
 
 def para_la_marca(indice: Indice, fecha: str) -> dict[str, Any]:
@@ -247,7 +256,7 @@ class Cambios:
         if self.base == "memoria":
             inicio = "Sin índice de una traducción anterior (se compara con la memoria)"
         else:
-            inicio = "Desde la última traducción" + (f" ({self.fecha[:10]})" if self.fecha else "")
+            inicio = "Desde la última traducción" + (f" ({fecha_local(self.fecha)})" if self.fecha else "")
         if not self.lugares:
             return f"{inicio}: no cambió nada."
         return f"{inicio}: {self.nuevas} nuevas, {self.cambiadas} cambiadas, {self.borradas} borradas."

@@ -6,7 +6,7 @@ cuando cambia el tema (`seguir_tema`).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 
 from PySide6.QtCore import QObject, QSize, Qt, Signal, Slot
 from PySide6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
@@ -54,8 +54,22 @@ def repintar(widget: QWidget) -> None:
     widget.update()
 
 
-def etiqueta(texto: str = "", tipo: str = "", ajustar: bool = False) -> QLabel:
+def solo_texto(raiz: QWidget, excepto: Iterable[QLabel] = ()) -> None:
+    """Las etiquetas de `raiz` muestran su texto tal cual, sin interpretarlo como HTML.
+
+    QLabel dibuja como HTML lo que «parece» HTML: un modpack llamado `<img src=…>` o un mensaje de un servidor con
+    etiquetas alterarían la ventana. Solo las de `excepto` (créditos y aviso de versión nueva) llevan enlaces.
+    """
+    dejar = {id(e) for e in excepto}
+    for e in raiz.findChildren(QLabel):
+        if id(e) not in dejar:
+            e.setTextFormat(Qt.TextFormat.PlainText)
+
+
+def etiqueta(texto: str = "", tipo: str = "", ajustar: bool = False, enriquecida: bool = False) -> QLabel:
+    """`enriquecida`: solo para textos propios con enlaces; lo demás (que puede venir del modpack) va tal cual."""
     e = QLabel(texto)
+    e.setTextFormat(Qt.TextFormat.RichText if enriquecida else Qt.TextFormat.PlainText)
     if tipo:
         e.setProperty("tipo", tipo)
     e.setWordWrap(ajustar)
@@ -165,6 +179,7 @@ class EtiquetaRuta(QLabel):
 
     def __init__(self, texto: str = "", tipo: str = "tenue", padre: QWidget | None = None) -> None:
         super().__init__(padre)
+        self.setTextFormat(Qt.TextFormat.PlainText)  # una ruta o un nombre del modpack nunca es HTML
         self.setProperty("tipo", tipo)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self._completo = ""
