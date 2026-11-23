@@ -184,9 +184,9 @@ def test_capturas_de_cada_estado(qtbot: QtBot, tmp_path: Path, app: QApplication
         assert imagen.save(str(carpeta / f"{preferencia}_{estado}.png"))
         assert _captura_util(imagen), estado
     assert capturas["elegida"] != capturas["traducida"]  # el estado se ve
-    # El tamaño mínimo no corta el botón principal
+    # En el tamaño mínimo el botón principal se ve entero o acortado con «…», nunca más angosto que eso (H-047)
     boton = v.b_principal
-    assert boton.isVisible() and boton.width() >= boton.sizeHint().width() - 2
+    assert boton.isVisible() and boton.width() >= boton.minimumSizeHint().width()
 
 
 # --- ventana angosta: nada queda cortado (H-047) ---------------------------------------------------------------------
