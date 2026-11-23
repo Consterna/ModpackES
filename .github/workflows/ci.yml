@@ -34,7 +34,7 @@ jobs:
           # Sin caché al construir una release (etiqueta): una caché envenenada no puede llegar a lo que se publica
           enable-cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
         with:
           distribution: temurin
           java-version: "21"
@@ -55,22 +55,22 @@ jobs:
       - name: Puerta de calidad (ruff, pyright y pytest con el validador Java)
         run: uv run python scripts/verificar.py
 
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
         with:
           distribution: temurin
           java-version: "25"  # Minecraft 26.x (Fabric 26.1) pide Java 25
 
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
         with:
           distribution: temurin
           java-version: "8"  # Forge 1.12.2 (ForgeGradle 2.3) corre con Java 8 y Minecraft 1.16.5 (Forge 1.16.5) se compila con Java 8
 
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
         with:
           distribution: temurin
           java-version: "16"  # ForgeGradle pide un JDK 16 para Minecraft 1.17.1 (Forge 1.17.1)
 
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
         with:
           distribution: temurin
           java-version: "17"  # ForgeGradle 6 (Forge 1.18.2, 1.19.2 y 1.20.1) pide Java 17
