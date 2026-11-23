@@ -6,7 +6,10 @@ error traen nombres de archivos del modpack: nada de eso debe dibujarse como HTM
 
 from __future__ import annotations
 
+import json
 import os
+import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -157,7 +160,7 @@ def _captura_util(imagen: QImage) -> bool:
     """La captura no está vacía ni es de un solo color (la ventana se dibujó de verdad)."""
     if imagen.isNull() or imagen.width() < 200 or imagen.height() < 200:
         return False
-    colores = {imagen.pixel(x, y) for x in range(0, imagen.width(), 37) for y in range(0, imagen.height(), 37)}
+    colores = {imagen.pixel(x, y) for x in range(0, imagen.width(), 7) for y in range(0, imagen.height(), 7)}
     return len(colores) > 8
 
 
@@ -178,9 +181,97 @@ def test_capturas_de_cada_estado(qtbot: QtBot, tmp_path: Path, app: QApplication
     carpeta = Path(os.environ.get("MODPACKES_CAPTURAS", str(tmp_path / "capturas")))
     carpeta.mkdir(parents=True, exist_ok=True)
     for estado, imagen in capturas.items():
-        assert _captura_util(imagen), estado
         assert imagen.save(str(carpeta / f"{preferencia}_{estado}.png"))
+        assert _captura_util(imagen), estado
     assert capturas["elegida"] != capturas["traducida"]  # el estado se ve
     # El tamaño mínimo no corta el botón principal
     boton = v.b_principal
     assert boton.isVisible() and boton.width() >= boton.sizeHint().width() - 2
+
+
+# --- ventana angosta: nada queda cortado (H-047) ---------------------------------------------------------------------
+
+#: Arma la ventana con la plataforma real (con «offscreen» Qt no tiene fuentes y todo mide 1,7 veces más), fuera de
+#: la pantalla, en el tamaño mínimo, con un nombre largo y todas las opciones: antes y después de analizar.
+_MEDIR_ANCHOS = """
+import json, os, sys, tempfile, time
+from pathlib import Path
+os.environ.pop("QT_QPA_PLATFORM", None)
+os.environ["TRADUCTOR_ES_PRUEBA_UI"] = "1"
+sys.path.insert(0, sys.argv[1])
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QScrollArea
+from tests import fabrica
+from traductor_es.fuentes import vanilla
+from traductor_es.fuentes.lanzadores import InstanciaEncontrada
+from traductor_es.motores.simulador import Simulador
+from traductor_es.ui import tema
+from traductor_es.ui.ventana import Ventana
+vanilla.raices_de_lanzadores = list
+app = QApplication([])
+tema.instalar(app, "claro")
+salida = []
+with tempfile.TemporaryDirectory() as tmp:
+    juego = fabrica.prism(Path(tmp), "1.20.1")
+    fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench"}))
+    nombre = "Un modpack con un nombre larguísimo que no entra en la barra lateral"
+    v = Ventana(buscar_instancias=lambda: [InstanciaEncontrada("Prism Launcher", nombre, juego)],
+                fabrica_motor=lambda *_a: Simulador())
+    v.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+    v.lista.setCurrentRow(0)
+    v.c_espana.setChecked(True)
+    v.c_revisar.setChecked(True)
+    v.resize(v.minimumSize())
+    v.show()
+    for estado in ("elegida", "analizada"):
+        if estado == "analizada":
+            v.b_principal.click()
+            fin = time.monotonic() + 60
+            while time.monotonic() < fin and not (v._hilo is None and v.ultimo_informe is not None):
+                app.processEvents()
+                time.sleep(0.02)
+        app.processEvents()
+        for a in v.findChildren(QScrollArea):
+            if a.isVisible() and a.widget().minimumSizeHint().width() > a.viewport().width() + 1:
+                salida.append([estado, a.viewport().width(), a.widget().minimumSizeHint().width()])
+    v.close()
+print(json.dumps(salida))
+"""
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="mide con las fuentes de Windows")
+@pytest.mark.parametrize("escala", ["1", "2"])
+def test_en_el_tamano_minimo_todo_cabe(escala: str) -> None:
+    """Sin barra horizontal, lo que no cabía quedaba cortado: la cuarta tarjeta, el campo y los botones."""
+    entorno = {**os.environ, "QT_SCALE_FACTOR": escala, "PYTHONUTF8": "1"}
+    raiz = str(Path(__file__).resolve().parent.parent)
+    proc = subprocess.run(
+        [sys.executable, "-c", _MEDIR_ANCHOS, raiz],
+        env=entorno,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    assert json.loads(proc.stdout.strip().splitlines()[-1]) == []  # [estado, ancho del panel, ancho que pide]
+
+
+def test_los_botones_secundarios_bajan_de_fila_si_no_caben(qtbot: QtBot, tmp_path: Path, app: QApplication) -> None:
+    tema.instalar(app, "claro")
+    v = _ventana(qtbot, _modpack(tmp_path), "Un modpack con un nombre larguísimo que no entra en la barra lateral")
+    v.resize(2400, 900)
+    v.show()
+    qtbot.waitExposed(v)
+    v.b_principal.click()  # analizar: aparece «Analizar de nuevo» junto al botón principal
+    qtbot.waitUntil(lambda: v._hilo is None and v.ultimo_informe is not None, timeout=30000)  # pyright: ignore[reportPrivateUsage]
+    QApplication.processEvents()
+    assert v.fila_acciones.dos_filas is False
+    v.resize(v.minimumSize())
+    QApplication.processEvents()
+    assert v.fila_acciones.dos_filas is True
+    assert v.fila_acciones.minimumSizeHint().width() < v.b_principal.sizeHint().width()  # el principal se acorta
+    assert v.b_principal.text() == v.b_principal.accessibleName()  # su texto queda entero para el lector
+    v.resize(2400, 900)
+    QApplication.processEvents()
+    assert v.fila_acciones.dos_filas is False

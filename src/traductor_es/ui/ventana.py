@@ -66,6 +66,7 @@ from .componentes import (
     Aviso,
     BotonPrincipal,
     EtiquetaRuta,
+    FilaAcciones,
     Pasos,
     Plegable,
     TarjetaGrupo,
@@ -414,7 +415,7 @@ class Ventana(QMainWindow):
         self.bienvenida.cerrada.connect(self._bienvenida_vista)
         self.bienvenida.setVisible(not self._preferencias.get("bienvenida_vista", False))
         capa.addWidget(self.bienvenida)
-        self.e_titulo = etiqueta("Elige una instancia", "titulo")
+        self.e_titulo = etiqueta("Elige una instancia", "titulo", ajustar=True)  # un nombre largo baja de línea
         self.e_ruta = EtiquetaRuta(SIN_INSTANCIA)
         capa.addWidget(self.e_titulo)
         capa.addWidget(self.e_ruta)
@@ -432,7 +433,7 @@ class Ventana(QMainWindow):
         capa.addWidget(self.e_contexto)
         self.avanzadas = Plegable("Opciones avanzadas", self._opciones_avanzadas())
         capa.addWidget(self.avanzadas)
-        capa.addLayout(self._acciones())
+        capa.addWidget(self._acciones())
         self.barra = QProgressBar()
         self.barra.setTextVisible(False)
         self.barra.setFixedHeight(8)
@@ -451,6 +452,7 @@ class Ventana(QMainWindow):
         self.creditos = etiqueta(
             f'{NOMBRE} {__version__} · © 2026 {AUTOR} · Licencia GPL-3.0 · <a href="{REPOSITORIO}">{REPOSITORIO}</a>',
             "tenue",
+            ajustar=True,  # en una ventana angosta baja de línea en vez de ensanchar el panel
             enriquecida=True,
         )
         self.creditos.setOpenExternalLinks(True)
@@ -550,9 +552,7 @@ class Ventana(QMainWindow):
         formulario.addRow("", self.c_activar)
         return caja
 
-    def _acciones(self) -> QHBoxLayout:
-        fila = QHBoxLayout()
-        fila.setSpacing(10)
+    def _acciones(self) -> FilaAcciones:
         self.b_principal = BotonPrincipal()
         self.b_principal.setToolTip("La acción del paso en el que estás (Ctrl+Enter)")
         self.b_principal.clicked.connect(self._accion_principal)
@@ -567,12 +567,8 @@ class Ventana(QMainWindow):
         self.b_secundario.clicked.connect(lambda: self.lanzar("analizar"))
         self.b_mas = QPushButton("Más")
         self.b_mas.setMenu(self._menu_mas())
-        fila.addWidget(self.b_principal)
-        fila.addWidget(self.b_cancelar)
-        fila.addWidget(self.b_secundario)
-        fila.addStretch(1)
-        fila.addWidget(self.b_mas)
-        return fila
+        self.fila_acciones = FilaAcciones([self.b_principal, self.b_cancelar], [self.b_secundario, self.b_mas])
+        return self.fila_acciones
 
     def _menu_mas(self) -> QMenu:
         menu = QMenu(self)
@@ -1088,14 +1084,14 @@ class Ventana(QMainWindow):
             if parcial:
                 self._estado = "traducir"  # el botón principal ofrece traducir con el motor lo que falta
                 faltan = f"{_miles(resultado.a_traducir)} textos siguen en inglés porque no venían en lo importado"
-                self.estado.setText(f"Importado en parte: {faltan}. Puedes traducirlos con el botón de abajo.")
+                self.estado.setText(f"Importado en parte: {faltan}. Puedes traducirlos con el botón de arriba.")
                 self.aviso.mostrar(f"Traducción importada en parte: {faltan}.", "aviso")
             elif accion == "analizar":
                 self._estado = "traducir"
                 if not self.bienvenida.isHidden():
                     self.bienvenida.setVisible(False)
                     self._bienvenida_vista()
-                self.estado.setText("Análisis listo. Elige qué traducir y pulsa el botón de abajo.")
+                self.estado.setText("Análisis listo. Elige qué traducir y pulsa el botón de arriba.")
             else:
                 self._estado = "listo"
                 self.estado.setText("¡Listo! Abre el juego: ya está en español.")

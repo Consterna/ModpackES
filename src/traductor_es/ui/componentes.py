@@ -8,15 +8,19 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 
-from PySide6.QtCore import QObject, QSize, Qt, Signal, Slot
-from PySide6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal, Slot
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPaintEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QPushButton,
     QSizePolicy,
+    QStyle,
+    QStyleOptionButton,
+    QStylePainter,
     QVBoxLayout,
     QWidget,
 )
@@ -140,7 +144,7 @@ class TarjetaInstancia(Tarjeta):
         capa = QVBoxLayout(self)
         capa.setContentsMargins(10, 8, 10, 8)
         capa.setSpacing(2)
-        self.e_nombre = etiqueta(nombre, "subtitulo")
+        self.e_nombre = EtiquetaRuta(nombre, "subtitulo", modo=Qt.TextElideMode.ElideRight)
         self.e_detalle = etiqueta(f"{lanzador} · leyendo…", "tenue", ajustar=True)
         self.e_estado = etiqueta("", "tenue")
         for e in (self.e_nombre, self.e_detalle, self.e_estado):
@@ -175,13 +179,24 @@ class TarjetaInstancia(Tarjeta):
 
 
 class EtiquetaRuta(QLabel):
-    """Una ruta que se acorta por el medio para caber en el ancho que haya; completa en el texto de ayuda."""
+    """Un texto de una línea que se acorta («…») para caber en el ancho que haya; completo en el texto de ayuda.
 
-    def __init__(self, texto: str = "", tipo: str = "tenue", padre: QWidget | None = None) -> None:
+    Una ruta se acorta por el medio (se ven la unidad y la carpeta final); un nombre, por el final. Nunca pide más
+    ancho que el que hay: un nombre largo no puede ensanchar la barra ni el panel.
+    """
+
+    def __init__(
+        self,
+        texto: str = "",
+        tipo: str = "tenue",
+        padre: QWidget | None = None,
+        modo: Qt.TextElideMode = Qt.TextElideMode.ElideMiddle,
+    ) -> None:
         super().__init__(padre)
         self.setTextFormat(Qt.TextFormat.PlainText)  # una ruta o un nombre del modpack nunca es HTML
         self.setProperty("tipo", tipo)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._modo = modo
         self._completo = ""
         self.fijar(texto)
 
@@ -200,7 +215,10 @@ class EtiquetaRuta(QLabel):
 
     def _acortar(self) -> None:
         ancho = max(self.width(), 40)
-        self.setText(self.fontMetrics().elidedText(self._completo, Qt.TextElideMode.ElideMiddle, ancho))
+        self.setText(self.fontMetrics().elidedText(self._completo, self._modo, ancho))
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(40, super().minimumSizeHint().height())
 
 
 class Pasos(QWidget):
@@ -220,7 +238,8 @@ class Pasos(QWidget):
                 linea = QFrame()
                 linea.setFrameShape(QFrame.Shape.HLine)
                 linea.setProperty("tipo", "separador")
-                linea.setFixedWidth(28)
+                linea.setMinimumWidth(8)  # en una ventana angosta las rayas se achican; el texto no
+                linea.setMaximumWidth(28)
                 capa.addWidget(linea)
             icono_ = QLabel()
             texto = etiqueta(nombre)
@@ -381,6 +400,8 @@ class Plegable(QWidget):
         self.cabecera.setCheckable(True)
         self.cabecera.setChecked(abierta)
         self.cabecera.setStyleSheet("text-align: left;")
+        # El resumen se acorta con «…» al ancho que haya: con muchas opciones ensanchaba el panel y lo cortaba
+        self.cabecera.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.cabecera.toggled.connect(self._al_alternar)
         capa.addWidget(self.cabecera)
         capa.addWidget(contenido)
@@ -404,14 +425,93 @@ class Plegable(QWidget):
         self._pintar()
         self.alternada.emit(abierta)
 
-    def _pintar(self) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._pintar()
+
+    def texto_completo(self) -> str:
         abierta = self.cabecera.isChecked()
         extra = "" if abierta or not self._resumen else f"   ·   {self._resumen}"
-        self.cabecera.setText(f"{self.titulo}{extra}")
+        return f"{self.titulo}{extra}"
+
+    def _pintar(self) -> None:
+        abierta = self.cabecera.isChecked()
+        completo = self.texto_completo()
+        disponible = self.cabecera.width() - 14 - 28  # el ícono y los márgenes del botón
+        texto = completo
+        if self.cabecera.width() > 0:
+            texto = self.cabecera.fontMetrics().elidedText(completo, Qt.TextElideMode.ElideRight, max(disponible, 80))
+        self.cabecera.setText(texto)
+        self.cabecera.setToolTip(completo if texto != completo else "")
         self.cabecera.setAccessibleName(f"{self.titulo}, {'abierta' if abierta else 'cerrada'}")
         nombre = "chevron-down" if abierta else "chevron-right"
         self.cabecera.setIcon(iconos.icono(nombre, tema.actual().tenue, 14))
         self.cabecera.setIconSize(QSize(14, 14))
+
+
+class FilaAcciones(QWidget):
+    """La acción principal y, a su lado, las secundarias. Si no caben en una línea, las secundarias bajan a otra fila.
+
+    El panel no tiene barra horizontal: una fila más ancha que la ventana dejaba botones cortados (H-047).
+    """
+
+    def __init__(
+        self, principales: Sequence[QWidget], secundarias: Sequence[QWidget], padre: QWidget | None = None
+    ) -> None:
+        super().__init__(padre)
+        self._principales = list(principales)
+        self._secundarias = list(secundarias)
+        capa = QVBoxLayout(self)
+        capa.setContentsMargins(0, 0, 0, 0)
+        capa.setSpacing(10)
+        capa.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)  # el mínimo lo da `minimumSizeHint`
+        self._arriba = QHBoxLayout()
+        self._abajo = QHBoxLayout()
+        for fila in (self._arriba, self._abajo):
+            fila.setSpacing(10)
+            capa.addLayout(fila)
+        self.dos_filas: bool | None = None
+        self._acomodar(False)
+
+    def _visibles(self, lista: Sequence[QWidget]) -> list[QWidget]:
+        return [w for w in lista if not w.isHidden()]
+
+    def _ancho_en_una_fila(self) -> int:
+        visibles = self._visibles([*self._principales, *self._secundarias])
+        return sum(w.sizeHint().width() for w in visibles) + 10 * max(len(visibles) - 1, 0)
+
+    def _acomodar(self, dos_filas: bool) -> None:
+        if dos_filas == self.dos_filas:
+            return
+        self.dos_filas = dos_filas
+        for fila in (self._arriba, self._abajo):
+            while fila.count():
+                fila.takeAt(0)
+        for w in self._principales:
+            self._arriba.addWidget(w)
+        destino = self._abajo if dos_filas else self._arriba
+        *izquierda, derecha = self._secundarias
+        for w in izquierda:
+            destino.addWidget(w)
+        destino.addStretch(1)
+        destino.addWidget(derecha)
+        if not dos_filas:
+            self._abajo.addStretch(1)
+        self.updateGeometry()
+
+    def minimumSizeHint(self) -> QSize:
+        visibles = self._visibles([*self._principales, *self._secundarias])
+        ancho = max((w.minimumSizeHint().width() for w in visibles), default=0)
+        return QSize(ancho, super().minimumSizeHint().height())
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self._acomodar(self._ancho_en_una_fila() > event.size().width())
+        super().resizeEvent(event)
+
+    def event(self, evento: QEvent) -> bool:
+        if evento.type() == QEvent.Type.LayoutRequest:  # un botón cambió de texto o se mostró: puede que ya no quepa
+            self._acomodar(self._ancho_en_una_fila() > self.width())
+        return super().event(evento)
 
 
 class BotonPrincipal(QPushButton):
@@ -434,3 +534,21 @@ class BotonPrincipal(QPushButton):
         if self.nombre_icono:
             self.setIcon(iconos.icono(self.nombre_icono, tema.actual().sobre_acento, 18))
             self.setIconSize(QSize(18, 18))
+
+    def minimumSizeHint(self) -> QSize:
+        """Puede ser más angosto que su texto: se dibuja acortado con «…» (el texto y el nombre accesible quedan
+        enteros). Si no, en una ventana angosta o con una escala grande, el botón ensanchaba el panel y se cortaba."""
+        base = super().minimumSizeHint()
+        return QSize(min(base.width(), 160), base.height())
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        opcion = QStyleOptionButton()
+        self.initStyleOption(opcion)
+        pide = self.sizeHint().width()
+        if pide > self.width():
+            resto = pide - self.fontMetrics().horizontalAdvance(self.text())  # ícono, márgenes y relleno
+            opcion.text = self.fontMetrics().elidedText(
+                self.text(), Qt.TextElideMode.ElideRight, max(self.width() - resto, 20)
+            )
+        pintor = QStylePainter(self)
+        pintor.drawControl(QStyle.ControlElement.CE_PushButton, opcion)

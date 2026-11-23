@@ -100,7 +100,14 @@ def test_plegable(qtbot: QtBot) -> None:
     qtbot.addWidget(p)
     p.fijar_resumen("español latino · revisión apagada")
     assert not p.abierta and contenido.isHidden()
-    assert "revisión apagada" in p.cabecera.text()
+    assert "revisión apagada" in p.texto_completo()
+    p.show()
+    p.resize(220, p.height())  # angosta: el resumen se acorta y queda entero en la ayuda
+    QApplication.processEvents()
+    assert p.cabecera.text().endswith("…") and "revisión apagada" in p.cabecera.toolTip()
+    p.resize(900, p.height())
+    QApplication.processEvents()
+    assert "revisión apagada" in p.cabecera.text() and not p.cabecera.toolTip()
     estados: list[bool] = []
 
     def anotar(abierta: bool) -> None:
