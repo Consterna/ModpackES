@@ -26,6 +26,9 @@ from .base import Cancelado, ErrorFatal, Lote
 from .instrucciones import interpretar, sistema, usuario
 
 MODELO_POR_DEFECTO = "gemini-3.8-flash"
+#: google-genai 3 usa por defecto la API `v1`, que no tiene todo lo que usa la app (salida con esquema, modelos
+#: `-preview`, algunos alias). Se fija la misma que con google-genai 2.
+VERSION_API = "v1beta"
 #: Precios de pago en US$ por millón de tokens (entrada, salida), según la página de precios de Google
 #: en noviembre de 2026. Solo sirven para estimar: Google puede cambiarlos.
 PRECIOS: dict[str, tuple[float, float]] = {
@@ -127,7 +130,7 @@ class Gemini:
     ) -> None:
         self.modelo = modelo.strip()
         self._cliente: Any = cliente or genai.Client(
-            api_key=clave.strip(), http_options=types.HttpOptions(timeout=240_000)
+            api_key=clave.strip(), http_options=types.HttpOptions(timeout=240_000, api_version=VERSION_API)
         )
         self._esperar = esperar
         self._reintentos = reintentos

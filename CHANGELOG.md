@@ -6,6 +6,13 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **google-genai 3** (antes 2.34). La versión 3 usa por defecto la API `v1` de Gemini, que no tiene todo lo que usa
+  la app: con ella, un pedido de traducción volvía vacío sin dar error. La app fija la API `v1beta`, la misma de
+  antes, y se comprobó con la API real (un lote traducido y un trabajo por lotes creado y cancelado). El cliente HTTP
+  de Google pasa a `httpx2`, que usa los certificados de Windows.
+
 ## [2.3.0] - 2026-11-23
 
 ### Agregado

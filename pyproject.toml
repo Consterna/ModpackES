@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Localization",
 ]
 dependencies = [
-    "google-genai>=2.34.0",
+    "google-genai>=3.0.0",
     "httpx>=0.28",
     "json5>=0.9",
     "keyring>=25.7.0",
