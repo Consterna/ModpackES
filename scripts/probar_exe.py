@@ -2,7 +2,8 @@
 
 Uso:  uv run python scripts/probar_exe.py [dist/ModpackES-portable.zip | carpeta/ModpackES.exe]
       uv run python scripts/probar_exe.py --instalador [dist/ModpackES-instalador.exe]
-El zip se extrae en una carpeta temporal y se prueba el programa de dentro, también con una `dwmapi.dll` falsa al
+El zip se extrae en una carpeta temporal y se prueba el programa de dentro, también con una `dwmapi.dll` o una
+`uxtheme.dll` falsa al
 lado (H-016: tiene que seguir usando la de System32). Con --instalador lo instala en silencio en una carpeta
 temporal, prueba el programa instalado y lo desinstala.
 """
@@ -25,11 +26,18 @@ from tests import fabrica  # noqa: E402
 
 from traductor_es import NOMBRE, __version__  # noqa: E402
 
+#: Las DLL de Windows que el programa carga desde System32 (`traductor_es/dll_sistema.py`)
+DLLS_PLANTADAS = ("dwmapi.dll", "uxtheme.dll")
 #: Lo que nunca va dentro del programa (ver `construir_exe.py`)
 _SOLO_DESARROLLO = frozenset({"hypothesis", "numpy", "pytest", "_pytest", "pytestqt", "sortedcontainers", "setuptools"})
 
 
-def probar(exe: Path) -> int:
+def probar(exe: Path, espera: int = 300, sin_pantalla: bool = True) -> int:
+    """La autoprueba del programa. `sin_pantalla=False` usa la plataforma real de Windows (la ventana no llega a
+    mostrarse): así carga las mismas DLL que al abrirlo de verdad, que es lo que importa con una DLL plantada."""
+    entorno = {k: v for k, v in os.environ.items() if k != "QT_QPA_PLATFORM"}
+    if sin_pantalla:
+        entorno["QT_QPA_PLATFORM"] = "offscreen"
     with tempfile.TemporaryDirectory() as tmp:
         juego = fabrica.prism(Path(tmp), "1.20.1")
         fabrica.jar(juego / "mods" / "m.jar", fabrica.lang("m", "en_us", {"item.m.wrench": "Wrench"}))
@@ -37,12 +45,16 @@ def probar(exe: Path) -> int:
         capitulo.parent.mkdir(parents=True)
         capitulo.write_text('{ title: "Getting Started" }', encoding="utf-8")
         salida = Path(tmp) / "autoprueba.json"
-        proc = subprocess.run(
-            [str(exe), "--autoprueba", str(juego), str(salida)],
-            env={**os.environ, "TRADUCTOR_ES_DATOS": str(Path(tmp) / "datos"), "QT_QPA_PLATFORM": "offscreen"},
-            timeout=300,
-            check=False,
-        )  # fmt: skip
+        try:
+            proc = subprocess.run(
+                [str(exe), "--autoprueba", str(juego), str(salida)],
+                env={**entorno, "TRADUCTOR_ES_DATOS": str(Path(tmp) / "datos")},
+                timeout=espera,
+                check=False,
+            )  # fmt: skip
+        except subprocess.TimeoutExpired:  # p. ej. un diálogo de error de Windows por una DLL rota
+            print(f"FALLA: el .exe no terminó en {espera} s")
+            return 1
         if proc.returncode != 0 or not salida.is_file():
             print(f"FALLA: el .exe terminó con código {proc.returncode}")
             return 1
@@ -90,10 +102,13 @@ def probar_portable(paquete: Path) -> int:
             codigo = probar(exe)
             if codigo:
                 return codigo
-            (exe.parent / "dwmapi.dll").write_bytes(b"MZ\x00\x00\xde\xad\xbe\xef")  # una DLL plantada
-            if probar(exe):
-                print("FALLA: con una dwmapi.dll falsa junto al programa, la cargó")
-                return 1
+            for dll in DLLS_PLANTADAS:  # una DLL plantada junto al programa no se tiene que cargar
+                planta = exe.parent / dll
+                planta.write_bytes(b"MZ\x00\x00\xde\xad\xbe\xef")
+                if probar(exe, espera=120, sin_pantalla=False):
+                    print(f"FALLA: con una {dll} falsa junto al programa, la cargó")
+                    return 1
+                planta.unlink()
     print(f"OK: {paquete.name} trae la carpeta {NOMBRE}/ y una DLL plantada no se carga")
     return 0
 
