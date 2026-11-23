@@ -167,6 +167,10 @@ razona el modelo).
 La capa gratuita de Gemini sirve para probar, pero tiene límites de peticiones por minuto y por día que un
 modpack grande supera enseguida. Con la facturación activada (nivel 1) se traduce de una vez.
 
+> [!IMPORTANT]
+> Las condiciones de la API de Gemini piden tener **18 años o más**. Si eres menor, usa un motor local (LM Studio u
+> Ollama), que no envía nada fuera de tu PC.
+
 ## Multijugador
 
 Las misiones y los scripts de servidor los lee el servidor. «Más ▸ Kit de servidor…» arma un `.zip` con esos
@@ -174,6 +178,13 @@ archivos ya traducidos, el resource pack para los jugadores y las instrucciones.
 resource pack, listo para publicar: con `pack.png`, un `LEEME.txt` (aviso de traducción automática, si una persona
 la revisó, motores usados y créditos), la versión del modpack en el nombre del archivo y `supported_formats` en el
 `pack.mcmeta` cuando la versión lo usa (de 1.20.2 a 1.21.8).
+
+> [!WARNING]
+> Antes de **publicar** el pack o el kit, revisa la licencia del modpack y de sus mods: una traducción cuenta como
+> una adaptación, y muchas licencias (todos los derechos reservados, CC-BY-ND) no dejan publicarla sin permiso del
+> autor. Las plataformas también tienen reglas propias: Modrinth, por ejemplo, no admite proyectos hechos
+> principalmente con IA y pide marcar el contenido generado. Lo prudente es revisar la traducción a mano y pedir
+> permiso. Para usarla tú y en tu propio servidor no hace falta publicar nada.
 
 ## Compartir una traducción
 
@@ -222,7 +233,9 @@ salen de tu PC. No se envía nada más. Al abrirse, la app consulta en GitHub si
 enviar datos tuyos); se desactiva en el engranaje, con «Avisar al abrir si hay una versión nueva».
 
 Ten en cuenta que, según las condiciones de Google, los datos de la capa gratuita de Gemini pueden usarse para
-mejorar sus productos; revisa las condiciones del proveedor que uses.
+mejorar sus productos, con revisión humana; con la facturación activada, no. En el Espacio Económico Europeo, Suiza
+y el Reino Unido se aplican siempre las condiciones de pago. Los textos que se envían son de los autores de los mods:
+revisa las condiciones del proveedor que uses.
 </details>
 
 <details>

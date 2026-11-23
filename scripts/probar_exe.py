@@ -70,6 +70,10 @@ def probar_portable(paquete: Path) -> int:
         if raices != {NOMBRE} or f"{NOMBRE}/{NOMBRE}.exe" not in z.namelist():
             print(f"FALLA: el zip tiene que traer solo la carpeta {NOMBRE}/ con {NOMBRE}.exe (trae {sorted(raices)})")
             return 1
+        faltan = [n for n in ("LICENSE.txt", "THIRD-PARTY-NOTICES.md") if f"{NOMBRE}/{n}" not in z.namelist()]
+        if faltan:
+            print(f"FALLA: el programa no lleva {faltan}")
+            return 1
         de_desarrollo = sorted(
             {
                 PurePosixPath(n).parts[2]

@@ -102,12 +102,20 @@ def buscar_iscc() -> Path | None:
     return next((c for c in [*candidatos, *_ISCC_HABITUALES] if c.is_file()), None)
 
 
+#: Junto al programa: su licencia y los avisos de terceros, con dónde está el código fuente de cada parte (GPL §6)
+LICENCIAS = {"LICENSE": "LICENSE.txt", "THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md"}
+
+
 def onedir(icono: Path, version: Path, reusar: bool = False) -> int:
     """La carpeta del programa en build/onedir/ModpackES (la que llevan el zip y el instalador)."""
-    if reusar and (ONEDIR / NOMBRE / f"{NOMBRE}.exe").is_file():
-        return 0
-    shutil.rmtree(ONEDIR, ignore_errors=True)
-    return _pyinstaller("--onedir", ONEDIR, BUILD / "onedir_trabajo", icono, version)
+    if not (reusar and (ONEDIR / NOMBRE / f"{NOMBRE}.exe").is_file()):
+        shutil.rmtree(ONEDIR, ignore_errors=True)
+        codigo = _pyinstaller("--onedir", ONEDIR, BUILD / "onedir_trabajo", icono, version)
+        if codigo:
+            return codigo
+    for origen, nombre in LICENCIAS.items():
+        shutil.copyfile(RAIZ / origen, ONEDIR / NOMBRE / nombre)
+    return 0
 
 
 def comprimir(carpeta: Path, destino: Path) -> Path:

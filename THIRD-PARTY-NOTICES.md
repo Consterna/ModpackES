@@ -5,14 +5,29 @@ bibliotecas de abajo, cada una con su propia licencia. Sus textos completos vien
 proyecto y en su página.
 
 Qt for Python (PySide6 y Shiboken6) se ofrece bajo LGPL-3.0, GPL-2.0 o GPL-3.0; ModpackES la usa bajo la
-GPL-3.0, compatible con su propia licencia, y todo su código fuente está publicado. Qt es © The Qt Company
-Ltd. y otros colaboradores.
+GPL-3.0, compatible con su propia licencia, y todo su código fuente está publicado. Como Qt se usa bajo la
+GPL-3.0 (no «o posterior»), el programa completo se distribuye en la práctica bajo la GPL-3.0. Qt es © The Qt
+Company Ltd. y otros colaboradores.
+
+## Código fuente
+
+El código de ModpackES está en https://github.com/Consterna/ModpackES (la etiqueta `v<versión>` de cada versión).
+El de las bibliotecas que van dentro del programa, sin modificar:
+
+- PySide6 y Shiboken6 6.12.0: https://download.qt.io/official_releases/QtForPython/pyside6/ (y el sdist en
+  https://pypi.org/project/PySide6/6.12.0/).
+- Qt 6.12.0: https://download.qt.io/official_releases/qt/
+- Python 3.13.16: https://www.python.org/downloads/source/
+- El cargador de PyInstaller (GPL-2.0 con «Bootloader Exception»): https://github.com/pyinstaller/pyinstaller
+- Las demás, en la página de cada proyecto de la tabla.
 
 Los íconos de la interfaz son de [Lucide](https://lucide.dev) 1.60.0 (licencia ISC; los derivados de Feather,
 con licencia MIT). El texto completo de ambas licencias va en `src/traductor_es/ui/iconos/LICENSE.txt`.
 
 ModpackES no está afiliado a Mojang Studios, Microsoft ni Google. Minecraft es una marca de Mojang
 Studios. Gemini es una marca de Google LLC.
+
+## Bibliotecas
 
 | Biblioteca | Versión | Licencia | Proyecto |
 |---|---|---|---|
