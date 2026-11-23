@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..formatos import json_cadenas, nbt, snbt
+from ..formatos import json_cadenas, lang_json5, nbt, snbt
 from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, contar, piezas_de, unidades
 from .cambios import Lugar
 
@@ -89,6 +89,7 @@ def es_texto_en_linea(c: snbt.Cadena) -> bool:
 
 
 _NEUTRO_SNBT = b"{\n}\n"
+_NEUTRO_JSON5 = b"{}\n"
 
 
 def _es_titulo(pieza: Pieza) -> bool:
@@ -188,6 +189,10 @@ class _Base:
 # ====================================================================== FTB Quests
 
 
+#: Formatos con un archivo por idioma (la versión de España también los escribe)
+_POR_IDIOMA = frozenset({"lang", "json5"})
+
+
 class FTBQuests(_Base):
     nombre = "Misiones de FTB Quests"
 
@@ -223,7 +228,7 @@ class FTBQuests(_Base):
 
     def detectar(self) -> bool:
         if self.ctx.solo_por_idioma:
-            return any(self.formato(r) == "lang" for r in self.raices())
+            return any(self.formato(r) in _POR_IDIOMA for r in self.raices())
         return bool(self.raices())
 
     def describir(self) -> str:
@@ -231,7 +236,7 @@ class FTBQuests(_Base):
             "lang": "textos en lang/ (1.21+)",
             "nbt": "NBT binario (1.12)",
             "snbt": "texto en los capítulos",
-            "json5": "JSON5 (26.x), que todavía no se traduce",
+            "json5": "textos en lang/ en JSON5 (26.x)",
         }
         return ", ".join(f"{r.name}: {nombres[self.formato(r)]}" for r in self.raices())
 
@@ -241,13 +246,18 @@ class FTBQuests(_Base):
     def _preparar(self) -> Iterator[_Trabajo]:
         for raiz in self.raices():
             formato = self.formato(raiz)
-            if self.ctx.solo_por_idioma and formato != "lang":
+            if self.ctx.solo_por_idioma and formato not in _POR_IDIOMA:
                 continue  # los capítulos tienen un solo idioma: ya los tradujo la pasada principal
             if formato == "json5":
-                self.ctx.registro(
-                    f"Las misiones de {raiz.name} están en JSON5 (FTB Quests 26.x), que todavía no sé traducir: "
-                    "quedan en inglés"
-                )
+                yield from self._json5(raiz)
+                if not self.ctx.solo_por_idioma and any(
+                    p for p in raiz.rglob("*.json5") if "lang" not in p.relative_to(raiz).parts
+                ):
+                    self.ctx.registro(
+                        f"{raiz.name}: en FTB Quests 26.x se traducen los textos de lang/. Lo que sigue dentro de "
+                        "los capítulos (avisos de recompensa, mensaje de bloqueo, nombres de recompensas) queda "
+                        "en inglés"
+                    )
             elif formato == "lang":
                 yield from self._lang(raiz)
                 if not self.ctx.solo_por_idioma:  # un solo idioma en los capítulos: ya los hizo la pasada principal
@@ -350,6 +360,62 @@ class FTBQuests(_Base):
             if n < len(lista) and lista[n].strip() and lista[n] != c.texto:
                 fijos[c.inicio] = lista[n]
         return fijos
+
+    # ---------------------------------------------------------------- carpeta lang en JSON5 (26.x)
+    def _json5(self, raiz: Path) -> Iterator[_Trabajo]:
+        """`lang/en_us/**/*.json5` → `lang/<variante>/` con las mismas rutas. Es la única forma que lee FTB Quests
+        26.x (`TranslationManager`): carpetas por idioma, sin archivo suelto. Si a un idioma le falta una clave,
+        el juego usa la del idioma de reserva, así que un archivo parcial también sirve."""
+        lang = raiz / "lang"
+        origen = lang / "en_us"
+        for fuente in sorted(origen.rglob("*.json5")):
+            try:
+                textos = lang_json5.leer(fuente.read_bytes())
+            except (ValueError, UnicodeDecodeError):
+                self.ctx.registro(f"{fuente.name} está dañado: se deja igual")
+                continue
+            relativa = fuente.relative_to(origen)
+            for variante in self.ctx.variantes:
+                destino = lang / variante / relativa
+                trabajo = self._trabajo_json5(textos, destino, self._fijos_json5(destino, textos))
+                trabajo.fuente = fuente
+                yield trabajo
+
+    def _fijos_json5(self, destino: Path, textos: Mapping[str, lang_json5.Valor]) -> dict[str, lang_json5.Valor]:
+        """Lo que el modpack ya trae traducido en ese idioma (por clave), que se respeta."""
+        original = self._original(destino)
+        if original is None:
+            return {}
+        try:
+            previas = lang_json5.leer(original)
+        except (ValueError, UnicodeDecodeError):
+            return {}
+        return {k: v for k, v in previas.items() if k in textos and v and v != textos[k]}
+
+    @staticmethod
+    def _trabajo_json5(
+        textos: Mapping[str, lang_json5.Valor], destino: Path, fijos: Mapping[str, lang_json5.Valor]
+    ) -> _Trabajo:
+        lineas = [
+            (clave, t) for clave, v in textos.items() if clave not in fijos for t in ([v] if isinstance(v, str) else v)
+        ]
+        piezas = con_vecindad([p for clave, t in lineas for p in piezas_de(t, f"misión: {clave}")], _es_titulo)
+
+        def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
+            salida: dict[str, lang_json5.Valor] = {}
+            hechos = faltan = 0
+            for clave, valor in textos.items():
+                if clave in fijos:
+                    salida[clave] = fijos[clave]
+                    continue
+                for t in [valor] if isinstance(valor, str) else valor:
+                    us = unidades(t)
+                    hechos += sum(1 for u in us if u in trad)
+                    faltan += sum(1 for u in us if u not in trad)
+                salida[clave] = aplicar(valor, trad) if isinstance(valor, str) else [aplicar(t, trad) for t in valor]
+            return lang_json5.escribir(salida), hechos, faltan
+
+        return _Trabajo([destino], piezas, generar, _NEUTRO_JSON5)
 
     # ---------------------------------------------------------------- NBT binario (1.12)
     def _nbt(self, raiz: Path) -> Iterator[_Trabajo]:

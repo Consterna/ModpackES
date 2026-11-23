@@ -59,7 +59,7 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 | FTB Quests: SNBT, carpeta `lang/` y NBT de 1.12 | `config/ftbquests/quests/` | ✅ | `modulos/misiones.py` |
 | Nombre y descripción de los objetos de **recompensa** de FTB Quests | `rewards[].item`: `tag.display.Name`/`Lore` (hasta 1.20.4, en SNBT y en el NBT de 1.12) o `components` `custom_name`/`item_name`/`lore` (1.20.5+) | ✅ | Nunca bajo `tasks`: ahí FTB Quests compara el NBT del objeto que entrega el jugador, y cambiarle el nombre rompería la misión. El título y la descripción de la misión y de cada tarea se traducen como siempre. Pedido aparte, con el tono de la interfaz. |
 | FTB Quests en otras raíces | `config/ftbquests/normal/` (FTB Interactions Remastered), `config/ftb_quests/`, `defaultconfigs/ftbquests/` | ❌ | por confirmar en el corpus |
-| FTB Quests en JSON5 | `data.json5` y lang `.json5` | ❌ | por confirmar |
+| FTB Quests en JSON5 (26.x) | `lang/<idioma>/**/*.json5` | ✅ | `modulos/misiones.py` y `formatos/lang_json5.py`, comprobado en el código de FTB Quests (`TranslationManager`, `TranslationTable`). Lo que sigue dentro de los capítulos `.json5` (aviso de recompensa, mensaje de bloqueo, nombres de recompensa) aún no: se avisa. |
 | BetterQuesting | `DefaultQuests.json`, carpeta `DefaultQuests/` | ✅ | |
 | BetterQuesting v3 y lang | `properties.betterquesting.name/desc`, `DefaultQuests.lang`, `resources/betterquesting/lang/` | 🟡 | por confirmar en el corpus |
 | HQM, Heracles, Odyssey | `config/hqm`, `config/heracles`, `config/odyssey` | ✅ | |

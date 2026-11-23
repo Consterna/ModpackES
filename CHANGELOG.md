@@ -16,6 +16,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Agregado
 
+- **Misiones de FTB Quests 26.x**, que guardan sus textos en JSON5, en carpetas por idioma
+  (`config/ftbquests/quests/lang/<idioma>/**/*.json5`). Se escribe cada variante de español con las mismas rutas
+  que el inglés, y se respeta lo que el modpack ya trae traducido. Una clave que falte la completa el juego con el
+  idioma de reserva. Lo que sigue dentro de los capítulos JSON5 (el aviso de una recompensa, el mensaje de bloqueo,
+  los nombres de las recompensas) todavía queda en inglés, y el registro lo dice.
 - **Fuentes de texto que antes quedaban en inglés**, encontradas al auditar 47 modpacks reales (ver [docs/cobertura.md](docs/cobertura.md)). Cada una va en su propio módulo, después de los anteriores y sin alimentar el glosario, así que los pedidos de lo que ya se traducía no cambian. Las respuestas grabadas de los bancos de calidad dan exactamente lo mismo que antes.
   - **Menú principal de FancyMenu y Drippy:** el texto de los botones y de los textos del menú, en los diseños v3 y v2. Se cambia solo el valor de esas líneas. Los marcadores de FancyMenu (`{"placeholder":…}`), los colores `%#…%` y el salto `%n%` vuelven exactos, y lo que ya usa una clave de idioma se deja. Aparece en 24 de los 47 packs.
   - **Opciones de los shaderpacks** con Iris u Oculus. Su idioma va al resource pack, en un espacio propio: Iris usa una clave del shaderpack solo si el idioma del juego no la tiene. Una clave que dos shaderpacks usan con distinto texto no se traduce, y el español que trae un shaderpack se copia. Aparece en 13 packs, con hasta 2.000 textos cada uno.
@@ -135,7 +140,6 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 - **La traducción de un modpack se cortaba con un error** cuando un nombre que la app ya había decidido (uno que se repite en el pack) volvía a llegar, traducido distinto, desde los mods. Pasaba en un pack de FTB real («Force Shears»). Ahora manda lo que ya se decidió y la traducción sigue.
 - **Un `.lang` de 1.12 cuya primera clave empieza con una marca de orden de bytes** perdía esa marca al volver a leerlo, y la clave cambiaba. Ahora el archivo empieza con una línea de comentario.
 - **FTB Quests en 1.21 con carpeta `lang/`:** lo que sigue en los capítulos quedaba en inglés: el texto de una recompensa de aviso, el mensaje de bloqueo de `data.snbt` y los nombres de los objetos de recompensa. Ahora se traducen en su lugar, con copia. El nombre de las **cajas de botín** (`loot_crate.item_name`) no se traducía en ninguna versión; su id (`string_id`) se deja.
-- **FTB Quests 26.x guarda las misiones en JSON5**, que la app todavía no traduce: antes las dejaba en inglés sin decir nada. Ahora el análisis y el registro lo avisan.
 - **Scripts de KubeJS en Minecraft 1.21 y 26.x:** los tooltips (`ItemEvents.modifyTooltips`, `ItemEvents.dynamicTooltips`), la información del visor de recetas (`RecipeViewerEvents.addInformation`) y los nombres de sus grupos quedaban en inglés, porque KubeJS 7 cambió esos nombres. Ahora se traducen; lo que solo sirve para quitar o igualar una línea (`removeText`, `dynamic`) se deja.
 - **Las instancias de GDLauncher no aparecían en la lista:** GDLauncher guarda el juego en la subcarpeta `instance/` de cada instancia y la app no la buscaba. Ahora salen, y también se puede soltar su carpeta en la ventana.
 - **Una misión de FTB Quests podía quedar imposible de completar:** si una tarea pedía un objeto con un nombre o un título propio (por ejemplo un libro escrito) y comparaba su NBT, la app traducía ese título y la misión ya no reconocía el objeto. Ahora lo que está dentro del objeto de una tarea no se toca; el título de la tarea y los nombres de las recompensas se siguen traduciendo.
