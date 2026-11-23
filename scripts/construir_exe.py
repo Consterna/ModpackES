@@ -7,7 +7,8 @@ Uso:  uv run python scripts/construir_exe.py               → dist/ModpackES-po
 Los dos salen de la versión en carpeta («onedir»), que arranca más rápido porque no se descomprime en cada inicio.
 No hay un .exe suelto: un .exe que se abre desde Descargas carga las DLL que alguien deje en esa carpeta (H-016).
 El instalador lo pone en su carpeta de programas, y el zip en la carpeta donde se extrae.
-El instalador necesita Inno Setup 6.3 o superior (ISCC.exe); la variable ISCC puede indicar dónde está.
+El instalador necesita Inno Setup 6.7 o superior (ISCC.exe); la variable ISCC puede indicar dónde está.
+Hace falta Python 3.13.16 o superior: las anteriores tienen una bomba de memoria en `zipfile` (CVE-2026-15310).
 """
 
 from __future__ import annotations
@@ -70,6 +71,10 @@ def _preparar() -> tuple[Path, Path]:
     return icono, version
 
 
+_SOLO_DESARROLLO = ("hypothesis", "numpy", "pytest", "_pytest", "pytestqt", "sortedcontainers", "setuptools",
+                    "nbtlib", "coverage", "pyright", "ruff")  # fmt: skip
+
+
 def _pyinstaller(modo: str, destino: Path, trabajo: Path, icono: Path, version: Path) -> int:
     comando = [
         sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", modo, "--windowed",
@@ -79,6 +84,9 @@ def _pyinstaller(modo: str, destino: Path, trabajo: Path, icono: Path, version: 
         "--collect-data", "traductor_es",  # el validador Java (ValidadorTraductor.java) y el ícono
         "--hidden-import", "keyring.backends.Windows",
         "--exclude-module", "tkinter",
+        # Paquetes de desarrollo que PyInstaller arrastraba sin que la app los use: no van en el programa
+        # (tampoco estaban en el SBOM ni en THIRD-PARTY-NOTICES, que se arman sin el grupo dev)
+        *(x for m in _SOLO_DESARROLLO for x in ("--exclude-module", m)),
         "--distpath", str(destino), "--workpath", str(trabajo), "--specpath", str(trabajo),
         str(RAIZ / "scripts" / "lanzador_ventana.py"),
     ]  # fmt: skip
@@ -94,12 +102,20 @@ def buscar_iscc() -> Path | None:
     return next((c for c in [*candidatos, *_ISCC_HABITUALES] if c.is_file()), None)
 
 
+#: Junto al programa: su licencia y los avisos de terceros, con dónde está el código fuente de cada parte (GPL §6)
+LICENCIAS = {"LICENSE": "LICENSE.txt", "THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md"}
+
+
 def onedir(icono: Path, version: Path, reusar: bool = False) -> int:
     """La carpeta del programa en build/onedir/ModpackES (la que llevan el zip y el instalador)."""
-    if reusar and (ONEDIR / NOMBRE / f"{NOMBRE}.exe").is_file():
-        return 0
-    shutil.rmtree(ONEDIR, ignore_errors=True)
-    return _pyinstaller("--onedir", ONEDIR, BUILD / "onedir_trabajo", icono, version)
+    if not (reusar and (ONEDIR / NOMBRE / f"{NOMBRE}.exe").is_file()):
+        shutil.rmtree(ONEDIR, ignore_errors=True)
+        codigo = _pyinstaller("--onedir", ONEDIR, BUILD / "onedir_trabajo", icono, version)
+        if codigo:
+            return codigo
+    for origen, nombre in LICENCIAS.items():
+        shutil.copyfile(RAIZ / origen, ONEDIR / NOMBRE / nombre)
+    return 0
 
 
 def comprimir(carpeta: Path, destino: Path) -> Path:
@@ -138,7 +154,24 @@ def instalador(icono: Path, version: Path, reusar: bool = False) -> int:
     return subprocess.run(comando, cwd=RAIZ, check=False).returncode
 
 
+#: Por cada rama de Python, la primera versión sin CVE-2026-15310 (bomba de memoria en `zipfile` con miembros bzip2,
+#: LZMA o Zstandard). La 3.15.0 ya salió con el arreglo; las ramas anteriores a 3.13 no sirven para la app.
+PYTHON_SEGURO = {(3, 13): (3, 13, 16), (3, 14): (3, 14, 8)}
+
+
+def python_seguro(version: tuple[int, int, int]) -> str | None:
+    """None si esa versión de Python sirve para construir; si no, la mínima de su rama (o «3.13.16»)."""
+    if version[:2] < (3, 13):
+        return "3.13.16"
+    minimo = PYTHON_SEGURO.get(version[:2])
+    return ".".join(map(str, minimo)) if minimo is not None and version < minimo else None
+
+
 def main(argv: list[str] | None = None) -> int:
+    actual = (sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+    if minimo := python_seguro(actual):
+        print(f"Hace falta Python {minimo} o superior para construir el programa (este es {sys.version.split()[0]}).")
+        return 2
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--instalador", action="store_true", help="construir el instalador en vez del portable")
     ap.add_argument("--reusar", action="store_true", help="usar la carpeta ya construida en build/onedir")

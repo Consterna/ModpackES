@@ -1,10 +1,14 @@
-; Instalador de ModpackES (Inno Setup 6.3 o superior). Lo arma scripts/construir_exe.py --instalador, que pasa:
+; Instalador de ModpackES (Inno Setup 6.7 o superior). Lo arma scripts/construir_exe.py --instalador, que pasa:
 ;   /DVersion=2.1.0  /DOrigen=<carpeta onedir de PyInstaller>  /DSalida=<carpeta del instalador>
 ;   /DIcono=<.ico>   /DLicencia=<LICENSE>
 ; Se instala para el usuario actual (sin pedir permisos de administrador).
 
 #ifndef Version
   #error Falta /DVersion
+#endif
+; 6.7.0 activa RedirectionGuard, que protege al instalador de carpetas redirigidas con enlaces
+#if Ver < EncodeVer(6, 7, 0)
+  #error Hace falta Inno Setup 6.7 o superior
 #endif
 
 [Setup]

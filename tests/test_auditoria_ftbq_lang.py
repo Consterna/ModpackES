@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from traductor_es.formatos import snbt
+from traductor_es.formatos import lang_json5, snbt
 from traductor_es.fuentes import vanilla
 from traductor_es.fuentes.instancia import Instancia
 from traductor_es.modulos.base import Contexto
@@ -105,20 +105,98 @@ def test_la_caja_de_botin_tambien_en_120(tmp_path: Path, memoria: Memoria) -> No
     assert 'item_name: "«ES» Common Crate"' in texto and 'string_id: "common"' in texto
 
 
-def test_json5_de_26_avisa_y_no_escribe(tmp_path: Path) -> None:
-    juego = fabrica.prism(tmp_path, "1.21.1", "neoforge")
+#: FTB Quests 26.x (rama `main`): `lang/<idioma>/**/*.json5`, un objeto plano por archivo; `quest_desc` es una lista
+INTRO_JSON5 = """{
+  // escrito por FTB Quests con de.marhali.json5
+  'quest.0123456789ABCDEF.title': 'Welcome',
+  "quest.0123456789ABCDEF.quest_desc": ["Hello there.", "", "{@pagebreak}", "Second page"],
+  "chapter.0A0B0C0D0E0F0102.title": "Intro",
+}
+"""
+
+
+def _pack_26(tmp_path: Path) -> Path:
+    juego = fabrica.prism(tmp_path, "26.1.2", "neoforge")
     quests = juego / "config" / "ftbquests" / "quests"
     (quests / "lang" / "en_us" / "chapters").mkdir(parents=True)
     (quests / "data.json5").write_text("{ version: 13 }", encoding="utf-8")
-    (quests / "lang" / "en_us" / "chapters" / "intro.json5").write_text(
-        '{"quest.0123456789ABCDEF.title": "Welcome"}', encoding="utf-8"
+    (quests / "chapters").mkdir()
+    (quests / "chapters" / "intro.json5").write_text('{ id: "0A0B0C0D0E0F0102" }', encoding="utf-8")
+    (quests / "lang" / "en_us" / "chapters" / "intro.json5").write_text(INTRO_JSON5, encoding="utf-8")
+    (quests / "lang" / "en_us" / "chapter_group.json5").write_text('{"chapter_group.1A.title": "Basics"}', "utf-8")
+    return juego
+
+
+def test_json5_de_26_se_traduce_en_cada_idioma(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _pack_26(tmp_path)
+    lang = juego / "config" / "ftbquests" / "quests" / "lang"
+    # el modpack ya trae su propio es_es para el título del capítulo: se respeta
+    (lang / "es_es" / "chapters").mkdir(parents=True)
+    (lang / "es_es" / "chapters" / "intro.json5").write_text(
+        '{"chapter.0A0B0C0D0E0F0102.title": "Introducción"}', "utf-8"
     )
+    avisos: list[str] = []
+    with Proceso(juego, Simulador(), memoria=memoria, registro=avisos.append) as p:
+        p.ejecutar()
+    mx = lang_json5.leer((lang / "es_mx" / "chapters" / "intro.json5").read_bytes())
+    assert mx == {
+        "quest.0123456789ABCDEF.title": "«ES» Welcome",
+        "quest.0123456789ABCDEF.quest_desc": ["«ES» Hello there.", "", "{@pagebreak}", "«ES» Second page"],
+        "chapter.0A0B0C0D0E0F0102.title": "«ES» Intro",
+    }
+    es = lang_json5.leer((lang / "es_es" / "chapters" / "intro.json5").read_bytes())
+    assert es["chapter.0A0B0C0D0E0F0102.title"] == "Introducción"  # lo del modpack manda
+    assert es["quest.0123456789ABCDEF.title"] == "«ES» Welcome"
+    assert lang_json5.leer((lang / "es_ar" / "chapter_group.json5").read_bytes()) == {
+        "chapter_group.1A.title": "«ES» Basics"
+    }
+    assert (lang / "en_us" / "chapters" / "intro.json5").read_text(
+        encoding="utf-8"
+    ) == INTRO_JSON5  # el inglés no se toca
+    assert not (lang / "es_mx.json5").exists()  # FTB Quests 26.x no lee un archivo suelto por idioma
+    assert any("dentro de los capítulos" in a for a in avisos)  # lo que sigue en línea, avisado
+
+
+def test_json5_de_26_se_restaura(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _pack_26(tmp_path)
+    lang = juego / "config" / "ftbquests" / "quests" / "lang"
+    with Proceso(juego, Simulador(), memoria=memoria) as p:
+        p.ejecutar()
+        assert (lang / "es_mx" / "chapters" / "intro.json5").is_file()
+        p.restaurar()
+    assert (lang / "es_mx" / "chapters" / "intro.json5").read_bytes() == b"{}\n"  # vacío: el juego usa en_us
+    assert (lang / "en_us" / "chapters" / "intro.json5").read_text(encoding="utf-8") == INTRO_JSON5
+
+
+def test_json5_en_la_version_de_espana(tmp_path: Path) -> None:
+    juego = _pack_26(tmp_path)
+    inst = Instancia(juego)
+    with inst:
+        modulo = FTBQuests(Contexto(inst, Respaldo(juego), solo_por_idioma=True))
+        assert modulo.detectar()
+        assert modulo.formato(modulo.raices()[0]) == "json5"
+        assert "JSON5" in modulo.describir()
+        assert {p.texto for p in modulo.recolectar()} == {"Welcome", "Hello there.", "Second page", "Intro", "Basics"}
+
+
+def test_json5_danado_se_salta_con_aviso(tmp_path: Path, memoria: Memoria) -> None:
+    juego = _pack_26(tmp_path)
+    lang = juego / "config" / "ftbquests" / "quests" / "lang"
+    (lang / "en_us" / "roto.json5").write_text("{ 'quest.X.title': ", encoding="utf-8")
     avisos: list[str] = []
     inst = Instancia(juego)
     with inst:
         modulo = FTBQuests(Contexto(inst, Respaldo(juego), registro=avisos.append))
-        assert modulo.formato(modulo.raices()[0]) == "json5"
-        assert "JSON5" in modulo.describir()
-        assert modulo.recolectar() == []
-    assert len(avisos) == 1 and "JSON5" in avisos[0] and "inglés" in avisos[0]
-    assert not (quests / "lang" / "es_mx").exists()
+        assert {p.texto for p in modulo.recolectar()} >= {"Welcome", "Basics"}
+    assert "roto.json5 está dañado: se deja igual" in avisos
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ['Comillas "dobles" y \\ barra', "Línea\u2028separada", "Un 'apóstrofo'", "Tab\tdentro"],
+)
+def test_lang_json5_ida_y_vuelta(texto: str) -> None:
+    datos = {"quest.A.title": texto, "quest.A.quest_desc": [texto, ""]}
+    escrito = lang_json5.escribir(datos)
+    assert lang_json5.leer(escrito) == datos
+    assert "\u2028".encode() not in escrito  # nunca un U+2028 crudo: va escapado

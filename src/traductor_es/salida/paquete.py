@@ -13,7 +13,8 @@ from __future__ import annotations
 import json
 import re
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -109,6 +110,23 @@ def nombre_de_archivo(datos: DatosModpack, extension: str = EXTENSION, prefijo: 
     return (limpio or "traduccion") + extension
 
 
+@contextmanager
+def zip_nuevo(destino: Path) -> Generator[zipfile.ZipFile]:
+    """Un zip que se escribe en un temporal al lado y reemplaza a `destino` solo al terminar bien.
+
+    Si algo falla a mitad (disco lleno, cancelación), el zip anterior queda como estaba y no queda el temporal.
+    """
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    temporal = destino.with_name(destino.name + ".tmp")
+    try:
+        with zipfile.ZipFile(temporal, "w", zipfile.ZIP_DEFLATED) as zf:
+            yield zf
+        temporal.replace(destino)
+    except BaseException:
+        temporal.unlink(missing_ok=True)
+        raise
+
+
 def textos_del_modpack(proceso: Proceso) -> tuple[set[tuple[str, str]], list[str]]:
     """Los textos (núcleo, ámbito) que la traducción del modpack busca en la memoria. Solo lee.
 
@@ -158,9 +176,7 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
     }
     if filas_es or correcciones_es:
         meta["version_espana"] = {"memoria": len(filas_es), "correcciones": len(correcciones_es)}
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    temporal = destino.with_name(destino.name + ".tmp")
-    with zipfile.ZipFile(temporal, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zip_nuevo(destino) as zf:
         zf.writestr(_META, _json(meta))
         zf.writestr(_MEMORIA, _json([_fila_json(f) for f in filas]))
         zf.writestr(_CORRECCIONES, _json(dict(sorted(correcciones.items()))))
@@ -168,7 +184,6 @@ def exportar_paquete(proceso: Proceso, destino: Path, revisado: bool = False) ->
         if filas_es or correcciones_es:
             zf.writestr(_MEMORIA_ES, _json([_fila_json(f) for f in filas_es]))
             zf.writestr(_CORRECCIONES_ES, _json(dict(sorted(correcciones_es.items()))))
-    temporal.replace(destino)
     return ResumenExportacion(destino, len(filas), len(correcciones), len(glosario), modelos, avisos, len(filas_es))
 
 

@@ -10,6 +10,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
+from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
 from traductor_es.fuentes import vanilla
@@ -331,6 +332,10 @@ def test_elegir_el_tema_lo_aplica_y_lo_recuerda(qtbot: QtBot) -> None:
     from traductor_es import configuracion
     from traductor_es.ui import tema
 
+    if tema.tema() is None:  # sin depender de que otra prueba lo haya instalado antes (orden aleatorio, xdist)
+        app = QApplication.instance()
+        assert isinstance(app, QApplication)
+        tema.instalar(app, "sistema")
     v = Ventana(buscar_instancias=list)
     qtbot.addWidget(v)
     instalado = tema.tema()

@@ -21,14 +21,29 @@ bibliotecas de abajo, cada una con su propia licencia. Sus textos completos vien
 proyecto y en su página.
 
 Qt for Python (PySide6 y Shiboken6) se ofrece bajo LGPL-3.0, GPL-2.0 o GPL-3.0; ModpackES la usa bajo la
-GPL-3.0, compatible con su propia licencia, y todo su código fuente está publicado. Qt es © The Qt Company
-Ltd. y otros colaboradores.
+GPL-3.0, compatible con su propia licencia, y todo su código fuente está publicado. Como Qt se usa bajo la
+GPL-3.0 (no «o posterior»), el programa completo se distribuye en la práctica bajo la GPL-3.0. Qt es © The Qt
+Company Ltd. y otros colaboradores.
+
+## Código fuente
+
+El código de ModpackES está en https://github.com/Consterna/ModpackES (la etiqueta `v<versión>` de cada versión).
+El de las bibliotecas que van dentro del programa, sin modificar:
+
+- PySide6 y Shiboken6 {pyside}: https://download.qt.io/official_releases/QtForPython/pyside6/ (y el sdist en
+  https://pypi.org/project/PySide6/{pyside}/).
+- Qt {qt}: https://download.qt.io/official_releases/qt/
+- Python {python}: https://www.python.org/downloads/source/
+- El cargador de PyInstaller (GPL-2.0 con «Bootloader Exception»): https://github.com/pyinstaller/pyinstaller
+- Las demás, en la página de cada proyecto de la tabla.
 
 Los íconos de la interfaz son de [Lucide](https://lucide.dev) 1.60.0 (licencia ISC; los derivados de Feather,
 con licencia MIT). El texto completo de ambas licencias va en `src/traductor_es/ui/iconos/LICENSE.txt`.
 
 ModpackES no está afiliado a Mojang Studios, Microsoft ni Google. Minecraft es una marca de Mojang
 Studios. Gemini es una marca de Google LLC.
+
+## Bibliotecas
 
 | Biblioteca | Versión | Licencia | Proyecto |
 |---|---|---|---|
@@ -76,7 +91,9 @@ def main() -> int:
         except metadata.PackageNotFoundError:
             continue  # solo se instala en otros sistemas (p. ej. secretstorage en Linux): no va en el .exe
         filas.append(f"| {nombre} | {version} | {_licencia(datos)} | {_pagina(datos, nombre)} |")
-    DESTINO.write_text(ENCABEZADO + "\n".join(filas) + "\n", encoding="utf-8", newline="\n")
+    pyside = metadata.version("pyside6-essentials")
+    encabezado = ENCABEZADO.format(pyside=pyside, qt=".".join(pyside.split(".")[:3]), python=python)
+    DESTINO.write_text(encabezado + "\n".join(filas) + "\n", encoding="utf-8", newline="\n")
     print(f"{DESTINO} ({len(filas)} bibliotecas)")
     return 0
 

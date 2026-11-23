@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..formatos import json_cadenas, nbt, snbt
+from ..formatos import json_cadenas, lang_json5, nbt, snbt
 from .base import Contexto, Pieza, Resumen, aplicar, con_vecindad, contar, piezas_de, unidades
 from .cambios import Lugar
 
@@ -44,17 +44,22 @@ def piezas_de_recompensa(nombres: Sequence[snbt.Cadena | nbt.CadenaNbt]) -> list
 _CLAVES_DE_OBJETO = frozenset({"item", "items", "tag", "components", "nbt"})
 
 
+def en_objeto_de(c: snbt.Cadena | nbt.CadenaNbt, lista: str) -> bool:
+    """El texto está dentro de un objeto (su NBT o sus componentes) de una tarea (`tasks`) o recompensa (`rewards`)."""
+    ruta = list(c.ruta)
+    if lista not in ruta:
+        return False
+    despues = ruta[len(ruta) - 1 - ruta[::-1].index(lista) + 1 :]
+    return any(clave in _CLAVES_DE_OBJETO for clave in despues)
+
+
 def en_objeto_de_tarea(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
     """El texto está dentro del objeto que pide una tarea (p. ej. el `title` de un libro escrito).
 
     FTB Quests compara ese NBT con el que entrega el jugador (`match_nbt`): traducirlo haría imposible la misión.
     El título propio de la tarea (`tasks[…].title`) no está dentro del objeto y sí se traduce.
     """
-    ruta = list(c.ruta)
-    if "tasks" not in ruta:
-        return False
-    despues = ruta[len(ruta) - 1 - ruta[::-1].index("tasks") + 1 :]
-    return any(clave in _CLAVES_DE_OBJETO for clave in despues)
+    return en_objeto_de(c, "tasks")
 
 
 def es_campo_ftbq(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
@@ -89,6 +94,7 @@ def es_texto_en_linea(c: snbt.Cadena) -> bool:
 
 
 _NEUTRO_SNBT = b"{\n}\n"
+_NEUTRO_JSON5 = b"{}\n"
 
 
 def _es_titulo(pieza: Pieza) -> bool:
@@ -188,6 +194,10 @@ class _Base:
 # ====================================================================== FTB Quests
 
 
+#: Formatos con un archivo por idioma (la versión de España también los escribe)
+_POR_IDIOMA = frozenset({"lang", "json5"})
+
+
 class FTBQuests(_Base):
     nombre = "Misiones de FTB Quests"
 
@@ -223,7 +233,7 @@ class FTBQuests(_Base):
 
     def detectar(self) -> bool:
         if self.ctx.solo_por_idioma:
-            return any(self.formato(r) == "lang" for r in self.raices())
+            return any(self.formato(r) in _POR_IDIOMA for r in self.raices())
         return bool(self.raices())
 
     def describir(self) -> str:
@@ -231,23 +241,51 @@ class FTBQuests(_Base):
             "lang": "textos en lang/ (1.21+)",
             "nbt": "NBT binario (1.12)",
             "snbt": "texto en los capítulos",
-            "json5": "JSON5 (26.x), que todavía no se traduce",
+            "json5": "textos en lang/ en JSON5 (26.x)",
         }
         return ", ".join(f"{r.name}: {nombres[self.formato(r)]}" for r in self.raices())
 
     def _prefijos(self) -> list[str]:
         return [_relativa(self.ctx, r) + "/" for r in self.raices()]
 
+    def _pedidos_por_tareas(self, raiz: Path) -> frozenset[str]:
+        """Los textos del NBT de los objetos que piden las tareas, en todo el libro de misiones.
+
+        Si una misión da un objeto como recompensa y otra lo pide con `match_nbt` (un libro escrito, un objeto con
+        nombre), traducir el de la recompensa haría que ya no coincida con el que pide la tarea (H-048).
+        """
+        pedidos: set[str] = set()
+        for ruta in sorted(raiz.rglob("*.snbt")):
+            original = None if "lang" in ruta.relative_to(raiz).parts else self._original(ruta)
+            if original is not None:
+                try:
+                    pedidos |= {c.texto for c in snbt.escanear(original.decode("utf-8")) if en_objeto_de_tarea(c)}
+                except (ValueError, UnicodeDecodeError):
+                    continue
+        for ruta in sorted(raiz.rglob("*.nbt")):
+            original = self._original(ruta)
+            if original is not None:
+                try:
+                    pedidos |= {c.texto for c in nbt.cadenas(nbt.leer(original)[0]) if en_objeto_de_tarea(c)}
+                except (ValueError, EOFError, OSError):
+                    continue
+        return frozenset(pedidos)
+
     def _preparar(self) -> Iterator[_Trabajo]:
         for raiz in self.raices():
             formato = self.formato(raiz)
-            if self.ctx.solo_por_idioma and formato != "lang":
+            if self.ctx.solo_por_idioma and formato not in _POR_IDIOMA:
                 continue  # los capítulos tienen un solo idioma: ya los tradujo la pasada principal
             if formato == "json5":
-                self.ctx.registro(
-                    f"Las misiones de {raiz.name} están en JSON5 (FTB Quests 26.x), que todavía no sé traducir: "
-                    "quedan en inglés"
-                )
+                yield from self._json5(raiz)
+                if not self.ctx.solo_por_idioma and any(
+                    p for p in raiz.rglob("*.json5") if "lang" not in p.relative_to(raiz).parts
+                ):
+                    self.ctx.registro(
+                        f"{raiz.name}: en FTB Quests 26.x se traducen los textos de lang/. Lo que sigue dentro de "
+                        "los capítulos (avisos de recompensa, mensaje de bloqueo, nombres de recompensas) queda "
+                        "en inglés"
+                    )
             elif formato == "lang":
                 yield from self._lang(raiz)
                 if not self.ctx.solo_por_idioma:  # un solo idioma en los capítulos: ya los hizo la pasada principal
@@ -259,6 +297,11 @@ class FTBQuests(_Base):
 
     # ---------------------------------------------------------------- SNBT en línea (1.14 - 1.20)
     def _snbt(self, raiz: Path, filtro: Callable[[snbt.Cadena], bool] = es_texto_ftbq) -> Iterator[_Trabajo]:
+        pedidos = self._pedidos_por_tareas(raiz)
+
+        def elegir(c: snbt.Cadena) -> bool:
+            return filtro(c) and not (en_objeto_de(c, "rewards") and c.texto in pedidos)
+
         for ruta in sorted(raiz.rglob("*.snbt")):
             if "lang" in ruta.relative_to(raiz).parts:
                 continue
@@ -266,7 +309,7 @@ class FTBQuests(_Base):
             if original is None:
                 continue
             try:
-                trabajo = self._trabajo_snbt(original.decode("utf-8"), [ruta], filtro, {})
+                trabajo = self._trabajo_snbt(original.decode("utf-8"), [ruta], elegir, {})
             except (ValueError, UnicodeDecodeError):
                 self.ctx.registro(f"{ruta.name} está dañado: se deja igual")
                 continue
@@ -351,8 +394,69 @@ class FTBQuests(_Base):
                 fijos[c.inicio] = lista[n]
         return fijos
 
+    # ---------------------------------------------------------------- carpeta lang en JSON5 (26.x)
+    def _json5(self, raiz: Path) -> Iterator[_Trabajo]:
+        """`lang/en_us/**/*.json5` → `lang/<variante>/` con las mismas rutas. Es la única forma que lee FTB Quests
+        26.x (`TranslationManager`): carpetas por idioma, sin archivo suelto. Si a un idioma le falta una clave,
+        el juego usa la del idioma de reserva, así que un archivo parcial también sirve."""
+        lang = raiz / "lang"
+        origen = lang / "en_us"
+        for fuente in sorted(origen.rglob("*.json5")):
+            try:
+                textos = lang_json5.leer(fuente.read_bytes())
+            except (ValueError, UnicodeDecodeError):
+                self.ctx.registro(f"{fuente.name} está dañado: se deja igual")
+                continue
+            relativa = fuente.relative_to(origen)
+            for variante in self.ctx.variantes:
+                destino = lang / variante / relativa
+                trabajo = self._trabajo_json5(textos, destino, self._fijos_json5(destino, textos))
+                trabajo.fuente = fuente
+                yield trabajo
+
+    def _fijos_json5(self, destino: Path, textos: Mapping[str, lang_json5.Valor]) -> dict[str, lang_json5.Valor]:
+        """Lo que el modpack ya trae traducido en ese idioma (por clave), que se respeta."""
+        original = self._original(destino)
+        if original is None:
+            return {}
+        try:
+            previas = lang_json5.leer(original)
+        except (ValueError, UnicodeDecodeError):
+            return {}
+        return {k: v for k, v in previas.items() if k in textos and v and v != textos[k]}
+
+    @staticmethod
+    def _trabajo_json5(
+        textos: Mapping[str, lang_json5.Valor], destino: Path, fijos: Mapping[str, lang_json5.Valor]
+    ) -> _Trabajo:
+        lineas = [
+            (clave, t) for clave, v in textos.items() if clave not in fijos for t in ([v] if isinstance(v, str) else v)
+        ]
+        piezas = con_vecindad([p for clave, t in lineas for p in piezas_de(t, f"misión: {clave}")], _es_titulo)
+
+        def generar(trad: Mapping[str, str]) -> tuple[bytes, int, int]:
+            salida: dict[str, lang_json5.Valor] = {}
+            hechos = faltan = 0
+            for clave, valor in textos.items():
+                if clave in fijos:
+                    salida[clave] = fijos[clave]
+                    continue
+                for t in [valor] if isinstance(valor, str) else valor:
+                    us = unidades(t)
+                    hechos += sum(1 for u in us if u in trad)
+                    faltan += sum(1 for u in us if u not in trad)
+                salida[clave] = aplicar(valor, trad) if isinstance(valor, str) else [aplicar(t, trad) for t in valor]
+            return lang_json5.escribir(salida), hechos, faltan
+
+        return _Trabajo([destino], piezas, generar, _NEUTRO_JSON5)
+
     # ---------------------------------------------------------------- NBT binario (1.12)
     def _nbt(self, raiz: Path) -> Iterator[_Trabajo]:
+        pedidos = self._pedidos_por_tareas(raiz)
+
+        def libre(c: nbt.CadenaNbt) -> bool:
+            return not (en_objeto_de(c, "rewards") and c.texto in pedidos)
+
         for ruta in sorted(raiz.rglob("*.nbt")):
             original = self._original(ruta)
             if original is None:
@@ -362,8 +466,10 @@ class FTBQuests(_Base):
             except (ValueError, EOFError, OSError):
                 self.ctx.registro(f"No pude leer {ruta.name}: se deja igual")
                 continue
-            textos = [c for c in nbt.cadenas(arbol) if es_campo_ftbq(c)]
-            nombres = [c for c in nbt.cadenas(arbol) if not es_campo_ftbq(c) and es_nombre_de_recompensa(c)]
+            textos = [c for c in nbt.cadenas(arbol) if es_campo_ftbq(c) and libre(c)]
+            nombres = [
+                c for c in nbt.cadenas(arbol) if not es_campo_ftbq(c) and es_nombre_de_recompensa(c) and libre(c)
+            ]
             if not textos and not nombres:
                 continue
             # Como en SNBT: los nombres de recompensa van aparte, para que los textos de la misión salgan igual
@@ -376,7 +482,7 @@ class FTBQuests(_Base):
                 arbol, _ = nbt.leer(original)  # árbol nuevo cada vez: no se acumulan cambios
                 hechos = faltan = 0
                 for c in nbt.cadenas(arbol):
-                    if es_campo_ftbq(c) or es_nombre_de_recompensa(c):
+                    if (es_campo_ftbq(c) or es_nombre_de_recompensa(c)) and libre(c):
                         us = unidades(c.texto)
                         hechos += sum(1 for u in us if u in trad)
                         faltan += sum(1 for u in us if u not in trad)

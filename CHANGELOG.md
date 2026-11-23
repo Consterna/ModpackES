@@ -6,16 +6,15 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
-### Cambiado
-
-- **La versión portable ahora es un `.zip` con la carpeta del programa** (`ModpackES-portable.zip`), en vez de un
-  `.exe` suelto. Un `.exe` que se abre desde Descargas carga ciertas DLL de esa carpeta antes que las de Windows, y
-  una página web puede dejar ahí una falsa. Extraído en su propia carpeta, eso ya no pasa. Es la misma carpeta que
-  instala el instalador, que sigue siendo la descarga recomendada. Además, el programa carga `dwmapi.dll` desde
-  System32 antes de abrir la ventana, así que una copia falsa junto al `.exe` tampoco se usa.
+## [2.3.0] - 2026-11-23
 
 ### Agregado
 
+- **Misiones de FTB Quests 26.x**, que guardan sus textos en JSON5, en carpetas por idioma
+  (`config/ftbquests/quests/lang/<idioma>/**/*.json5`). Se escribe cada variante de español con las mismas rutas
+  que el inglés, y se respeta lo que el modpack ya trae traducido. Una clave que falte la completa el juego con el
+  idioma de reserva. Lo que sigue dentro de los capítulos JSON5 (el aviso de una recompensa, el mensaje de bloqueo,
+  los nombres de las recompensas) todavía queda en inglés, y el registro lo dice.
 - **Fuentes de texto que antes quedaban en inglés**, encontradas al auditar 47 modpacks reales (ver [docs/cobertura.md](docs/cobertura.md)). Cada una va en su propio módulo, después de los anteriores y sin alimentar el glosario, así que los pedidos de lo que ya se traducía no cambian. Las respuestas grabadas de los bancos de calidad dan exactamente lo mismo que antes.
   - **Menú principal de FancyMenu y Drippy:** el texto de los botones y de los textos del menú, en los diseños v3 y v2. Se cambia solo el valor de esas líneas. Los marcadores de FancyMenu (`{"placeholder":…}`), los colores `%#…%` y el salto `%n%` vuelven exactos, y lo que ya usa una clave de idioma se deja. Aparece en 24 de los 47 packs.
   - **Opciones de los shaderpacks** con Iris u Oculus. Su idioma va al resource pack, en un espacio propio: Iris usa una clave del shaderpack solo si el idioma del juego no la tiene. Una clave que dos shaderpacks usan con distinto texto no se traduce, y el español que trae un shaderpack se copia. Aparece en 13 packs, con hasta 2.000 textos cada uno.
@@ -36,6 +35,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   - la foto del corpus traducido con el simulador, con la prueba de que restaurar deja los bytes originales;
   - una puerta de regresión de la calidad con las respuestas grabadas;
   - el análisis de lo que vuelca una sonda dentro del juego.
+  - fuzzing de los parsers de formatos (`fuzz_parsers.py`), que el workflow manual «Fuzzing» corre 1 h por parser en GitHub Actions.
 - **Perfiles de calidad** («Calidad» en la ventana y `--calidad` en `analizar` y `traducir`). El análisis estima el costo de cada uno:
   - **Equilibrado** (por defecto): después de traducir, lo que quedó con dudas (cifras distintas, un paréntesis sin cerrar, usted, inglés, un término del glosario…) se corrige una vez explicando qué falló. La corrección se queda solo si pasa las reglas y un juez a ciegas la prefiere en los dos órdenes; si no, queda la primera, marcada. Cuesta cerca de un 5 % más.
   - **Máximo:** además, cada texto corto (6 palabras o menos: nombres, botones) se traduce tres veces en lotes distintos. Gana la traducción en que coinciden dos; si no coinciden, gana la de mejor promedio entre tres señales (dudas del control de calidad, términos del glosario y parecido con las otras), y el texto queda marcado para revisarlo. También activa la revisión de misiones y libros. Cuesta un 30 % más, más la revisión. Con Gemini 3.8 Flash no mejoró de forma medible (ver [docs/calidad.md](docs/calidad.md)): queda como opción.
@@ -89,6 +89,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **La versión portable ahora es un `.zip` con la carpeta del programa** (`ModpackES-portable.zip`), en vez de un
+  `.exe` suelto. Un `.exe` que se abre desde Descargas carga ciertas DLL de esa carpeta antes que las de Windows, y
+  una página web puede dejar ahí una falsa. Extraído en su propia carpeta, eso ya no pasa. Es la misma carpeta que
+  instala el instalador, que sigue siendo la descarga recomendada. Además, el programa carga `dwmapi.dll` desde
+  System32 antes de abrir la ventana, así que una copia falsa junto al `.exe` tampoco se usa.
 - **Fin del plan de calidad:** una revisión de 150 traducciones con un diccionario, un revisor más fuerte y una persona (en los 27 textos que lo necesitaban) dio 26 Bien, 1 Leve y 0 Grave; lo que queda es del modelo. Ver [docs/calidad.md](docs/calidad.md).
 - **Frases partidas con su contexto:**
   - Un texto con estilos mezclados («Use the » + «Wrench» en dorado + « to rotate») se sigue traduciendo por trozos, para no perder los estilos, pero cada trozo va con la frase entera, para que encaje en ella. Vale para las misiones (FTB Quests, Heracles) y los libros.
@@ -134,8 +139,20 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 - **La traducción de un modpack se cortaba con un error** cuando un nombre que la app ya había decidido (uno que se repite en el pack) volvía a llegar, traducido distinto, desde los mods. Pasaba en un pack de FTB real («Force Shears»). Ahora manda lo que ya se decidió y la traducción sigue.
 - **Un `.lang` de 1.12 cuya primera clave empieza con una marca de orden de bytes** perdía esa marca al volver a leerlo, y la clave cambiaba. Ahora el archivo empieza con una línea de comentario.
+- **Escrituras más seguras ante cortes y antivirus:**
+  - cada archivo del modpack se baja al disco antes de reemplazar el anterior, así que un corte de luz ya no puede dejarlo vacío;
+  - si un antivirus o el indexador lo tiene abierto un instante, se reintenta un poco antes de fallar;
+  - «Exportar pack», el kit de servidor y el paquete para compartir se escriben en un temporal: si fallan a mitad, el archivo anterior queda como estaba.
+- **La licencia y los avisos de terceros van junto al programa** (`LICENSE.txt` y `THIRD-PARTY-NOTICES.md` en la carpeta, también en el instalador), con dónde está el código fuente de Qt, PySide6 y Python, como pide la GPL.
+- **El README avisa** de que la API de Gemini pide tener 18 años o más, de cómo usa Google los textos en la capa gratuita, y de que publicar una traducción puede necesitar permiso del autor y cumplir las reglas de cada plataforma.
+- **El programa ya no lleva paquetes de desarrollo** (hypothesis, numpy, setuptools) que PyInstaller metía sin que la app los usara. Pesa 30 MB menos, y lo que va dentro coincide con la lista de componentes (SBOM) y con los avisos de terceros.
+- **FTB Quests: una misión que pide un objeto que da otra misión ya no queda imposible.** Si una misión da como recompensa un libro escrito o un objeto con nombre y otra lo pide con `match_nbt`, el nombre de la recompensa se traducía y el de la tarea no, así que el objeto entregado ya no coincidía. Ahora un texto del objeto de una recompensa que también pide alguna tarea, en cualquier capítulo, se deja en inglés.
+- **Con la ventana chica o con la escala de Windows alta, parte de la ventana quedaba cortada:** la cuarta tarjeta (Scripts), el campo de ambientación y los botones de la derecha. Pasaba con el tamaño mínimo, el de un portátil de 1366×768 al 125 %. Un nombre de instancia largo ensanchaba la barra lateral. Ahora todo entra:
+  - el nombre de la instancia y el resumen de opciones se acortan con «…», con el texto entero en la ayuda;
+  - el título y los créditos bajan de línea;
+  - «Analizar de nuevo» y «Más» pasan a otra fila si no caben junto al botón principal.
+- Después de analizar, el mensaje decía «pulsa el botón de abajo», pero el botón está arriba.
 - **FTB Quests en 1.21 con carpeta `lang/`:** lo que sigue en los capítulos quedaba en inglés: el texto de una recompensa de aviso, el mensaje de bloqueo de `data.snbt` y los nombres de los objetos de recompensa. Ahora se traducen en su lugar, con copia. El nombre de las **cajas de botín** (`loot_crate.item_name`) no se traducía en ninguna versión; su id (`string_id`) se deja.
-- **FTB Quests 26.x guarda las misiones en JSON5**, que la app todavía no traduce: antes las dejaba en inglés sin decir nada. Ahora el análisis y el registro lo avisan.
 - **Scripts de KubeJS en Minecraft 1.21 y 26.x:** los tooltips (`ItemEvents.modifyTooltips`, `ItemEvents.dynamicTooltips`), la información del visor de recetas (`RecipeViewerEvents.addInformation`) y los nombres de sus grupos quedaban en inglés, porque KubeJS 7 cambió esos nombres. Ahora se traducen; lo que solo sirve para quitar o igualar una línea (`removeText`, `dynamic`) se deja.
 - **Las instancias de GDLauncher no aparecían en la lista:** GDLauncher guarda el juego en la subcarpeta `instance/` de cada instancia y la app no la buscaba. Ahora salen, y también se puede soltar su carpeta en la ventana.
 - **Una misión de FTB Quests podía quedar imposible de completar:** si una tarea pedía un objeto con un nombre o un título propio (por ejemplo un libro escrito) y comparaba su NBT, la app traducía ese título y la misión ya no reconocía el objeto. Ahora lo que está dentro del objeto de una tarea no se toca; el título de la tarea y los nombres de las recompensas se siguen traduciendo.
@@ -313,7 +330,8 @@ Farming Crossing 4 (1.20.1, Forge).
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
 
-[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.2.0...HEAD
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/Consterna/ModpackES/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/Consterna/ModpackES/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/Consterna/ModpackES/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/Consterna/ModpackES/compare/v2.0.0...v2.1.0

@@ -40,7 +40,7 @@ y **cualquier lanzador**, y escribe a la vez las siete variantes de español del
 | Contenido | Formatos | Dónde queda |
 |---|---|---|
 | Textos de mods (objetos, bloques, menús, tooltips) | `lang/*.json` (1.13+) y `.lang` (1.12 y antes), incluidos los jars anidados (también los que Fabric y Quilt declaran fuera de `META-INF/jars`), KubeJS y los resource packs del modpack | Resource pack `Traduccion_ES` |
-| Misiones | FTB Quests (texto en los capítulos, carpeta `lang/` de 1.21+, NBT de 1.12 y el nombre de los objetos de recompensa, también en 1.12; nunca el de los objetos que pide una tarea, que FTB Quests compara), BetterQuesting, HQM, Heracles | En su sitio, con copia de seguridad |
+| Misiones | FTB Quests (texto en los capítulos, carpeta `lang/` de 1.21+ y su versión JSON5 de 26.x, NBT de 1.12 y el nombre de los objetos de recompensa, también en 1.12; nunca el de los objetos que pide una tarea, que FTB Quests compara), BetterQuesting, HQM, Heracles | En su sitio, con copia de seguridad |
 | Libros guía | Patchouli (también los campos que muestran las plantillas propias de un mod, como el `heading` de Blood Magic), Mantle (Tinkers), Citadel (Alex's Mobs), GuideME (AE2), Lavender. Modonomicon va por claves de idioma | Resource pack (o en su sitio, si es un libro propio del modpack) |
 | Scripts de KubeJS | Lo que ve el jugador: `tell`, `notify`, `displayName`, `Text.of`, tooltips, información de JEI/REI/EMI, el nombre de los grupos de REI, los mensajes armados por partes antes de un `tell`, y el texto de `tellraw`, `title` y `say` en `runCommand` | En su sitio, con copia de seguridad |
 | Scripts de CraftTweaker | Lo que se ve de los `.zs` de `scripts/`: `addTooltip`, `addShiftTooltip`, `displayName`, `setDisplayName`, las descripciones de JEI (`addDescription`, `addInfo`) y el texto de `game.setLocalization` | En su sitio, con copia de seguridad |
@@ -167,6 +167,10 @@ razona el modelo).
 La capa gratuita de Gemini sirve para probar, pero tiene límites de peticiones por minuto y por día que un
 modpack grande supera enseguida. Con la facturación activada (nivel 1) se traduce de una vez.
 
+> [!IMPORTANT]
+> Las condiciones de la API de Gemini piden tener **18 años o más**. Si eres menor, usa un motor local (LM Studio u
+> Ollama), que no envía nada fuera de tu PC.
+
 ## Multijugador
 
 Las misiones y los scripts de servidor los lee el servidor. «Más ▸ Kit de servidor…» arma un `.zip` con esos
@@ -174,6 +178,13 @@ archivos ya traducidos, el resource pack para los jugadores y las instrucciones.
 resource pack, listo para publicar: con `pack.png`, un `LEEME.txt` (aviso de traducción automática, si una persona
 la revisó, motores usados y créditos), la versión del modpack en el nombre del archivo y `supported_formats` en el
 `pack.mcmeta` cuando la versión lo usa (de 1.20.2 a 1.21.8).
+
+> [!WARNING]
+> Antes de **publicar** el pack o el kit, revisa la licencia del modpack y de sus mods: una traducción cuenta como
+> una adaptación, y muchas licencias (todos los derechos reservados, CC-BY-ND) no dejan publicarla sin permiso del
+> autor. Las plataformas también tienen reglas propias: Modrinth, por ejemplo, no admite proyectos hechos
+> principalmente con IA y pide marcar el contenido generado. Lo prudente es revisar la traducción a mano y pedir
+> permiso. Para usarla tú y en tu propio servidor no hace falta publicar nada.
 
 ## Compartir una traducción
 
@@ -222,7 +233,9 @@ salen de tu PC. No se envía nada más. Al abrirse, la app consulta en GitHub si
 enviar datos tuyos); se desactiva en el engranaje, con «Avisar al abrir si hay una versión nueva».
 
 Ten en cuenta que, según las condiciones de Google, los datos de la capa gratuita de Gemini pueden usarse para
-mejorar sus productos; revisa las condiciones del proveedor que uses.
+mejorar sus productos, con revisión humana; con la facturación activada, no. En el Espacio Económico Europeo, Suiza
+y el Reino Unido se aplican siempre las condiciones de pago. Los textos que se envían son de los autores de los mods:
+revisa las condiciones del proveedor que uses.
 </details>
 
 <details>
@@ -297,7 +310,7 @@ uv sync
 uv run python scripts/verificar.py            # ruff, pyright estricto, compileall y pytest con cobertura
 uv run python scripts/verificar.py --rapido   # sin las pruebas de Java ni el corpus real
 uv run python scripts/construir_exe.py        # dist/ModpackES-portable.zip (carpeta del programa)
-uv run python scripts/construir_exe.py --instalador  # dist/ModpackES-instalador.exe (necesita Inno Setup 6.3+)
+uv run python scripts/construir_exe.py --instalador  # dist/ModpackES-instalador.exe (necesita Inno Setup 6.7+)
 uv run python scripts/probar_exe.py           # extrae el zip, arranca el .exe y analiza un modpack de prueba
 uv run python scripts/probar_exe.py --instalador  # instala en una carpeta temporal, prueba y desinstala
 ```
