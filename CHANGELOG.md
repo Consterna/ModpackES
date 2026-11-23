@@ -6,12 +6,18 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+## [2.3.1] - 2026-11-23
+
 ### Cambiado
 
 - **google-genai 3** (antes 2.34). La versión 3 usa por defecto la API `v1` de Gemini, que no tiene todo lo que usa
   la app: con ella, un pedido de traducción volvía vacío sin dar error. La app fija la API `v1beta`, la misma de
   antes, y se comprobó con la API real (un lote traducido y un trabajo por lotes creado y cancelado). El cliente HTTP
   de Google pasa a `httpx2`, que usa los certificados de Windows.
+
+### Seguridad
+
+- **Una `uxtheme.dll` falsa junto al programa ya no se carga.** En la 2.3.0, al sacar del programa los paquetes de desarrollo cambió el orden de carga, y Windows buscaba `uxtheme.dll` primero en la carpeta del programa. Ahora se carga desde System32 antes de abrir la ventana, como `dwmapi.dll`, y la prueba del programa planta una copia falsa de cada una. Para aprovecharlo había que escribir dentro de la carpeta del programa.
 
 ## [2.3.0] - 2026-11-23
 
@@ -337,7 +343,8 @@ Farming Crossing 4 (1.20.1, Forge).
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
 
-[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.3.0...HEAD
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/Consterna/ModpackES/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Consterna/ModpackES/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/Consterna/ModpackES/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/Consterna/ModpackES/compare/v2.1.0...v2.1.1

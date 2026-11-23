@@ -18,7 +18,7 @@ solo_windows = pytest.mark.skipif(sys.platform != "win32", reason="solo en Windo
 def test_precarga_dwmapi_desde_system32() -> None:
     sistema = dll_sistema.carpeta_sistema()
     assert sistema is not None and (sistema / "kernel32.dll").is_file()
-    assert dll_sistema.precargar() == [sistema / "dwmapi.dll"]
+    assert dll_sistema.precargar() == [sistema / "dwmapi.dll", sistema / "uxtheme.dll"]
     cargada = dll_sistema.ruta_cargada("dwmapi.dll")
     assert cargada is not None and cargada.parent.resolve() == sistema.resolve()
 

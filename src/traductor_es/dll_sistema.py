@@ -1,8 +1,10 @@
 """DLL de Windows que el programa carga desde System32 antes de que nadie las pida por su nombre (CWE-427).
 
-Windows busca una DLL que no está entre las «KnownDLLs» primero en la carpeta del `.exe`. `dwmapi.dll`, que pide
-Qt al crear la ventana, es una de ellas: si alguien deja una falsa junto al programa, se cargaría esa. Cargarla
-antes con su ruta completa lo evita, porque Windows reutiliza el módulo que ya tiene cargado con ese nombre.
+Windows busca una DLL que no está entre las «KnownDLLs» primero en la carpeta del `.exe`. `dwmapi.dll` y
+`uxtheme.dll`, que pide Qt al crear la ventana, son dos de ellas: si alguien deja una falsa junto al programa, se
+cargaría esa. Cargarlas antes con su ruta completa lo evita, porque Windows reutiliza el módulo que ya tiene cargado
+con ese nombre. `uxtheme.dll` la cargaba antes desde System32 algún paquete de desarrollo que PyInstaller metía sin
+querer; al sacarlos (2.3.0) quedó expuesta (H-055).
 """
 
 from __future__ import annotations
@@ -11,8 +13,8 @@ import ctypes
 import sys
 from pathlib import Path
 
-#: Las que se cargan antes de importar Qt.
-DLLS = ("dwmapi.dll",)
+#: Las que se cargan antes de importar Qt. `probar_exe.py` comprueba con una copia falsa de cada una.
+DLLS = ("dwmapi.dll", "uxtheme.dll")
 _MAX_RUTA = 32768
 
 
