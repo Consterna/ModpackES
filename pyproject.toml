@@ -39,6 +39,10 @@ modpackes = "traductor_es.__main__:main"
 [project.gui-scripts]
 modpackes-ventana = "traductor_es.ui.app:main"
 
+[tool.uv]
+# La misma uv en el CI y en este PC (setup-uv la lee de aquí)
+required-version = ">=0.13.1"
+
 [dependency-groups]
 dev = [
     "pytest>=8",

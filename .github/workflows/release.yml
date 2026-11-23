@@ -46,12 +46,11 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: dist  # reemplaza el instalador y el zip por los firmados
 
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
-
-      - name: Lista de componentes (SBOM CycloneDX)
-        run: |
-          uv export --no-dev --no-hashes --no-emit-project --format requirements-txt > requisitos.txt
-          uvx --from cyclonedx-bom==7.5.0 cyclonedx-py requirements requisitos.txt --of JSON -o dist/ModpackES-sbom.cdx.json
+      # El SBOM lo arma el job «sbom» del CI, sin permisos: aquí no se instala nada de PyPI
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: ModpackES-sbom
+          path: dist
 
       - name: Atestación de origen de los ejecutables
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
