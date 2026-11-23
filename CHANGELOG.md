@@ -6,13 +6,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
-### Cambiado
-
-- **La versión portable ahora es un `.zip` con la carpeta del programa** (`ModpackES-portable.zip`), en vez de un
-  `.exe` suelto. Un `.exe` que se abre desde Descargas carga ciertas DLL de esa carpeta antes que las de Windows, y
-  una página web puede dejar ahí una falsa. Extraído en su propia carpeta, eso ya no pasa. Es la misma carpeta que
-  instala el instalador, que sigue siendo la descarga recomendada. Además, el programa carga `dwmapi.dll` desde
-  System32 antes de abrir la ventana, así que una copia falsa junto al `.exe` tampoco se usa.
+## [2.3.0] - 2026-11-23
 
 ### Agregado
 
@@ -95,6 +89,11 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ### Cambiado
 
+- **La versión portable ahora es un `.zip` con la carpeta del programa** (`ModpackES-portable.zip`), en vez de un
+  `.exe` suelto. Un `.exe` que se abre desde Descargas carga ciertas DLL de esa carpeta antes que las de Windows, y
+  una página web puede dejar ahí una falsa. Extraído en su propia carpeta, eso ya no pasa. Es la misma carpeta que
+  instala el instalador, que sigue siendo la descarga recomendada. Además, el programa carga `dwmapi.dll` desde
+  System32 antes de abrir la ventana, así que una copia falsa junto al `.exe` tampoco se usa.
 - **Fin del plan de calidad:** una revisión de 150 traducciones con un diccionario, un revisor más fuerte y una persona (en los 27 textos que lo necesitaban) dio 26 Bien, 1 Leve y 0 Grave; lo que queda es del modelo. Ver [docs/calidad.md](docs/calidad.md).
 - **Frases partidas con su contexto:**
   - Un texto con estilos mezclados («Use the » + «Wrench» en dorado + « to rotate») se sigue traduciendo por trozos, para no perder los estilos, pero cada trozo va con la frase entera, para que encaje en ella. Vale para las misiones (FTB Quests, Heracles) y los libros.
@@ -324,7 +323,8 @@ Farming Crossing 4 (1.20.1, Forge).
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
 
-[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.2.0...HEAD
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/Consterna/ModpackES/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/Consterna/ModpackES/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/Consterna/ModpackES/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/Consterna/ModpackES/compare/v2.0.0...v2.1.0
