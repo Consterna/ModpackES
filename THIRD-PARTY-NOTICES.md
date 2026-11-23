@@ -40,10 +40,12 @@ Studios. Gemini es una marca de Google LLC.
 | cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | https://github.com/pyca/cryptography |
 | distro | 1.9.0 | Apache Software License | https://github.com/python-distro/distro |
 | google-auth | 2.62.1 | Apache Software License | https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth |
-| google-genai | 2.34.0 | Apache-2.0 | https://github.com/googleapis/python-genai |
+| google-genai | 3.6.1 | Apache-2.0 | https://github.com/googleapis/python-genai |
 | h11 | 0.16.0 | MIT License | https://github.com/python-hyper/h11 |
 | httpcore | 1.0.9 | BSD-3-Clause | https://www.encode.io/httpcore/ |
+| httpcore2 | 2.16.2 | BSD-3-Clause | https://github.com/pydantic/httpx2 |
 | httpx | 0.28.1 | BSD License | https://github.com/encode/httpx |
+| httpx2 | 2.16.2 | BSD-3-Clause | https://github.com/pydantic/httpx2 |
 | idna | 3.20 | BSD-3-Clause | https://github.com/kjd/idna |
 | jaraco-classes | 3.4.0 | MIT License | https://github.com/jaraco/jaraco.classes |
 | jaraco-context | 6.1.2 | MIT | https://github.com/jaraco/jaraco.context |
@@ -51,7 +53,7 @@ Studios. Gemini es una marca de Google LLC.
 | json5 | 0.17.3 | Apache-2.0 | https://github.com/dpranke/pyjson5 |
 | keyring | 25.7.0 | MIT | https://github.com/jaraco/keyring |
 | more-itertools | 11.2.1 | MIT | https://github.com/more-itertools/more-itertools |
-| platformdirs | 4.14.3 | MIT | https://github.com/tox-dev/platformdirs |
+| platformdirs | 4.14.8 | MIT | https://github.com/tox-dev/platformdirs |
 | pyasn1 | 0.6.5 | BSD-2-Clause | https://github.com/pyasn1/pyasn1 |
 | pyasn1-modules | 0.4.2 | BSD License | https://github.com/pyasn1/pyasn1-modules |
 | pycparser | 3.12 | BSD-3-Clause | https://github.com/eliben/pycparser |
@@ -63,6 +65,7 @@ Studios. Gemini es una marca de Google LLC.
 | shiboken6 | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pyside.org |
 | sniffio | 1.3.1 | MIT License, Apache Software License | https://github.com/python-trio/sniffio |
 | tenacity | 9.1.4 | Apache Software License | https://github.com/jd/tenacity |
+| truststore | 0.10.5 | MIT | https://github.com/sethmlarson/truststore |
 | typing-extensions | 4.16.0 | PSF-2.0 | https://github.com/python/typing_extensions |
 | typing-inspection | 0.4.4 | MIT | https://github.com/pydantic/typing-inspection |
 | urllib3 | 2.8.0 | MIT | https://pypi.org/project/urllib3/ |
