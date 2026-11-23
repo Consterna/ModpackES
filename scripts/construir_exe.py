@@ -154,13 +154,22 @@ def instalador(icono: Path, version: Path, reusar: bool = False) -> int:
     return subprocess.run(comando, cwd=RAIZ, check=False).returncode
 
 
-#: La primera 3.13 sin CVE-2026-15310 (bomba de memoria en `zipfile` con miembros bzip2, LZMA o Zstandard)
-PYTHON_MINIMO = (3, 13, 16)
+#: Por cada rama de Python, la primera versión sin CVE-2026-15310 (bomba de memoria en `zipfile` con miembros bzip2,
+#: LZMA o Zstandard). La 3.15.0 ya salió con el arreglo; las ramas anteriores a 3.13 no sirven para la app.
+PYTHON_SEGURO = {(3, 13): (3, 13, 16), (3, 14): (3, 14, 8)}
+
+
+def python_seguro(version: tuple[int, int, int]) -> str | None:
+    """None si esa versión de Python sirve para construir; si no, la mínima de su rama (o «3.13.16»)."""
+    if version[:2] < (3, 13):
+        return "3.13.16"
+    minimo = PYTHON_SEGURO.get(version[:2])
+    return ".".join(map(str, minimo)) if minimo is not None and version < minimo else None
 
 
 def main(argv: list[str] | None = None) -> int:
-    if sys.version_info[:3] < PYTHON_MINIMO:
-        minimo = ".".join(map(str, PYTHON_MINIMO))
+    actual = (sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+    if minimo := python_seguro(actual):
         print(f"Hace falta Python {minimo} o superior para construir el programa (este es {sys.version.split()[0]}).")
         return 2
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
