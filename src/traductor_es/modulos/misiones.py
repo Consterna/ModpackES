@@ -44,17 +44,22 @@ def piezas_de_recompensa(nombres: Sequence[snbt.Cadena | nbt.CadenaNbt]) -> list
 _CLAVES_DE_OBJETO = frozenset({"item", "items", "tag", "components", "nbt"})
 
 
+def en_objeto_de(c: snbt.Cadena | nbt.CadenaNbt, lista: str) -> bool:
+    """El texto está dentro de un objeto (su NBT o sus componentes) de una tarea (`tasks`) o recompensa (`rewards`)."""
+    ruta = list(c.ruta)
+    if lista not in ruta:
+        return False
+    despues = ruta[len(ruta) - 1 - ruta[::-1].index(lista) + 1 :]
+    return any(clave in _CLAVES_DE_OBJETO for clave in despues)
+
+
 def en_objeto_de_tarea(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
     """El texto está dentro del objeto que pide una tarea (p. ej. el `title` de un libro escrito).
 
     FTB Quests compara ese NBT con el que entrega el jugador (`match_nbt`): traducirlo haría imposible la misión.
     El título propio de la tarea (`tasks[…].title`) no está dentro del objeto y sí se traduce.
     """
-    ruta = list(c.ruta)
-    if "tasks" not in ruta:
-        return False
-    despues = ruta[len(ruta) - 1 - ruta[::-1].index("tasks") + 1 :]
-    return any(clave in _CLAVES_DE_OBJETO for clave in despues)
+    return en_objeto_de(c, "tasks")
 
 
 def es_campo_ftbq(c: snbt.Cadena | nbt.CadenaNbt) -> bool:
@@ -243,6 +248,29 @@ class FTBQuests(_Base):
     def _prefijos(self) -> list[str]:
         return [_relativa(self.ctx, r) + "/" for r in self.raices()]
 
+    def _pedidos_por_tareas(self, raiz: Path) -> frozenset[str]:
+        """Los textos del NBT de los objetos que piden las tareas, en todo el libro de misiones.
+
+        Si una misión da un objeto como recompensa y otra lo pide con `match_nbt` (un libro escrito, un objeto con
+        nombre), traducir el de la recompensa haría que ya no coincida con el que pide la tarea (H-048).
+        """
+        pedidos: set[str] = set()
+        for ruta in sorted(raiz.rglob("*.snbt")):
+            original = None if "lang" in ruta.relative_to(raiz).parts else self._original(ruta)
+            if original is not None:
+                try:
+                    pedidos |= {c.texto for c in snbt.escanear(original.decode("utf-8")) if en_objeto_de_tarea(c)}
+                except (ValueError, UnicodeDecodeError):
+                    continue
+        for ruta in sorted(raiz.rglob("*.nbt")):
+            original = self._original(ruta)
+            if original is not None:
+                try:
+                    pedidos |= {c.texto for c in nbt.cadenas(nbt.leer(original)[0]) if en_objeto_de_tarea(c)}
+                except (ValueError, EOFError, OSError):
+                    continue
+        return frozenset(pedidos)
+
     def _preparar(self) -> Iterator[_Trabajo]:
         for raiz in self.raices():
             formato = self.formato(raiz)
@@ -269,6 +297,11 @@ class FTBQuests(_Base):
 
     # ---------------------------------------------------------------- SNBT en línea (1.14 - 1.20)
     def _snbt(self, raiz: Path, filtro: Callable[[snbt.Cadena], bool] = es_texto_ftbq) -> Iterator[_Trabajo]:
+        pedidos = self._pedidos_por_tareas(raiz)
+
+        def elegir(c: snbt.Cadena) -> bool:
+            return filtro(c) and not (en_objeto_de(c, "rewards") and c.texto in pedidos)
+
         for ruta in sorted(raiz.rglob("*.snbt")):
             if "lang" in ruta.relative_to(raiz).parts:
                 continue
@@ -276,7 +309,7 @@ class FTBQuests(_Base):
             if original is None:
                 continue
             try:
-                trabajo = self._trabajo_snbt(original.decode("utf-8"), [ruta], filtro, {})
+                trabajo = self._trabajo_snbt(original.decode("utf-8"), [ruta], elegir, {})
             except (ValueError, UnicodeDecodeError):
                 self.ctx.registro(f"{ruta.name} está dañado: se deja igual")
                 continue
@@ -419,6 +452,11 @@ class FTBQuests(_Base):
 
     # ---------------------------------------------------------------- NBT binario (1.12)
     def _nbt(self, raiz: Path) -> Iterator[_Trabajo]:
+        pedidos = self._pedidos_por_tareas(raiz)
+
+        def libre(c: nbt.CadenaNbt) -> bool:
+            return not (en_objeto_de(c, "rewards") and c.texto in pedidos)
+
         for ruta in sorted(raiz.rglob("*.nbt")):
             original = self._original(ruta)
             if original is None:
@@ -428,8 +466,10 @@ class FTBQuests(_Base):
             except (ValueError, EOFError, OSError):
                 self.ctx.registro(f"No pude leer {ruta.name}: se deja igual")
                 continue
-            textos = [c for c in nbt.cadenas(arbol) if es_campo_ftbq(c)]
-            nombres = [c for c in nbt.cadenas(arbol) if not es_campo_ftbq(c) and es_nombre_de_recompensa(c)]
+            textos = [c for c in nbt.cadenas(arbol) if es_campo_ftbq(c) and libre(c)]
+            nombres = [
+                c for c in nbt.cadenas(arbol) if not es_campo_ftbq(c) and es_nombre_de_recompensa(c) and libre(c)
+            ]
             if not textos and not nombres:
                 continue
             # Como en SNBT: los nombres de recompensa van aparte, para que los textos de la misión salgan igual
@@ -442,7 +482,7 @@ class FTBQuests(_Base):
                 arbol, _ = nbt.leer(original)  # árbol nuevo cada vez: no se acumulan cambios
                 hechos = faltan = 0
                 for c in nbt.cadenas(arbol):
-                    if es_campo_ftbq(c) or es_nombre_de_recompensa(c):
+                    if (es_campo_ftbq(c) or es_nombre_de_recompensa(c)) and libre(c):
                         us = unidades(c.texto)
                         hechos += sum(1 for u in us if u in trad)
                         faltan += sum(1 for u in us if u not in trad)

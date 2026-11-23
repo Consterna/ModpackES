@@ -140,6 +140,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 - **La traducción de un modpack se cortaba con un error** cuando un nombre que la app ya había decidido (uno que se repite en el pack) volvía a llegar, traducido distinto, desde los mods. Pasaba en un pack de FTB real («Force Shears»). Ahora manda lo que ya se decidió y la traducción sigue.
 - **Un `.lang` de 1.12 cuya primera clave empieza con una marca de orden de bytes** perdía esa marca al volver a leerlo, y la clave cambiaba. Ahora el archivo empieza con una línea de comentario.
+- **FTB Quests: una misión que pide un objeto que da otra misión ya no queda imposible.** Si una misión da como recompensa un libro escrito o un objeto con nombre y otra lo pide con `match_nbt`, el nombre de la recompensa se traducía y el de la tarea no, así que el objeto entregado ya no coincidía. Ahora un texto del objeto de una recompensa que también pide alguna tarea, en cualquier capítulo, se deja en inglés.
 - **Con la ventana chica o con la escala de Windows alta, parte de la ventana quedaba cortada:** la cuarta tarjeta (Scripts), el campo de ambientación y los botones de la derecha. Pasaba con el tamaño mínimo, el de un portátil de 1366×768 al 125 %. Un nombre de instancia largo ensanchaba la barra lateral. Ahora todo entra:
   - el nombre de la instancia y el resumen de opciones se acortan con «…», con el texto entero en la ayuda;
   - el título y los créditos bajan de línea;
