@@ -6,7 +6,9 @@ se salta ese archivo como si estuviera roto, se avisa y lo demás se traduce.
 
 from __future__ import annotations
 
+import importlib.util
 import io
+import types
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -190,3 +192,21 @@ def test_jar_con_version_rara_no_tumba_el_analisis(tmp_path: Path) -> None:
         analisis = p.analizar()
     assert analisis.a_traducir >= 1
     assert any("raro.jar" in a for a in analisis.avisos)
+
+
+def _arnes() -> types.ModuleType:
+    ruta = Path(__file__).resolve().parent.parent / "scripts" / "auditoria" / "fuzz_parsers.py"
+    spec = importlib.util.spec_from_file_location("fuzz_parsers", ruta)
+    assert spec is not None and spec.loader is not None
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+@pytest.mark.parametrize("parser", sorted(_arnes().PARSERS))
+def test_el_arnes_de_fuzzing_corre_cada_parser(parser: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """El workflow «Fuzzing» corre este arnés 1 h por parser: aquí, una fracción de segundo para que no se rompa."""
+    arnes = _arnes()
+    monkeypatch.setattr(arnes, "SALIDA", tmp_path)
+    resultado = arnes.fuzz(parser, 0.003)
+    assert resultado["casos"] > 0 and resultado["fallos"] == {}

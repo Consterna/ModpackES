@@ -41,6 +41,7 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   - la foto del corpus traducido con el simulador, con la prueba de que restaurar deja los bytes originales;
   - una puerta de regresión de la calidad con las respuestas grabadas;
   - el análisis de lo que vuelca una sonda dentro del juego.
+  - fuzzing de los parsers de formatos (`fuzz_parsers.py`), que el workflow manual «Fuzzing» corre 1 h por parser en GitHub Actions.
 - **Perfiles de calidad** («Calidad» en la ventana y `--calidad` en `analizar` y `traducir`). El análisis estima el costo de cada uno:
   - **Equilibrado** (por defecto): después de traducir, lo que quedó con dudas (cifras distintas, un paréntesis sin cerrar, usted, inglés, un término del glosario…) se corrige una vez explicando qué falló. La corrección se queda solo si pasa las reglas y un juez a ciegas la prefiere en los dos órdenes; si no, queda la primera, marcada. Cuesta cerca de un 5 % más.
   - **Máximo:** además, cada texto corto (6 palabras o menos: nombres, botones) se traduce tres veces en lotes distintos. Gana la traducción en que coinciden dos; si no coinciden, gana la de mejor promedio entre tres señales (dudas del control de calidad, términos del glosario y parecido con las otras), y el texto queda marcado para revisarlo. También activa la revisión de misiones y libros. Cuesta un 30 % más, más la revisión. Con Gemini 3.8 Flash no mejoró de forma medible (ver [docs/calidad.md](docs/calidad.md)): queda como opción.
