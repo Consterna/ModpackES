@@ -71,6 +71,10 @@ def _preparar() -> tuple[Path, Path]:
     return icono, version
 
 
+_SOLO_DESARROLLO = ("hypothesis", "numpy", "pytest", "_pytest", "pytestqt", "sortedcontainers", "setuptools",
+                    "nbtlib", "coverage", "pyright", "ruff")  # fmt: skip
+
+
 def _pyinstaller(modo: str, destino: Path, trabajo: Path, icono: Path, version: Path) -> int:
     comando = [
         sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", modo, "--windowed",
@@ -80,6 +84,9 @@ def _pyinstaller(modo: str, destino: Path, trabajo: Path, icono: Path, version: 
         "--collect-data", "traductor_es",  # el validador Java (ValidadorTraductor.java) y el ícono
         "--hidden-import", "keyring.backends.Windows",
         "--exclude-module", "tkinter",
+        # Paquetes de desarrollo que PyInstaller arrastraba sin que la app los use: no van en el programa
+        # (tampoco estaban en el SBOM ni en THIRD-PARTY-NOTICES, que se arman sin el grupo dev)
+        *(x for m in _SOLO_DESARROLLO for x in ("--exclude-module", m)),
         "--distpath", str(destino), "--workpath", str(trabajo), "--specpath", str(trabajo),
         str(RAIZ / "scripts" / "lanzador_ventana.py"),
     ]  # fmt: skip

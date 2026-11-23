@@ -25,6 +25,9 @@ from tests import fabrica  # noqa: E402
 
 from traductor_es import NOMBRE, __version__  # noqa: E402
 
+#: Lo que nunca va dentro del programa (ver `construir_exe.py`)
+_SOLO_DESARROLLO = frozenset({"hypothesis", "numpy", "pytest", "_pytest", "pytestqt", "sortedcontainers", "setuptools"})
+
 
 def probar(exe: Path) -> int:
     with tempfile.TemporaryDirectory() as tmp:
@@ -66,6 +69,16 @@ def probar_portable(paquete: Path) -> int:
         raices = {PurePosixPath(n).parts[0] for n in z.namelist()}
         if raices != {NOMBRE} or f"{NOMBRE}/{NOMBRE}.exe" not in z.namelist():
             print(f"FALLA: el zip tiene que traer solo la carpeta {NOMBRE}/ con {NOMBRE}.exe (trae {sorted(raices)})")
+            return 1
+        de_desarrollo = sorted(
+            {
+                PurePosixPath(n).parts[2]
+                for n in z.namelist()
+                if len(PurePosixPath(n).parts) > 3 and PurePosixPath(n).parts[2].split("-")[0] in _SOLO_DESARROLLO
+            }
+        )
+        if de_desarrollo:
+            print(f"FALLA: el programa lleva paquetes de desarrollo: {de_desarrollo}")
             return 1
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             z.extractall(tmp)
