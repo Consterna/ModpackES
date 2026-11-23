@@ -14,7 +14,7 @@ from PySide6.QtCore import QEvent, QObject, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from .. import NOMBRE, __version__, configuracion, registro
+from .. import NOMBRE, __version__, configuracion, dll_sistema, registro
 from ..motores.simulador import Simulador
 from ..proceso import Proceso
 from . import iconos, tema
@@ -51,6 +51,9 @@ def _autoprueba(carpeta: str, salida: str) -> int:
             "registro": bool(registro.ultimas_lineas(5)),
             "minecraft": str(p.instancia.version),
             "loader": p.instancia.loader,
+            #: de dónde cargó Windows dwmapi.dll: en el .exe tiene que ser System32 (H-016)
+            "dwmapi": str(dll_sistema.ruta_cargada("dwmapi.dll") or ""),
+            "system32": str(dll_sistema.carpeta_sistema() or ""),
             "modulos": [{"grupo": m.grupo, "textos": m.textos, "a_traducir": m.a_traducir} for m in informe.modulos],
         }
     Path(salida).write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
