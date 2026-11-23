@@ -428,3 +428,27 @@ def test_importar_un_resource_pack_trae_tambien_sus_libros(tmp_path: Path) -> No
     assert resumen.memoria == 2
     escrito = juego / "resourcepacks" / "Traduccion_ES" / entrada.format("es_mx")
     assert json.loads(escrito.read_text("utf-8"))["pages"][0]["text"] == "Bienvenido al mod."
+
+
+@pytest.mark.parametrize("cual", ["pack", "kit"])
+def test_una_exportacion_que_falla_deja_el_zip_anterior(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cual: str
+) -> None:
+    """Antes se escribía directo en el destino: si fallaba a mitad (disco lleno, un error), se perdía el anterior."""
+    juego = _instancia(tmp_path / "a")
+    with Memoria(":memory:") as memoria, Proceso(juego, MotorDePrueba(), grupos=["mods"], memoria=memoria) as p:
+        p.ejecutar()
+    destino = tmp_path / "salida.zip"
+    destino.write_bytes(b"el zip de la vez anterior")
+
+    def rompe(*_a: object, **_k: object) -> int:
+        raise OSError(28, "No queda espacio en el disco")
+
+    monkeypatch.setattr(exportar, "_escribir_pack", rompe)
+    with pytest.raises(OSError, match="espacio"):
+        if cual == "pack":
+            exportar.exportar_pack(juego, destino)
+        else:
+            exportar.exportar_kit_servidor(juego, destino)
+    assert destino.read_bytes() == b"el zip de la vez anterior"
+    assert not (tmp_path / "salida.zip.tmp").exists()

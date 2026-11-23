@@ -15,7 +15,7 @@ from ..fuentes.recursos import MARCA
 from ..fuentes.version import rango_publicable
 from ..modulos.datos import clasificar, entradas_del_zip
 from .copias import Respaldo
-from .paquete import nombre_de_archivo
+from .paquete import nombre_de_archivo, zip_nuevo
 from .resource_pack import NOMBRE, leer_marca, motores_de
 
 #: El ícono de la app (dibujado para el proyecto) sirve de pack.png.
@@ -116,8 +116,7 @@ def exportar_pack(juego: Path, destino: Path, revisado: bool = False) -> int:
     pack = juego / "resourcepacks" / NOMBRE
     if not (pack / "pack.mcmeta").is_file():
         raise ValueError("Todavía no hay traducción de mods ni de libros para exportar: traduce primero.")
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zip_nuevo(destino) as zf:  # si falla a mitad, el zip anterior queda como estaba
         return _escribir_pack(zf, juego, revisado)
 
 
@@ -156,9 +155,8 @@ def exportar_kit_servidor(juego: Path, destino: Path) -> int:
     pack = juego / "resourcepacks" / NOMBRE
     if not archivos and not (pack / "pack.mcmeta").is_file():
         raise ValueError("Todavía no hay nada traducido para el servidor: traduce primero.")
-    destino.parent.mkdir(parents=True, exist_ok=True)
     n = 0
-    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zip_nuevo(destino) as zf:
         for relativa in archivos:
             ruta = juego / relativa
             if ruta.is_file():

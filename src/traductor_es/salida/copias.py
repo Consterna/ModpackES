@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -79,12 +81,36 @@ def _leer_manifiesto(ruta: Path) -> dict[str, Any] | None:
     return manifiesto if isinstance(manifiesto.get("archivos"), dict) else None
 
 
+#: Errores de Windows que suelen durar un instante: un antivirus o el indexador tiene abierto el archivo
+#: (ERROR_ACCESS_DENIED y ERROR_SHARING_VIOLATION). Se reintenta un poco antes de rendirse.
+_PASAJEROS = frozenset({5, 32})
+_ESPERAS = (0.05, 0.2, 0.5)
+
+
+def _reemplazar(temporal: Path, ruta: Path) -> None:
+    for espera in (*_ESPERAS, None):
+        try:
+            temporal.replace(ruta)
+            return
+        except OSError as e:
+            if espera is None or getattr(e, "winerror", None) not in _PASAJEROS:
+                raise
+            time.sleep(espera)
+
+
 def _escribir_entero(ruta: Path, datos: bytes) -> None:
+    """Escribe en un temporal al lado y lo pone en su lugar: el archivo nunca queda a medias.
+
+    El temporal se baja al disco (`fsync`) antes del reemplazo: sin eso, tras un corte de luz el archivo podía quedar
+    vacío aunque el reemplazo se hubiera hecho.
+    """
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_name(ruta.name + ".traductor.tmp")
-    temporal.write_bytes(datos)
     try:
-        temporal.replace(ruta)
+        temporal.write_bytes(datos)
+        with temporal.open("r+b") as f:  # bajarlo al disco (las pruebas de cortes interceptan `write_bytes`)
+            os.fsync(f.fileno())
+        _reemplazar(temporal, ruta)
     except OSError:  # p. ej. el archivo está abierto en otro programa: el temporal no se queda
         temporal.unlink(missing_ok=True)
         raise
