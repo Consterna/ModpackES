@@ -71,6 +71,18 @@ def olvidar_clave(motor: str = "gemini") -> None:
         keyring.delete_password(SERVICIO, _usuario_de(motor))
 
 
+def _escribir_entero(ruta: Path, texto: str) -> None:
+    """Escribe en un temporal y lo pone en su sitio: un corte no deja el archivo del usuario a medias."""
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    temporal = ruta.with_name(ruta.name + ".tmp")
+    temporal.write_text(texto, encoding="utf-8")
+    try:
+        temporal.replace(ruta)
+    except OSError:
+        temporal.unlink(missing_ok=True)
+        raise
+
+
 def leer_preferencias() -> dict[str, Any]:
     try:
         datos: Any = json.loads((carpeta_datos() / "preferencias.json").read_text(encoding="utf-8"))
@@ -80,18 +92,14 @@ def leer_preferencias() -> dict[str, Any]:
 
 
 def guardar_preferencias(datos: dict[str, Any]) -> None:
-    ruta = carpeta_datos() / "preferencias.json"
-    ruta.parent.mkdir(parents=True, exist_ok=True)
     datos.pop("clave", None)  # por si acaso: la clave nunca va a un archivo
-    ruta.write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
+    _escribir_entero(carpeta_datos() / "preferencias.json", json.dumps(datos, indent=2, ensure_ascii=False))
 
 
 def guardar_glosario_usuario(terminos: Mapping[str, str]) -> None:
     """Guarda los términos del usuario ({inglés: español}); ignora los que tengan algo vacío."""
     limpios = {k.strip(): v.strip() for k, v in terminos.items() if k.strip() and v.strip()}
-    ruta = ruta_glosario_usuario()
-    ruta.parent.mkdir(parents=True, exist_ok=True)
-    ruta.write_text(json.dumps(limpios, indent=2, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    _escribir_entero(ruta_glosario_usuario(), json.dumps(limpios, indent=2, ensure_ascii=False, sort_keys=True))
 
 
 def leer_glosario_usuario() -> dict[str, str]:

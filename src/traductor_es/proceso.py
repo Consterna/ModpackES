@@ -14,6 +14,7 @@ from types import TracebackType
 from typing import Self, cast
 
 from . import configuracion
+from .fuentes import contenedores
 from .fuentes.instancia import Instancia
 from .fuentes.modpack import identificador
 from .modulos import (
@@ -261,6 +262,8 @@ class Proceso:
         tambien_es_es: bool = False,
         calidad: str = PERFIL_POR_DEFECTO,
     ) -> None:
+        contenedores.DESCARTADAS.clear()  # los avisos de entradas grandes o dañadas son de esta instancia
+        contenedores.DANADAS.clear()
         self.instancia = Instancia(carpeta)
         #: Perfil de calidad (ver `Traductor.perfil`); el máximo incluye la revisión de misiones y libros
         self.calidad = calidad
@@ -449,7 +452,8 @@ class Proceso:
         for grupo, modulo in self.modulos():
             try:
                 piezas = modulo.recolectar()
-            except (ValueError, OSError) as e:  # se deja fuera ese grupo y se avisa: el resto se puede traducir
+            # RecursionError: un archivo del modpack con miles de niveles de anidamiento que se escapó del parser
+            except (ValueError, OSError, RecursionError) as e:  # se deja fuera ese grupo y se avisa
                 informe.avisos.append(f"{modulo.nombre}: no se pudo leer ({e}). Queda fuera de la traducción.")
                 if grupo not in informe.fallidos:
                     informe.fallidos.append(grupo)
@@ -463,6 +467,7 @@ class Proceso:
                               len(pendientes), sum(len(t) for t in pendientes))
             )  # fmt: skip
         informe.avisos.extend(self._avisos_de_cobertura(informe, scripts_leidos))
+        informe.avisos.extend(self._avisos_de_tamano())
         self._comparar_con_la_ultima(informe, leidos)
         self._analizar_espana(informe)
         return informe
@@ -475,7 +480,7 @@ class Proceso:
         for grupo, modulo in self.modulos(self._espana.ctx):
             try:
                 piezas = modulo.recolectar()
-            except (ValueError, OSError):  # ya se avisó en la pasada principal
+            except (ValueError, OSError, RecursionError):  # ya se avisó en la pasada principal
                 continue
             pendientes = pendientes_de(self._espana.traductor, modulo, [p.texto for p in piezas])
             # Sin contar los textos otra vez: son los mismos de la pasada principal
@@ -569,6 +574,11 @@ class Proceso:
                 )  # fmt: skip
             except ValueError as e:
                 informe.avisos.append(str(e))
+            except OSError as e:  # options.txt de solo lectura o bloqueado: lo traducido ya está escrito
+                informe.avisos.append(
+                    f"No pude cambiar options.txt ({e.strerror or e}): activa el pack «{NOMBRE}» y el idioma "
+                    "a mano en el juego (Opciones ▸ Paquetes de recursos)."
+                )
             if not (self.instancia.juego / "options.txt").is_file():
                 informe.avisos.append(AVISO_SIN_OPCIONES)
         return informe
@@ -698,11 +708,39 @@ class Proceso:
         return nombre_archivo_lang(self.ctx.dialecto, self.instancia.version.partes)
 
     def restaurar(self) -> list[Path]:
-        """Devuelve misiones, scripts y libros propios del modpack a su versión original."""
-        return self.ctx.respaldo.restaurar("")
+        """Devuelve misiones, scripts y libros propios del modpack a su versión original.
+
+        Lo que cambió después de traducir (p. ej. una actualización del modpack) se deja y se avisa por el registro.
+        """
+        try:
+            return self.ctx.respaldo.restaurar("")
+        finally:
+            if aviso := self.ctx.respaldo.aviso_cambiados():
+                self.registro(aviso)
+
+    @staticmethod
+    def _avisos_de_tamano() -> list[str]:
+        """Archivos de jars o zips que no se leyeron por pasar el tope (dañados o «bombas» de compresión)."""
+        avisos: list[str] = []
+        if contenedores.DANADAS:
+            danadas = sorted(contenedores.DANADAS)
+            resto = f" y {len(danadas) - 5} más" if len(danadas) > 5 else ""
+            avisos.append(
+                f"Salté {len(danadas)} archivos dañados dentro de jars o zips (no se pudieron descomprimir): "
+                f"{', '.join(danadas[:5])}{resto}. Si es un mod, vuelve a descargarlo."
+            )
+        if not contenedores.DESCARTADAS:
+            return avisos
+        lista = sorted(contenedores.DESCARTADAS)
+        mas = f" y {len(lista) - 5} más" if len(lista) > 5 else ""
+        return [
+            *avisos,
+            f"Salté {len(lista)} archivos de más de {contenedores.MAXIMO_ENTRADA // 2**20} MiB dentro de jars o "
+            f"zips (puede ser un archivo dañado o hecho para llenar la memoria): {', '.join(lista[:5])}{mas}.",
+        ]
 
     def _avisos(self) -> list[str]:
-        avisos: list[str] = []
+        avisos: list[str] = self._avisos_de_tamano()
         opciones = self.instancia.opciones
         sospechosos = [p for p in opciones.packs if "localizer" in p.lower() or "translat" in p.lower()]
         if sospechosos:

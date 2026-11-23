@@ -18,6 +18,8 @@ ESCAPE_CRUDO: Final = chr(0xE000)
 _COLOR: Final = r"§[0-9a-fk-orA-FK-OR]|(?<![A-Z])&[0-9a-fk-orA-FK-OR]|(?<=[A-Z])&(?:[0-9a-fk-or]|[A-FK-OR](?=[a-z]))"
 
 _PATRONES: Final[tuple[str, ...]] = (
+    # los corchetes de los marcadores, si ya vienen en el original: se protegen para no confundirlos
+    r"[⟦⟧]",
     # escapes del formato de origen (\n en SNBT, etc.), incluido barra + salto real; uno de control, entero
     ESCAPE_CRUDO + r"(?:u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])",
     r"\$\([^)]*\)",  # macros de Patchouli: $(l) $(item) $(l:ruta) $()
@@ -67,8 +69,10 @@ def desenmascarar(traducido: str, tokens: tuple[str, ...]) -> str | None:
     vistos = sorted(int(n) for n in TOKEN.findall(traducido))
     if vistos != list(range(len(tokens))):
         return None
-    restaurado = TOKEN.sub(lambda m: tokens[int(m.group(1))], traducido)
-    return None if "⟦" in restaurado or "⟧" in restaurado else restaurado
+    sobrante = TOKEN.sub("", traducido)
+    if "⟦" in sobrante or "⟧" in sobrante:  # un marcador roto o inventado («⟦0», «0⟧»)
+        return None
+    return TOKEN.sub(lambda m: tokens[int(m.group(1))], traducido)
 
 
 def es_traducible(texto: str) -> bool:

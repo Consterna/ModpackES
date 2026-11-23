@@ -404,6 +404,8 @@ def medir(
                 informe.costo(modelo, False, motor_id, revisar=True), segundos + segundos_rev,
             )  # fmt: skip
             despues.revision = str(resumen)
+            # Acumulado (traducción + revisión), como su costo estimado: sin esto, lo que gasta el juez no se contaba
+            despues.tokens_reales, despues.costo_real = _gasto(motor, uso_antes, modelo)
             mediciones.append(despues)
     return mediciones
 

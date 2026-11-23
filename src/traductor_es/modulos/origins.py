@@ -20,12 +20,12 @@ from __future__ import annotations
 import json
 import re
 import zipfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-from ..fuentes.contenedores import abrir_mod
+from ..fuentes.contenedores import Contenedor, abrir_mod, abrir_zip, leer_entrada
 from ..nucleo.mascara import es_traducible
 from . import datos
 from .base import Contexto, Pieza, Resumen, contar
@@ -60,29 +60,26 @@ def _version(texto: str) -> tuple[int, ...]:
     return tuple(int(x) for x in re.findall(r"\d+", texto.split("+", maxsplit=1)[0].split("-", maxsplit=1)[0])[:3])
 
 
-def modo_de_origins(jars: list[Path]) -> str | None:
-    """CLAVE, MIXTO o DERIVADA según la versión de Origins que hay en `mods/`; None si no hay Origins."""
-    for jar in jars:
-        contenedores = list(abrir_mod(jar))
-        try:
-            for c in contenedores:
-                nombres = set(c.nombres())
-                if "fabric.mod.json" in nombres:
-                    try:
-                        meta: object = json.loads(c.leer("fabric.mod.json").decode("utf-8-sig"))
-                    except (KeyError, OSError, ValueError):
-                        continue
-                    if isinstance(meta, dict) and cast(dict[str, Any], meta).get("id") == "origins":
-                        v = _version(str(cast(dict[str, Any], meta).get("version", "")))
-                        if not v:
-                            return None
-                        return CLAVE if v < (1, 11) else MIXTO if v < (1, 13) else DERIVADA
-                for toml in ("META-INF/mods.toml", "META-INF/neoforge.mods.toml"):
-                    if toml in nombres and re.search(rb'modId\s*=\s*"(origins|neoorigins)"', c.leer(toml)):
-                        return CLAVE  # port de Forge/NeoForge y NeoOrigins: la cadena es la clave
-        finally:
-            for c in contenedores:
-                c.cerrar()
+def modo_de_origins(contenedores: Iterable[Contenedor]) -> str | None:
+    """CLAVE, MIXTO o DERIVADA según la versión de Origins que hay en `mods/`; None si no hay Origins.
+
+    `contenedores`: los de los mods, en el orden de los jars (los que ya abrió la instancia).
+    """
+    for c in contenedores:
+        nombres = set(c.nombres())
+        if "fabric.mod.json" in nombres:
+            try:
+                meta: object = json.loads(c.leer("fabric.mod.json").decode("utf-8-sig"))
+            except (KeyError, OSError, ValueError):
+                continue
+            if isinstance(meta, dict) and cast(dict[str, Any], meta).get("id") == "origins":
+                v = _version(str(cast(dict[str, Any], meta).get("version", "")))
+                if not v:
+                    return None
+                return CLAVE if v < (1, 11) else MIXTO if v < (1, 13) else DERIVADA
+        for toml in ("META-INF/mods.toml", "META-INF/neoforge.mods.toml"):
+            if toml in nombres and re.search(rb'modId\s*=\s*"(origins|neoorigins)"', c.leer(toml)):
+                return CLAVE  # port de Forge/NeoForge y NeoOrigins: la cadena es la clave
     return None
 
 
@@ -118,7 +115,7 @@ class Origins:
         self.sin_alcance: list[Texto] = []  #: orígenes y capas literales de Origins 1.11–1.12
 
     def detectar(self) -> bool:
-        self._modo = modo_de_origins(self.ctx.instancia.jars())
+        self._modo = modo_de_origins(self.ctx.instancia.contenedores_mods())
         return self._modo is not None
 
     def describir(self) -> str:
@@ -144,10 +141,10 @@ class Origins:
             relativa = ruta.relative_to(juego).as_posix()
             if ruta.suffix.lower() == ".zip":
                 try:
-                    with zipfile.ZipFile(ruta) as z:
+                    with abrir_zip(ruta) as z:
                         for n in z.namelist():
                             if _ARCHIVO.match(n):
-                                yield n, z.read(n)
+                                yield n, leer_entrada(z, n)
                 except (zipfile.BadZipFile, OSError):
                     continue
             elif (i := relativa.find("data/")) >= 0 and _ARCHIVO.match(relativa[i:]):

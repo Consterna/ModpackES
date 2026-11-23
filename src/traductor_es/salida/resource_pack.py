@@ -117,7 +117,11 @@ class PackSalida:
         ruta.parent.mkdir(parents=True, exist_ok=True)
         temporal = ruta.with_name(ruta.name + ".tmp")
         temporal.write_bytes(datos)
-        temporal.replace(ruta)
+        try:
+            temporal.replace(ruta)
+        except OSError:  # el juego abierto puede tener el archivo tomado: no queda el temporal
+            temporal.unlink(missing_ok=True)
+            raise
         return ruta
 
     def ruta_lang(self, namespace: str, idioma: str) -> str:

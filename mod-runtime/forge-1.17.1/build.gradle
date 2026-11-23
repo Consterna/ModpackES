@@ -90,3 +90,9 @@ sourceSets {
 tasks.named('test', Test).configure {
     useJUnitPlatform()
 }
+
+// Jars reproducibles: sin las fechas de los archivos y en un orden fijo, así se pueden comparar con la fuente
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

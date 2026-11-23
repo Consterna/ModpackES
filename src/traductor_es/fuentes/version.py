@@ -80,7 +80,7 @@ def formato_desde_jar(version_json: bytes, tipo: str) -> tuple[int, int] | None:
     """Lee `pack_version` del version.json que trae el jar del juego (la fuente oficial)."""
     try:
         datos: Any = json.loads(version_json)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         return None
     pv: object = cast(dict[str, Any], datos).get("pack_version") if isinstance(datos, dict) else None
     if isinstance(pv, int):  # 1.16-1.17: un solo número para ambos

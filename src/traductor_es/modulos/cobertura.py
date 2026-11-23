@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..fuentes.contenedores import abrir_zip, leer_entrada
 from ..fuentes.instancia import Instancia
 from ..nucleo.mascara import es_traducible
 from .base import Contexto, parece_clave
@@ -169,14 +170,14 @@ def frases_por_mod(
         progreso(i, len(jars))
         frases: list[str] = []
         try:
-            with zipfile.ZipFile(jar) as z:
+            with abrir_zip(jar) as z:
                 for info in z.infolist():
                     if (
                         info.filename.endswith(".class")
                         and not info.filename.startswith("META-INF")
                         and info.file_size < 3_000_000
                     ):
-                        frases += _frases_de_clase(z.read(info))
+                        frases += _frases_de_clase(leer_entrada(z, info))
         except (zipfile.BadZipFile, OSError):
             continue
         unicas = list(dict.fromkeys(f for f in frases if es_traducible(f) and not parece_clave(f)))

@@ -6,12 +6,55 @@ import io
 import json
 import os
 import zipfile
+import zlib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import IO, Any, Protocol, cast
 
 _PROFUNDIDAD_MAXIMA = 3
 _CARPETAS_ANIDADAS = ("META-INF/jars/", "META-INF/jarjar/", "META-INF/jarinjar/")
+#: Tope de lo que se descomprime de una sola entrada de un jar o zip. Ningún archivo de idioma, libro o script real
+#: se acerca; lo que lo pasa (un archivo dañado o una «bomba» de compresión) se salta y se avisa.
+MAXIMO_ENTRADA = 64 * 2**20
+#: Entradas saltadas por pasar el tope («jar!/ruta (N MiB)»), para el aviso del informe.
+DESCARTADAS: set[str] = set()
+
+
+#: Entradas que no se pudieron descomprimir (CRC malo, datos rotos, cifradas, compresión rara), para el aviso.
+DANADAS: set[str] = set()
+
+
+class EntradaIlegible(zipfile.BadZipFile, ValueError):
+    """Una entrada que no se puede leer. Es `BadZipFile` y `ValueError`: la saltan los que esperan cualquiera."""
+
+
+class EntradaDemasiadoGrande(EntradaIlegible):
+    """Una entrada que pasa `MAXIMO_ENTRADA`: se trata como un archivo dañado (se salta, no se lee)."""
+
+
+def _demasiado_grande(origen: str, info: zipfile.ZipInfo) -> bool:
+    if info.file_size <= MAXIMO_ENTRADA:
+        return False
+    DESCARTADAS.add(f"{origen}!/{info.filename} ({info.file_size // 2**20} MiB)")
+    return True
+
+
+def leer_entrada(z: zipfile.ZipFile, entrada: str | zipfile.ZipInfo, origen: str | None = None) -> bytes:
+    """`z.read(entrada)` con el tope de tamaño. Lanza `EntradaDemasiadoGrande` (un `BadZipFile`) si lo pasa.
+
+    El tamaño declarado limita lo que entrega `zipfile` (si miente, falla la comprobación CRC): basta con mirarlo.
+    """
+    info = entrada if isinstance(entrada, zipfile.ZipInfo) else z.getinfo(entrada)
+    if origen is None:  # solo el nombre: el aviso no lleva rutas del PC
+        origen = Path(z.filename).name if z.filename else "zip"
+    if _demasiado_grande(origen, info):
+        raise EntradaDemasiadoGrande(f"{info.filename} ocupa {info.file_size // 2**20} MiB: no se lee")
+    try:
+        return z.read(info)
+    except (zipfile.BadZipFile, zlib.error, RuntimeError, NotImplementedError, EOFError, OSError) as e:
+        # CRC malo o datos rotos (BadZipFile, zlib.error), cifrada (RuntimeError), método raro (NotImplementedError)
+        DANADAS.add(f"{origen}!/{info.filename}")
+        raise EntradaIlegible(f"{info.filename}: no se pudo descomprimir ({e})") from e
 
 
 class Contenedor(Protocol):
@@ -27,15 +70,28 @@ class Contenedor(Protocol):
     def cerrar(self) -> None: ...
 
 
+def abrir_zip(fuente: str | Path | IO[bytes], nombre: str | None = None) -> zipfile.ZipFile:
+    """`zipfile.ZipFile(fuente)` para leer. Un zip que Python no sabe abrir (una «versión necesaria» rara en el
+    índice, cabeceras imposibles) lanza `EntradaIlegible`, como uno dañado: Java sí los carga, así que se saltan
+    con aviso en vez de parar el análisis."""
+    try:
+        return zipfile.ZipFile(fuente)
+    except (NotImplementedError, ValueError, EOFError, OverflowError) as e:
+        origen = nombre or (Path(fuente).name if isinstance(fuente, (str, Path)) else "zip")
+        DANADAS.add(origen)
+        raise EntradaIlegible(f"{origen}: no se pudo abrir ({e})") from e
+
+
 class Zip:
     def __init__(self, nombre: str, zf: zipfile.ZipFile) -> None:
         self._nombre = nombre
         self._zf = zf
-        self._nombres = [n for n in zf.namelist() if not n.endswith("/")]
+        # Lo que pasa el tope ni se ofrece: así ningún módulo intenta leerlo
+        self._nombres = [i.filename for i in zf.infolist() if not i.is_dir() and not _demasiado_grande(nombre, i)]
 
     @classmethod
     def abrir(cls, ruta: Path) -> Zip:
-        return cls(ruta.name, zipfile.ZipFile(ruta))
+        return cls(ruta.name, abrir_zip(ruta))
 
     @property
     def nombre(self) -> str:
@@ -45,7 +101,7 @@ class Zip:
         return self._nombres
 
     def leer(self, ruta: str) -> bytes:
-        return self._zf.read(ruta)
+        return leer_entrada(self._zf, ruta, self._nombre)
 
     def cerrar(self) -> None:
         self._zf.close()
@@ -147,7 +203,8 @@ def _anidados(padre: Zip, ruta_padre: str, nivel: int) -> Iterator[Zip]:
     for n in padre.nombres():
         if n.endswith(".jar") and (n.startswith(_CARPETAS_ANIDADAS) or n in declarados):
             try:
-                hijo = Zip(f"{ruta_padre}!/{n.rsplit('/', 1)[-1]}", zipfile.ZipFile(io.BytesIO(padre.leer(n))))
+                nombre_hijo = f"{ruta_padre}!/{n.rsplit('/', 1)[-1]}"
+                hijo = Zip(nombre_hijo, abrir_zip(io.BytesIO(padre.leer(n)), nombre_hijo))
             except (zipfile.BadZipFile, OSError, KeyError):
                 continue
             yield hijo

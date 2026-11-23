@@ -18,9 +18,12 @@ def leer(datos: bytes | str) -> dict[str, str]:
     """
     texto = datos.decode("utf-8-sig", errors="replace") if isinstance(datos, bytes) else datos.lstrip(BOM)
     try:
-        crudo: Any = json.loads(texto, strict=False)
-    except json.JSONDecodeError:
-        crudo = json5.loads(texto)
+        try:
+            crudo: Any = json.loads(texto, strict=False)
+        except json.JSONDecodeError:
+            crudo = json5.loads(texto)
+    except RecursionError as e:  # miles de niveles de anidamiento: se trata como un archivo roto
+        raise ValueError("Archivo de idioma con demasiados niveles de anidamiento") from e
     if not isinstance(crudo, dict):
         raise ValueError("El archivo de idioma no es un objeto JSON")
     return {str(k): v for k, v in cast(dict[str, object], crudo).items() if isinstance(v, str)}
