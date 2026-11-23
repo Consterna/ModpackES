@@ -7,7 +7,8 @@ Uso:  uv run python scripts/construir_exe.py               → dist/ModpackES-po
 Los dos salen de la versión en carpeta («onedir»), que arranca más rápido porque no se descomprime en cada inicio.
 No hay un .exe suelto: un .exe que se abre desde Descargas carga las DLL que alguien deje en esa carpeta (H-016).
 El instalador lo pone en su carpeta de programas, y el zip en la carpeta donde se extrae.
-El instalador necesita Inno Setup 6.3 o superior (ISCC.exe); la variable ISCC puede indicar dónde está.
+El instalador necesita Inno Setup 6.7 o superior (ISCC.exe); la variable ISCC puede indicar dónde está.
+Hace falta Python 3.13.16 o superior: las anteriores tienen una bomba de memoria en `zipfile` (CVE-2026-15310).
 """
 
 from __future__ import annotations
@@ -138,7 +139,15 @@ def instalador(icono: Path, version: Path, reusar: bool = False) -> int:
     return subprocess.run(comando, cwd=RAIZ, check=False).returncode
 
 
+#: La primera 3.13 sin CVE-2026-15310 (bomba de memoria en `zipfile` con miembros bzip2, LZMA o Zstandard)
+PYTHON_MINIMO = (3, 13, 16)
+
+
 def main(argv: list[str] | None = None) -> int:
+    if sys.version_info[:3] < PYTHON_MINIMO:
+        minimo = ".".join(map(str, PYTHON_MINIMO))
+        print(f"Hace falta Python {minimo} o superior para construir el programa (este es {sys.version.split()[0]}).")
+        return 2
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--instalador", action="store_true", help="construir el instalador en vez del portable")
     ap.add_argument("--reusar", action="store_true", help="usar la carpeta ya construida en build/onedir")

@@ -71,6 +71,7 @@ Estado: ✅ la app lo traduce · 🟡 en parte · ❌ no · ⛔ no se puede de f
 | KubeJS: tooltips, nombres, mensajes, JEI/REI/EMI info, comandos de chat | ✅ | API por versión en `formatos/kubejs_api.py` |
 | KubeJS: nombres de grupos de REI (`REIEvents.groupEntries`, `onEvent('rei.group')`) | ✅ | Solo el segundo argumento de `group*` (el primero es el id). Pedido aparte, con el tono de la interfaz, para no cambiar los lotes de los scripts. |
 | KubeJS Ponder (`scene.text`), `addAnnouncement`, `.respond`, `.append` | ❓ | por confirmar en el corpus |
+| KubeJS `withName`, `withCustomName`, `withLore` (nombre y descripción de un objeto en el script) | ❌ | **Se dejan a propósito (decidido el 23-11).** Cambian el NBT o los componentes del objeto. Si ese objeto se usa como ingrediente, como objeto que pide una tarea o en una comparación, traducir el nombre haría que el juego ya no lo reconozca, como pasaba con las tareas de FTB Quests (H-039). El script no dice para qué se usa cada uno. |
 | CraftTweaker (`.zs`) | ✅ | |
 
 ### Datos (datapacks)

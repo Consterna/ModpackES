@@ -297,7 +297,7 @@ uv sync
 uv run python scripts/verificar.py            # ruff, pyright estricto, compileall y pytest con cobertura
 uv run python scripts/verificar.py --rapido   # sin las pruebas de Java ni el corpus real
 uv run python scripts/construir_exe.py        # dist/ModpackES-portable.zip (carpeta del programa)
-uv run python scripts/construir_exe.py --instalador  # dist/ModpackES-instalador.exe (necesita Inno Setup 6.3+)
+uv run python scripts/construir_exe.py --instalador  # dist/ModpackES-instalador.exe (necesita Inno Setup 6.7+)
 uv run python scripts/probar_exe.py           # extrae el zip, arranca el .exe y analiza un modpack de prueba
 uv run python scripts/probar_exe.py --instalador  # instala en una carpeta temporal, prueba y desinstala
 ```
