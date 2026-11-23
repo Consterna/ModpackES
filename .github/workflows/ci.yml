@@ -100,14 +100,14 @@ jobs:
           path: ~/.gradle/wrapper/dists
           key: gradle-dists-${{ hashFiles('mod-runtime/*/gradle/wrapper/gradle-wrapper.properties') }}-${{ github.run_id }}
 
-      - name: Construir ModpackES.exe
+      - name: Construir la versión portable (zip con la carpeta del programa)
         run: uv run python scripts/construir_exe.py
 
-      - name: Probar el .exe
+      - name: Probar la versión portable (también con una DLL plantada al lado)
         run: uv run python scripts/probar_exe.py
 
-      - name: Construir el instalador (Inno Setup, viene en la imagen de windows-latest)
-        run: uv run python scripts/construir_exe.py --instalador
+      - name: Construir el instalador con la misma carpeta (Inno Setup, viene en la imagen de windows-latest)
+        run: uv run python scripts/construir_exe.py --instalador --reusar
 
       - name: Probar el instalador (instalar, usar y desinstalar)
         run: uv run python scripts/probar_exe.py --instalador
@@ -117,7 +117,7 @@ jobs:
         with:
           name: ModpackES-exe
           path: |
-            dist/ModpackES.exe
+            dist/ModpackES-portable.zip
             dist/ModpackES-instalador.exe
           if-no-files-found: error
           retention-days: 14

@@ -6,6 +6,14 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **La versión portable ahora es un `.zip` con la carpeta del programa** (`ModpackES-portable.zip`), en vez de un
+  `.exe` suelto. Un `.exe` que se abre desde Descargas carga ciertas DLL de esa carpeta antes que las de Windows, y
+  una página web puede dejar ahí una falsa. Extraído en su propia carpeta, eso ya no pasa. Es la misma carpeta que
+  instala el instalador, que sigue siendo la descarga recomendada. Además, el programa carga `dwmapi.dll` desde
+  System32 antes de abrir la ventana, así que una copia falsa junto al `.exe` tampoco se usa.
+
 ### Agregado
 
 - **Fuentes de texto que antes quedaban en inglés**, encontradas al auditar 47 modpacks reales (ver [docs/cobertura.md](docs/cobertura.md)). Cada una va en su propio módulo, después de los anteriores y sin alimentar el glosario, así que los pedidos de lo que ya se traducía no cambian. Las respuestas grabadas de los bancos de calidad dan exactamente lo mismo que antes.

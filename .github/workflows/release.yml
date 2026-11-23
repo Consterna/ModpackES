@@ -44,7 +44,7 @@ jobs:
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           github-artifact-id: ${{ needs.construir.outputs.artefacto }}
           wait-for-completion: true
-          output-artifact-directory: dist  # reemplaza el .exe sin firmar
+          output-artifact-directory: dist  # reemplaza el instalador y el zip por los firmados
 
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
 
@@ -57,7 +57,7 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: |
-            dist/ModpackES.exe
+            dist/ModpackES-portable.zip
             dist/ModpackES-instalador.exe
 
       - name: Notas de la versión (del CHANGELOG)
@@ -77,12 +77,13 @@ jobs:
             echo
             echo "- **ModpackES-instalador.exe** (recomendado): se instala para tu usuario, sin permisos de administrador,"
             echo "  crea el acceso en el menú Inicio y arranca más rápido."
-            echo "- **ModpackES.exe**: portable, de un solo archivo; no necesita instalación."
+            echo "- **ModpackES-portable.zip**: sin instalación. Extrae todo el zip y abre"
+            echo "  \`ModpackES/ModpackES.exe\` (no desde dentro del zip)."
             echo
             echo "SHA-256:"
             echo
             echo "\`\`\`"
-            (cd dist && sha256sum ModpackES-instalador.exe ModpackES.exe)
+            (cd dist && sha256sum ModpackES-instalador.exe ModpackES-portable.zip)
             echo "\`\`\`"
             echo
             echo "Para comprobar que el archivo lo construyó este repositorio en GitHub Actions:"
@@ -104,5 +105,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ETIQUETA: ${{ github.ref_name }}
         run: >-
-          gh release create "$ETIQUETA" dist/ModpackES-instalador.exe dist/ModpackES.exe dist/ModpackES-sbom.cdx.json
+          gh release create "$ETIQUETA" dist/ModpackES-instalador.exe dist/ModpackES-portable.zip dist/ModpackES-sbom.cdx.json
           --title "ModpackES ${ETIQUETA#v}" --notes-file notas.md --verify-tag

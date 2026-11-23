@@ -14,7 +14,7 @@ todos los mods, con un par de clics.
 ![Minecraft 1.7.10 a 26.x](https://img.shields.io/badge/Minecraft-1.7.10%20a%2026.x-62B47A)
 
 [**Descargar el instalador**](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES-instalador.exe)
-· [versión portable](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe)
+· [versión portable](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES-portable.zip)
 · [Cómo se usa](#cómo-se-usa) · [Preguntas frecuentes](#preguntas-frecuentes) · [Cambios](CHANGELOG.md)
 
 <picture>
@@ -68,8 +68,10 @@ dentro de los capítulos tienen un solo idioma y quedan con el español elegido.
 1. Descarga e instala
    [`ModpackES-instalador.exe`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES-instalador.exe):
    se instala solo para tu usuario, sin pedir permisos de administrador, y arranca más rápido. Si prefieres no
-   instalar nada, usa la versión portable
-   [`ModpackES.exe`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES.exe).
+   instalar nada, descarga la versión portable
+   [`ModpackES-portable.zip`](https://github.com/Consterna/ModpackES/releases/latest/download/ModpackES-portable.zip), extrae todo el zip y abre
+   `ModpackES/ModpackES.exe`. Viene en una carpeta, y no como un `.exe` suelto, por seguridad: un programa que se
+   abre desde Descargas puede cargar archivos que otro programa haya dejado ahí.
 2. Cierra Minecraft y abre ModpackES.
 3. Elige la instancia en la barra de la izquierda: cada tarjeta muestra la versión de Minecraft, el loader y
    si ya está traducida. Salen las de Prism Launcher, MultiMC, CurseForge, Modrinth, ATLauncher, GDLauncher y
@@ -130,7 +132,7 @@ del original (`%s`, `§a`, `$(l)`…), no se guarda, para que no rompa el juego.
 > El ejecutable no tiene firma digital, así que la primera vez Windows SmartScreen puede avisar. Pulsa
 > «Más información» → «Ejecutar de todas formas». Puedes comprobar el archivo con el SHA-256 que viene en la
 > página de cada versión, o con `gh attestation verify ModpackES-instalador.exe -R Consterna/ModpackES` (o
-> `ModpackES.exe`), que confirma que lo construyó este repositorio en GitHub Actions.
+> `ModpackES-portable.zip`), que confirma que lo construyó este repositorio en GitHub Actions.
 
 ## Motores
 
@@ -294,9 +296,9 @@ del juego, un JDK 17 o superior (sirve el de Prism Launcher).
 uv sync
 uv run python scripts/verificar.py            # ruff, pyright estricto, compileall y pytest con cobertura
 uv run python scripts/verificar.py --rapido   # sin las pruebas de Java ni el corpus real
-uv run python scripts/construir_exe.py        # dist/ModpackES.exe (portable)
+uv run python scripts/construir_exe.py        # dist/ModpackES-portable.zip (carpeta del programa)
 uv run python scripts/construir_exe.py --instalador  # dist/ModpackES-instalador.exe (necesita Inno Setup 6.3+)
-uv run python scripts/probar_exe.py           # arranca el .exe y analiza un modpack de prueba
+uv run python scripts/probar_exe.py           # extrae el zip, arranca el .exe y analiza un modpack de prueba
 uv run python scripts/probar_exe.py --instalador  # instala en una carpeta temporal, prueba y desinstala
 ```
 
