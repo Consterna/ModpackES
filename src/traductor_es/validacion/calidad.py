@@ -23,6 +23,27 @@ _ESPANOL = frozenset({
     "al", "lo", "como", "más", "o", "tu", "puedes", "este", "esta",
 })  # fmt: skip
 _MARCADOR = re.compile(r"⟦\d+⟧")
+#: Lo que no es una palabra suelta del texto aunque la contenga: macros de Patchouli con ruta
+#: («$(l:tools/fire_rod)»), ids y etiquetas («minecraft:golden_axe», «#forge:seeds»), nombres con guion bajo
+#: («import_rewards_from_chest»), comandos y enlaces. El glosario no entra ahí: «fire» no es «Fuego» en una ruta.
+_IDENTIFICADOR = re.compile(
+    r"\$\([^)]*\)"
+    r"|https?://[^\s)\]}>\"']+"
+    r"|#?\b[a-z0-9_.-]+:[A-Za-z0-9_./-]*[A-Za-z0-9_/]"  # la ruta con mayúsculas: un id ya alterado («ns:Cofre»)
+    r"|[^\W_]+(?:_[^\W_]+)+"
+    r"|(?<![\w/:.])/[a-z][a-z0-9_]*"
+)
+
+
+def sin_identificadores(texto: str) -> str:
+    """El texto con los identificadores cambiados por espacios del mismo largo (las posiciones no cambian)."""
+    return _IDENTIFICADOR.sub(lambda m: " " * len(m.group(0)), texto)
+
+
+def _fuera_de_identificadores(libre: str, m: re.Match[str]) -> bool:
+    """La coincidencia `m` (buscada en el texto completo) no toca ningún identificador; `libre` es ese texto pasado
+    por `sin_identificadores`."""
+    return libre[m.start() : m.end()] == m.group(0)
 
 
 def _palabras(texto: str) -> list[str]:
@@ -160,7 +181,9 @@ def terminos_faltantes(
     `ambiguos` (una palabra que en minúscula tiene otro sentido, como «lead» en «lead the way») solo se exige si el
     original lo usa como nombre.
     """
-    original = sin_formato(original)  # «&4Arachnarch»: el código pegado no deja ver la palabra
+    # «&4Arachnarch»: el código pegado no deja ver la palabra; «$(l:tools/fire_rod)» no lleva el término «Fire»
+    original = sin_identificadores(sin_formato(original))
+    traduccion = sin_identificadores(traduccion)  # el término dentro de un id de la traducción tampoco cuenta
     minusculas = original.casefold()
     faltan: dict[str, str] = {}
     # Los más largos primero: lo que ya cubrió un término largo («Item Frame») no se exige otra vez como
@@ -198,14 +221,17 @@ def ajustar_mayusculas(original: str, traduccion: str, glosario: Mapping[str, st
     («Lingote de hierro») tampoco: en medio de una frase en español va en minúscula; solo se respetan los que el
     glosario escribe como nombre propio («Caballeros de la Muerte», «Fluix»).
     """
-    original = sin_formato(original)
+    original = sin_identificadores(sin_formato(original))
     for ingles, esperado in sorted(glosario.items(), key=lambda par: -len(par[1])):
         if not _escrito_como_nombre_propio(esperado) or not es_nombre_propio_en(ingles, original):
             continue
+        libre = sin_identificadores(traduccion)
 
-        def corregir(m: re.Match[str], esperado: str = esperado) -> str:
+        def corregir(m: re.Match[str], esperado: str = esperado, libre: str = libre) -> str:
             hallado = m.group(0)
-            return hallado if hallado.isupper() and len(hallado) > 1 else esperado
+            if not _fuera_de_identificadores(libre, m) or (hallado.isupper() and len(hallado) > 1):
+                return hallado
+            return esperado
 
         traduccion = _patron_palabra(esperado, re.IGNORECASE).sub(corregir, traduccion)
     return traduccion
@@ -286,8 +312,10 @@ def _reemplazar_con_articulo(traduccion: str, patron: re.Pattern[str], esperado:
     """Cambia cada aparición por `esperado` y ajusta el artículo de delante a su género («el Wrench» → «la Llave»).
 
     None si no aparece o si hay un artículo delante y no se sabe el género: mejor avisar que dejar «el Llave».
+    Lo que está dentro de un identificador («minecraft:chest», «$(l:tools/fire_rod)») no cuenta.
     """
-    apariciones = list(patron.finditer(traduccion))
+    libre = sin_identificadores(traduccion)
+    apariciones = [m for m in patron.finditer(traduccion) if _fuera_de_identificadores(libre, m)]
     if not apariciones:
         return None
     nuevo_genero = genero(esperado)
