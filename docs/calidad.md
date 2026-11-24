@@ -606,6 +606,45 @@ actual (60 de interfaz, 50 de misiones y 40 de libros) en tres pasos:
 **Conclusión:** con Gemini 3.8 Flash, lo que queda por mejorar es del modelo. Para subir más la calidad, el camino es
 un modelo más fuerte, o la revisión de una persona en los textos que la app ya marca como dudosos.
 
+## 23 de noviembre de 2026 · un modpack real contra su traducción de hace tres semanas
+
+Los bancos miden textos sueltos. Para ver el efecto de todo lo hecho desde la 2.0.0 en un pack completo, se volvió a
+traducir Farming Crossing 4 (Forge 1.20.1) con la 2.3.1. Se usó Gemini 3.8 Flash con el perfil equilibrado, unos
+US$ 2,47. Se comparó texto por texto con la traducción del 3 de noviembre, hecha con el mismo modelo y la 2.0.0.
+
+- **Forma:** todo lo escrito pasa los lectores reales del juego (3004 JSON con Gson, 18 archivos de misiones con FTB
+  Library y 28 scripts con `node --check`). En los textos de mods quedan menos traducciones iguales al inglés (504
+  contra 690) y ningún código de formato cambiado (antes, 9). También se traducen fuentes que antes no se leían:
+  shaders, textos del loader, datapacks y tips.
+- **Preferencia a ciegas** (Gemini 3.1 Pro como juez, cada par en los dos órdenes, sobre textos al azar que cambiaron):
+
+| Grupo | Gana la 2.3.1 | Gana la 2.0.0 | Empate o juez inconsistente | p |
+|---|---|---|---|---|
+| Interfaz de mods (80 textos) | 25 | 42 | 13 | 0,05 |
+| Misiones (42 textos) | 16 | 13 | 13 | 0,71 |
+
+En la interfaz, el juez prefirió la traducción vieja, y leyendo los 80 pares se ve por qué. Casi todo son sinónimos
+(«Caja» o «Cajón», «Cecina» o «Tasajo»), pero aparecieron errores del proceso, no del modelo:
+
+- **El arreglo de términos que quedaron en inglés entraba en los identificadores.** Su búsqueda de palabras toma `_`,
+  `:` y `/` como separadores y trabajaba sobre el texto con los códigos ya restaurados. Así, «fire» se volvía «Fuego»
+  dentro de `$(l:tools/fire_rod)`, y el enlace del libro de Botania quedaba roto. Pasó también en
+  `import_rewards_from_chest`, `minecraft:golden_axe`, `#forge:seeds` y en el prefijo `<Stick_God>` de un datapack:
+  16 textos en el pack. **Corregido:** la detección y el reemplazo ignoran las macros de Patchouli, los ids, las
+  etiquetas, los nombres con guion bajo, los comandos y los enlaces (`calidad.sin_identificadores`). Con las
+  respuestas grabadas, los tres bancos dan lo mismo que antes, porque no tenían ningún caso así.
+- **Términos de una palabra con dos sentidos en el juego.** «Chicken Nugget» salió como «Nugget de gallina», porque el
+  juego llama «Gallina» a la criatura y «Pollo» a la comida, y «Key: %s» salió como «Llave: %s». Sigue pendiente.
+
+El modelo también tradujo argumentos de comandos que el jugador tiene que escribir: `/trigger as_help` quedó como
+`/trigger como_ayuda`. Eso se arregló en el pack con una corrección del usuario. La máscara protege el comando,
+pero no sus argumentos.
+
+**Conclusión:** la conclusión del 18 de noviembre valía para los bancos, no para un pack entero. Un pack real tiene
+casos que los bancos no traen, como rutas dentro del texto, comandos o nombres de datapacks, y ahí todavía había
+errores del proceso. Antes de decir que una versión traduce mejor, conviene comparar a ciegas contra la traducción
+anterior de un pack real.
+
 ## Cómo repetirlo
 
 ```
