@@ -339,3 +339,61 @@ def test_los_codigos_de_color_pegados_no_esconden_un_termino() -> None:
     g = Glosario()
     g.descubrir(glosario)
     assert g.relevantes([original]) == glosario
+
+
+# ------------------------------------------------------------------ identificadores
+# Casos reales de Farming Crossing 4 (2026-11-23): el arreglo de términos que quedaron en inglés tomaba «_», «:» y
+# «/» como separadores y metía el glosario dentro de rutas, ids y comandos. Dos enlaces del libro de Botania
+# quedaban rotos.
+
+
+def test_no_cambia_terminos_dentro_de_un_enlace_de_patchouli() -> None:
+    original = "Interacts with the $(l:devices/forest_drum)$(item)Drum of the Wild$(0)$(/l)."
+    traduccion = "Interactúa con el $(l:devices/forest_drum)$(item)Tambor de lo salvaje$(0)$(/l)."
+    glosario = {"Forest": "Bosque"}
+    assert terminos_faltantes(original, traduccion, glosario) == {}
+    assert reemplazar_en_ingles(traduccion, glosario, original) == (traduccion, glosario)
+
+
+def test_no_cambia_terminos_dentro_de_ids_ni_etiquetas() -> None:
+    for original, traduccion, glosario in (
+        ("For example 'minecraft:golden_axe,minecraft:stone'", "Por ejemplo: 'minecraft:golden_axe,minecraft:stone'",
+         {"Axe": "Hacha", "Stone": "Piedra"}),
+        ("Any #forge:seeds", "Cualquier #forge:seeds", {"Seeds": "Semillas"}),
+        ("Tags names, such as 'forge:cobblestone'", "Nombres de etiquetas, como 'forge:cobblestone'",
+         {"Cobblestone": "Piedra labrada"}),
+    ):  # fmt: skip
+        assert terminos_faltantes(original, traduccion, glosario) == {}, original
+        final, _ = reemplazar_en_ingles(traduccion, glosario, original)
+        assert final == traduccion, original
+
+
+def test_no_cambia_terminos_dentro_de_un_nombre_con_guion_bajo() -> None:
+    original = "/ftbquests import_rewards_from_chest <reward_table>"
+    traduccion = "/ftbquests import_rewards_from_chest <tabla_de_recompensas>"
+    assert terminos_faltantes(original, traduccion, {"Chest": "Cofre"}) == {}
+    assert reemplazar_en_ingles(traduccion, {"Chest": "Cofre"})[0] == traduccion
+
+
+def test_fuera_de_los_identificadores_si_cambia_el_termino() -> None:
+    original = "Put the Chest next to minecraft:chest"
+    final, siguen = reemplazar_en_ingles("Pon el Chest junto a minecraft:chest", {"Chest": "Cofre"}, original)
+    assert final == "Pon el Cofre junto a minecraft:chest"
+    assert siguen == {}
+
+
+def test_las_mayusculas_no_entran_en_un_identificador() -> None:
+    glosario = {"Fluix": "Fluix"}
+    original = "Craft some Fluix crystals (ae2:fluix_crystal)"
+    assert ajustar_mayusculas(original, "Fabrica cristales de fluix (ae2:fluix_crystal)", glosario) == (
+        "Fabrica cristales de Fluix (ae2:fluix_crystal)"
+    )
+
+
+def test_el_reintento_no_rompe_un_enlace_de_patchouli() -> None:
+    glosario = Glosario()
+    glosario.fijar({"Fire": "Fuego", "Rod of the Hells": "Vara de los infiernos"})
+    original = "Try the $(l:tools/fire_rod)$(item)Rod of the Hells$(0)$(/l)."
+    motor = _Guion("Prueba la ⟦0⟧⟦1⟧Vara de los infiernos⟦2⟧⟦3⟧.")  # el motor ve los códigos como marcadores
+    traducciones, _ = _traducir(motor, glosario, original)
+    assert traducciones[original] == "Prueba la $(l:tools/fire_rod)$(item)Vara de los infiernos$(0)$(/l)."

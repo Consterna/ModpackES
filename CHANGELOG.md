@@ -6,6 +6,19 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+### Corregido
+
+- **El glosario ya no entra en rutas, ids ni comandos.** El arreglo automático de los términos que el modelo dejó en
+  inglés los buscaba también dentro de identificadores, porque tomaba `_`, `:` y `/` como separadores de palabras.
+  Así, en un libro de Botania, «fire» se volvía «Fuego» dentro del enlace `$(l:tools/fire_rod)` y el enlace quedaba
+  roto. Pasaba también con `minecraft:golden_axe` (que salía `minecraft:golden_Hacha`), `#forge:seeds`,
+  `import_rewards_from_chest` y nombres como `<Stick_God>`. Ahora la búsqueda y el reemplazo dejan fuera las macros de
+  Patchouli, los ids y etiquetas, los nombres con guion bajo, los comandos y los enlaces. Lo encontró la comparación de
+  Farming Crossing 4 con su traducción anterior (ver [docs/calidad.md](docs/calidad.md)). Las traducciones ya
+  guardadas con un enlace o un id dañado se vuelven a pedir solas en la próxima traducción, porque no conservan sus
+  códigos. Las de un nombre con guion bajo (`import_rewards_from_Cofre`) hay que corregirlas en
+  «Más ▸ Correcciones…».
+
 ## [2.3.1] - 2026-11-23
 
 ### Cambiado
