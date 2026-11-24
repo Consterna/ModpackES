@@ -29,7 +29,7 @@ _MARCADOR = re.compile(r"⟦\d+⟧")
 _IDENTIFICADOR = re.compile(
     r"\$\([^)]*\)"
     r"|https?://[^\s)\]}>\"']+"
-    r"|#?\b[a-z0-9_.-]+:[a-z0-9_./-]*[a-z0-9_/]"
+    r"|#?\b[a-z0-9_.-]+:[A-Za-z0-9_./-]*[A-Za-z0-9_/]"  # la ruta con mayúsculas: un id ya alterado («ns:Cofre»)
     r"|[^\W_]+(?:_[^\W_]+)+"
     r"|(?<![\w/:.])/[a-z][a-z0-9_]*"
 )
@@ -183,6 +183,7 @@ def terminos_faltantes(
     """
     # «&4Arachnarch»: el código pegado no deja ver la palabra; «$(l:tools/fire_rod)» no lleva el término «Fire»
     original = sin_identificadores(sin_formato(original))
+    traduccion = sin_identificadores(traduccion)  # el término dentro de un id de la traducción tampoco cuenta
     minusculas = original.casefold()
     faltan: dict[str, str] = {}
     # Los más largos primero: lo que ya cubrió un término largo («Item Frame») no se exige otra vez como

@@ -397,3 +397,12 @@ def test_el_reintento_no_rompe_un_enlace_de_patchouli() -> None:
     motor = _Guion("Prueba la ⟦0⟧⟦1⟧Vara de los infiernos⟦2⟧⟦3⟧.")  # el motor ve los códigos como marcadores
     traducciones, _ = _traducir(motor, glosario, original)
     assert traducciones[original] == "Prueba la $(l:tools/fire_rod)$(item)Vara de los infiernos$(0)$(/l)."
+
+
+def test_un_termino_que_solo_esta_en_un_identificador_de_la_traduccion_falta() -> None:
+    # El término está en la frase del original; en la traducción solo aparece dentro de un id (también alterado)
+    glosario = {"Chest": "Cofre"}
+    original = "Put the Chest next to minecraft:chest"
+    for traduccion in ("Pon el bloque junto a minecraft:cofre", "Pon el bloque junto a minecraft:Cofre"):
+        assert terminos_faltantes(original, traduccion, glosario) == glosario, traduccion
+    assert terminos_faltantes(original, "Pon el Cofre junto a minecraft:chest", glosario) == {}
