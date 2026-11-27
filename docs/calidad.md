@@ -677,6 +677,28 @@ título, que para un término ambiguo normal sí basta) el modelo decide por con
   opción para ordenar las teclas, y `mobz` dejó de armar «Foca Llave» (mal compuesto) a partir de «Seal Key».
 - `scripts/verificar.py` completo (pruebas, Java, corpus) y la puerta de calidad, en verde.
 
+## 27 de noviembre de 2026 · rendimiento: medido, sin una mejora clara de bajo riesgo
+
+El usuario pidió que la Fase 5 del ciclo de estabilización también mirara el rendimiento, no solo seguridad. No
+había ningún cuello de botella documentado antes de esto.
+
+**Medido:** `Proceso.analizar()` (el escaneo sin API que corre cada vez que se abre un modpack) sobre `ftb-130`
+del corpus de auditoría (13 973 archivos que la app termina escribiendo): **84 s**, con un pico de **448 MB** de
+memoria (82 MB en uso normal). Con `cProfile` el tiempo propio más alto aparecía en el analizador de `json5`
+(`formatos/lang_json.py`, el `json.loads` de respaldo cuando el JSON estricto falla), pero instrumentando
+`lang_json.leer` directamente (sin `cProfile`, que agrega mucho costo por llamada a un analizador recursivo con
+millones de llamadas chicas) el respaldo de `json5` solo se usó **6 veces en todo el pack** (4,1 s en total,
+incluidos 4 de los 7 idiomas oficiales de España/Latinoamérica del propio juego, que necesitan el analizador
+permisivo igual que los mods: ver el comentario de `lang_json.leer`). El resto del tiempo no se concentra en un
+punto claro: abrir cada jar (`zipfile._RealGetContents`, 554 llamadas) y las expresiones regulares de formato son
+los siguientes más pesados, pero ninguno destaca como una sola causa evitable sin cambiar de enfoque (otro
+analizador JSON5, leer los jars de otra forma), que es más que un arreglo chico y de bajo riesgo.
+
+**Conclusión:** no se encontró una mejora de bajo riesgo; no bloquea el cierre del ciclo, como preveía el plan.
+Si se quiere perseguir esto más adelante, conviene un perfilador por muestreo (`py-spy`), no `cProfile`, porque
+el costo por llamada de `cProfile` infla mucho las funciones con muchísimas llamadas chicas (como el analizador
+de `json5`) y puede señalar la causa equivocada.
+
 ## Cómo repetirlo
 
 ```
