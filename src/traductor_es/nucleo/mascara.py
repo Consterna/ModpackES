@@ -37,6 +37,12 @@ _PATRONES: Final[tuple[str, ...]] = (
     r"[\n\r\t]",  # saltos reales
     r"(?<![\w/:.])/[a-z][a-z0-9_]*",  # comandos como /home o /tpa
     r"\b[a-z0-9_.-]+:[a-z0-9_./-]*[a-z0-9_/]",  # ids de recursos: minecraft:stone, create:item/x
+    # Un nombre con guion bajo («as_help», un objetivo de /trigger) no es una palabra suelta: el inglés no los
+    # escribe así. Sin esto, el argumento de un comando que no es tellraw/title/say queda expuesto y se traduce
+    # («/trigger as_help» → «/trigger como_ayuda», visto en Farming Crossing 4: ver docs/calidad.md). La misma
+    # idea ya protegía esto después de traducir (`validacion.calidad._IDENTIFICADOR`); aquí evita que llegue así
+    # al modelo.
+    r"[^\W_]+(?:_[^\W_]+)+",
 )
 PROTEGER: Final = re.compile("|".join(f"(?:{p})" for p in _PATRONES))
 TOKEN: Final = re.compile(r"⟦(\d+)⟧")

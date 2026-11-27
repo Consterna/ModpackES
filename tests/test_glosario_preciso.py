@@ -69,6 +69,57 @@ def test_el_motor_no_recibe_el_termino_si_tiene_otro_sentido() -> None:
     assert g.relevantes(["The fire spreads"]) == {"Fire": "Fuego"}
 
 
+def test_un_homonimo_del_juego_solo_se_ofrece_si_el_texto_es_la_palabra_sola() -> None:
+    """«Chicken» es la Gallina (criatura) y el Pollo (comida): ninguno de los dos sentidos sale en minúscula («Raw
+    Chicken», «Cooked Chicken» van en estilo título), así que `ambiguo` no lo detecta (es la misma señal que
+    `test_una_palabra_con_otro_sentido_en_minuscula_es_ambigua`, y no se tocó: generalizarla a todo el glosario
+    marcaba cientos de términos de mods como ambiguos, medido con `scripts/auditoria/puerta_calidad.py`). Por eso
+    `HOMONIMOS_DEL_JUEGO` es aparte, y a propósito más estricto que un término ambiguo normal: ni siquiera «Breed
+    the Chicken» lo confirma, porque un estilo título («Chicken Nugget») tampoco dice cuál de los dos sentidos es.
+    Caso real de Farming Crossing 4 (ver docs/calidad.md): «Chicken Nugget» salía como «Nugget de Gallina»."""
+    g = Glosario()
+    g.agregar_pares(
+        {"entidad": "Chicken", "crudo": "Raw Chicken", "cocido": "Cooked Chicken"},
+        {"entidad": "Gallina", "crudo": "Pollo crudo", "cocido": "Pollo asado"},
+        fuente="minecraft",
+        oficial=True,
+    )
+    assert not g.ambiguo("Chicken")  # la señal general no lo detecta: ver el docstring
+    assert "Chicken" not in g.relevantes(["Chicken Nugget"])
+    assert "Chicken" not in g.relevantes(["Breed the Chicken to get feathers"])
+    assert g.relevantes(["Chicken"]) == {"Chicken": "Gallina"}  # solo, sigue siendo la criatura
+
+
+def test_key_es_otro_homonimo_del_juego() -> None:
+    """«Key» es el objeto («Llave») o la tecla del teclado («Tecla»). Caso real de Farming Crossing 4
+    (ver docs/calidad.md): «Backspace Key:» salía como «Llave Retroceso:» en vez de «Tecla Retroceso:»."""
+    g = Glosario()
+    g.agregar_pares({"objeto": "Key"}, {"objeto": "Llave"}, fuente="create", oficial=True)
+    assert not g.ambiguo("Key")
+    assert "Key" not in g.relevantes(["Backspace Key:"])
+    assert "Key" not in g.relevantes(["Config Key"])
+    assert g.relevantes(["Key"]) == {"Key": "Llave"}  # sola, sigue siendo el objeto
+
+
+def test_un_homonimo_no_se_filtra_a_todo_el_lote_por_otro_texto_suelto() -> None:
+    """Si un lote trae «Chicken» suelto junto con «Chicken Nugget», `relevantes` da un único diccionario para todo
+    el lote: ofrecer la pista solo porque «Chicken» es la palabra sola filtraría igual al Nugget, que comparte la
+    misma pista. Hallado en la revisión del PR #56 (Codex)."""
+    g = Glosario()
+    g.agregar_pares({"entidad": "Chicken"}, {"entidad": "Gallina"}, fuente="minecraft", oficial=True)
+    assert "Chicken" not in g.relevantes(["Chicken", "Chicken Nugget"])
+    assert g.relevantes(["Chicken", "Ground Beef"]) == {"Chicken": "Gallina"}  # sin otro texto que lo contradiga
+
+
+def test_un_homonimo_fijado_por_el_usuario_manda_siempre() -> None:
+    """Lo del usuario (`fijar`) manda incluso sobre `HOMONIMOS_DEL_JUEGO`: si decidió que «Chicken» es siempre
+    «Pollo», no hay dos sentidos que desambiguar. Hallado en la revisión del PR #56 (Codex)."""
+    g = Glosario()
+    g.agregar_pares({"entidad": "Chicken"}, {"entidad": "Gallina"}, fuente="minecraft", oficial=True)
+    g.fijar({"Chicken": "Pollo"})
+    assert g.relevantes(["Chicken Nugget"]) == {"Chicken": "Pollo"}
+
+
 def test_no_se_usan_las_traducciones_a_medias_de_un_mod() -> None:
     g = _glosario()
     g.agregar_pares(

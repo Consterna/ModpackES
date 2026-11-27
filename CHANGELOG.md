@@ -18,6 +18,18 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   guardadas con un enlace o un id dañado se vuelven a pedir solas en la próxima traducción, porque no conservan sus
   códigos. Las de un nombre con guion bajo (`import_rewards_from_Cofre`) hay que corregirlas en
   «Más ▸ Correcciones…».
+- **«Chicken» y «Key» ya no fuerzan un solo sentido.** El glosario los ofrecía como pista («Gallina», «Llave») para
+  cualquier texto que los contuviera, aunque el juego los traduce distinto según el contexto: «Chicken» es la
+  criatura o la comida, y «Key» es el objeto o la tecla del teclado. Así, «Chicken Nugget» salía como «Nugget de
+  Gallina» y «Backspace Key:» como «Llave Retroceso:». Ahora esos dos términos solo se exigen cuando el texto es
+  exactamente la palabra sola; el resto de las veces el modelo decide por contexto. Verificado con los textos
+  reales de Farming Crossing 4 (ver [docs/calidad.md](docs/calidad.md)) y con el mod `controlling` (atajos de
+  teclado) y `mobz` (que armaba «Foca Llave» en vez de dejar decidir al modelo) del corpus de auditoría.
+- **La máscara ya protege los nombres con guion bajo antes de traducir, no solo después.** Un argumento de comando
+  que no es `tellraw`/`title`/`say` (como el objetivo de `/trigger`) quedaba expuesto al modelo, que lo traducía
+  como si fuera una frase: `/trigger as_help` salía `/trigger como_ayuda`. Visto también en un libro con una ruta
+  de configuración (`liquified_experience.preferred_fluid`) y en una misión con un id de ítem (`barcode_reader`)
+  del corpus de auditoría.
 
 ## [2.3.1] - 2026-11-23
 

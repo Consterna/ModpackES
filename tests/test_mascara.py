@@ -29,6 +29,7 @@ CODIGOS = [
     "/home",
     "minecraft:stone",
     "create:item/wrench",
+    "as_help",
     ESCAPE_CRUDO + "t",
 ]
 
@@ -40,6 +41,16 @@ def test_cada_codigo_se_protege_y_vuelve_igual() -> None:
         assert codigo not in m.texto or codigo in ("{0}",), codigo  # el código no llega al traductor
         assert m.tokens, codigo
         assert desenmascarar(m.texto, m.tokens) == texto
+
+
+def test_el_argumento_de_un_comando_que_no_es_tellraw_no_se_traduce() -> None:
+    """Caso real de Farming Crossing 4 (ver docs/calidad.md): la máscara protegía «/trigger» pero no «as_help», y
+    el modelo lo tradujo como si fuera una palabra suelta («/trigger as_help» → «/trigger como_ayuda»)."""
+    texto = "Para pedir ayuda, escribe /trigger as_help en el chat."
+    m = enmascarar(texto)
+    assert "as_help" not in m.texto
+    assert "/trigger" not in m.texto
+    assert desenmascarar(m.texto, m.tokens) == texto
 
 
 def test_porcentaje_normal_y_barras_no_se_protegen() -> None:
