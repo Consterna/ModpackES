@@ -170,6 +170,21 @@ def uso_como_nombre(termino: str, original: str) -> bool:
     return False
 
 
+#: Términos de una palabra donde el propio juego usa un sentido distinto según el contexto, y ninguno de los dos
+#: sale en minúscula ni en estilo normal (ver docs/calidad.md, Farming Crossing 4): «Chicken» es la criatura
+#: («Gallina») o la comida («Pollo»: «Chicken Nugget» salía como «Nugget de Gallina»); «Key» es el objeto
+#: («Llave») o la tecla del teclado («Tecla»: «Backspace Key:» salía como «Llave Retroceso:»). No entran en
+#: `uso_como_nombre`: ahí el estilo título sí confirma el nombre («Lead Block»), y tocar esa regla para todos los
+#: términos ambiguos cambiaba casi todas las pistas que se mandan al motor (medido con
+#: `scripts/auditoria/puerta_calidad.py`). Esta lista es aparte y solo exige el término cuando el texto es
+#: exactamente la palabra sola, sin ese atajo.
+HOMONIMOS_DEL_JUEGO = frozenset({"chicken", "key"})
+
+
+def _es_solo_el_termino(termino: str, original: str) -> bool:
+    return sin_formato(original).strip(" .:!?¡¿\"'").casefold() == termino.casefold()
+
+
 def terminos_faltantes(
     original: str, traduccion: str, glosario: Mapping[str, str], ambiguos: Container[str] = frozenset()
 ) -> dict[str, str]:
@@ -179,7 +194,8 @@ def terminos_faltantes(
     de estilo. Un término que queda igual en los dos idiomas («Creeper», un jefe, un mod) solo se exige cuando
     el original lo escribe como nombre propio: así no se obliga a dejar en inglés una palabra común. Un término de
     `ambiguos` (una palabra que en minúscula tiene otro sentido, como «lead» en «lead the way») solo se exige si el
-    original lo usa como nombre.
+    original lo usa como nombre. Uno de `HOMONIMOS_DEL_JUEGO` (como «Chicken») solo se exige si el original es
+    exactamente esa palabra: el juego la traduce distinto en la criatura y en la comida.
     """
     # «&4Arachnarch»: el código pegado no deja ver la palabra; «$(l:tools/fire_rod)» no lleva el término «Fire»
     original = sin_identificadores(sin_formato(original))
@@ -196,6 +212,8 @@ def terminos_faltantes(
             continue
         minusculas = patron.sub(lambda m: " " * len(m.group(0)), minusculas)
         if ingles in ambiguos and not uso_como_nombre(ingles, original):
+            continue
+        if ingles.casefold() in HOMONIMOS_DEL_JUEGO and not _es_solo_el_termino(ingles, original):
             continue
         if _sin_tildes(ingles) == _sin_tildes(esperado) and not _con_mayuscula(ingles, original):
             continue

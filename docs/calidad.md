@@ -645,6 +645,38 @@ casos que los bancos no traen, como rutas dentro del texto, comandos o nombres d
 errores del proceso. Antes de decir que una versión traduce mejor, conviene comparar a ciegas contra la traducción
 anterior de un pack real.
 
+## 27 de noviembre de 2026 · Chicken y Key: cerrados los dos pendientes de la retraducción de FC4
+
+La comparación del 23 de noviembre dejó dos cosas pendientes: el glosario fuerza un solo sentido de «Chicken»
+(Gallina, la criatura) y de «Key» (Llave, el objeto) aunque el juego los traduce distinto según el contexto
+(Pollo la comida, Tecla del teclado). No salen en minúscula en ningún lado, así que la señal de ambigüedad por
+prosa (`Glosario.aprender_usos`, ver el 15 de noviembre) no los detecta.
+
+**Primer intento, descartado:** una señal general, comparando cada término de una palabra contra los demás
+términos del glosario que lo tienen como palabra completa («Chicken» contra «Raw Chicken», «Cooked Chicken»).
+Medido con `scripts/auditoria/puerta_calidad.py`, cambiaba las pistas de **399 de 399** textos del banco
+`ui_final_contexto`: con miles de términos de mods (muchos traducidos por el motor, no por el juego), una
+traducción algo distinta de la misma palabra es normal y no señala una ambigüedad real. Descartado por el riesgo
+de regresión, no por el resultado puntual.
+
+**Lo que quedó:** una lista corta y a mano, `calidad.HOMONIMOS_DEL_JUEGO` (hoy «chicken» y «key»), que solo exige
+el término cuando el texto es exactamente la palabra sola; en cualquier otro caso (incluido un nombre en estilo
+título, que para un término ambiguo normal sí basta) el modelo decide por contexto, sin la pista. No se tocó
+`uso_como_nombre` ni la ambigüedad por prosa: con la lista aparte, los bancos dieron idéntico a la línea base.
+
+**Verificado con datos reales, no solo con los bancos:**
+
+- La memoria de la retraducción del 23 de noviembre tenía **61 textos de «Chicken»** en Farming Crossing 4 con
+  «Gallina» en vez de «Pollo» («Chicken Nugget» → «Nugget de Gallina», «Chicken Curry» → «Curry de Gallina»…).
+  Se volvieron a traducir 54 de ellos con el modelo real y el código actual: **46 salieron con «Pollo»**; de los
+  8 que siguen con «Gallina», ninguno es un error — «Huevo de gallina» es el término correcto del juego, «Butchers
+  Feed Chickens» es sobre la criatura (un oficio que alimenta gallinas) y «Chicken Nest»/«Chicken Head» son
+  sombreros de fiesta donde «gallina» es una lectura tan válida como «pollo».
+- `scripts/auditoria/foto_corpus.py` sobre los 14 packs representativos encontró, con el arreglo de «Key»,
+  3 mods reales que cambian: `controlling` (un mod de atajos de teclado) dejó de forzar «Llave A->Z» en la
+  opción para ordenar las teclas, y `mobz` dejó de armar «Foca Llave» (mal compuesto) a partir de «Seal Key».
+- `scripts/verificar.py` completo (pruebas, Java, corpus) y la puerta de calidad, en verde.
+
 ## Cómo repetirlo
 
 ```

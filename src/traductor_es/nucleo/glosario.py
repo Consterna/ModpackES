@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
-from ..validacion.calidad import PALABRA, patron_de_termino, sale_el_termino, uso_como_nombre
+from ..validacion.calidad import HOMONIMOS_DEL_JUEGO, PALABRA, patron_de_termino, sale_el_termino, uso_como_nombre
 from .mascara import es_traducible, sin_formato
 
 _MAX_LARGO = 48
@@ -243,6 +243,19 @@ class Glosario:
             self._por_palabra = None
         return orden
 
+    def _sin_confirmar(self, original: str, textos: Iterable[str]) -> bool:
+        """¿Hay que no ofrecer `original` como pista para estos textos?
+
+        Un término ambiguo por prosa (ver `ambiguo`) solo se ofrece si algún texto lo usa como nombre. Uno de
+        `HOMONIMOS_DEL_JUEGO` (como «Chicken»: ver docs/calidad.md) es más estricto a propósito: solo se ofrece si
+        algún texto es exactamente esa palabra, porque un nombre en estilo título («Chicken Nugget») no dice cuál
+        de los dos sentidos del juego es.
+        """
+        if original.casefold() in HOMONIMOS_DEL_JUEGO:
+            esperado = original.casefold()
+            return not any(sin_formato(t).strip(" .:!?¡¿\"'").casefold() == esperado for t in textos)
+        return self.ambiguo(original) and not any(uso_como_nombre(original, t) for t in textos)
+
     def oficial(self, texto: str) -> str | None:
         """El nombre del propio juego para ese texto entero («Iron Ingot» → «Lingote de hierro»), si el usuario no
         lo cambió."""
@@ -266,7 +279,7 @@ class Glosario:
         for termino_bajo, original, patron in sorted(candidatos, key=lambda c: -len(c[0])):
             if termino_bajo in bajo and patron.search(bajo):
                 bajo = patron.sub(lambda m: " " * len(m.group(0)), bajo)  # lo cubierto no cuenta para los cortos
-                if self.ambiguo(original) and not uso_como_nombre(original, texto):
+                if self._sin_confirmar(original, [texto]):
                     continue
                 elegidos[original] = self._fijos.get(original) or self._terminos[original]
                 if len(elegidos) >= maximo:
@@ -286,7 +299,7 @@ class Glosario:
             if bajo in bloque and patron.search(bloque):
                 # Lo que cubre un término largo no cuenta para uno corto: «Wither» dentro de «Wither Skeleton»
                 bloque = patron.sub(lambda m: " " * len(m.group(0)), bloque)
-                if self.ambiguo(original) and not any(uso_como_nombre(original, t) for t in lista):
+                if self._sin_confirmar(original, lista):
                     continue
                 elegidos[original] = self._fijos.get(original) or self._terminos[original]
                 if len(elegidos) >= maximo:
