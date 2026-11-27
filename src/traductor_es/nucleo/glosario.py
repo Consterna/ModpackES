@@ -248,12 +248,21 @@ class Glosario:
 
         Un término ambiguo por prosa (ver `ambiguo`) solo se ofrece si algún texto lo usa como nombre. Uno de
         `HOMONIMOS_DEL_JUEGO` (como «Chicken»: ver docs/calidad.md) es más estricto a propósito: solo se ofrece si
-        algún texto es exactamente esa palabra, porque un nombre en estilo título («Chicken Nugget») no dice cuál
-        de los dos sentidos del juego es.
+        todos los textos que lo tienen son exactamente esa palabra, porque un nombre en estilo título («Chicken
+        Nugget») no dice cuál de los dos sentidos del juego es. Hace falta que sean *todos* y no *alguno*: si un
+        lote trae «Chicken» suelto junto con «Chicken Nugget», ofrecer la pista solo porque el primero es la
+        palabra sola la filtraría igual al segundo, que comparte el mismo lote y la misma pista (`relevantes` da
+        un único diccionario para todo el lote). Lo del usuario (`fijar`) manda siempre, sin este filtro.
         """
+        if original in self._fijos:
+            return False
         if original.casefold() in HOMONIMOS_DEL_JUEGO:
             esperado = original.casefold()
-            return not any(sin_formato(t).strip(" .:!?¡¿\"'").casefold() == esperado for t in textos)
+            patron = patron_de_termino(esperado, re.IGNORECASE)
+            limpios = [sin_formato(t) for t in textos]
+            return any(
+                limpio.strip(" .:!?¡¿\"'").casefold() != esperado and patron.search(limpio) for limpio in limpios
+            )
         return self.ambiguo(original) and not any(uso_como_nombre(original, t) for t in textos)
 
     def oficial(self, texto: str) -> str | None:

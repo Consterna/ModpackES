@@ -101,6 +101,25 @@ def test_key_es_otro_homonimo_del_juego() -> None:
     assert g.relevantes(["Key"]) == {"Key": "Llave"}  # sola, sigue siendo el objeto
 
 
+def test_un_homonimo_no_se_filtra_a_todo_el_lote_por_otro_texto_suelto() -> None:
+    """Si un lote trae «Chicken» suelto junto con «Chicken Nugget», `relevantes` da un único diccionario para todo
+    el lote: ofrecer la pista solo porque «Chicken» es la palabra sola filtraría igual al Nugget, que comparte la
+    misma pista. Hallado en la revisión del PR #56 (Codex)."""
+    g = Glosario()
+    g.agregar_pares({"entidad": "Chicken"}, {"entidad": "Gallina"}, fuente="minecraft", oficial=True)
+    assert "Chicken" not in g.relevantes(["Chicken", "Chicken Nugget"])
+    assert g.relevantes(["Chicken", "Ground Beef"]) == {"Chicken": "Gallina"}  # sin otro texto que lo contradiga
+
+
+def test_un_homonimo_fijado_por_el_usuario_manda_siempre() -> None:
+    """Lo del usuario (`fijar`) manda incluso sobre `HOMONIMOS_DEL_JUEGO`: si decidió que «Chicken» es siempre
+    «Pollo», no hay dos sentidos que desambiguar. Hallado en la revisión del PR #56 (Codex)."""
+    g = Glosario()
+    g.agregar_pares({"entidad": "Chicken"}, {"entidad": "Gallina"}, fuente="minecraft", oficial=True)
+    g.fijar({"Chicken": "Pollo"})
+    assert g.relevantes(["Chicken Nugget"]) == {"Chicken": "Pollo"}
+
+
 def test_no_se_usan_las_traducciones_a_medias_de_un_mod() -> None:
     g = _glosario()
     g.agregar_pares(
