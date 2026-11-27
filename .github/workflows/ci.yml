@@ -91,6 +91,9 @@ jobs:
             gradle-dists-${{ hashFiles('mod-runtime/*/gradle/wrapper/gradle-wrapper.properties') }}-
             gradle-dists-
 
+      - name: Validar los gradle-wrapper.jar contra las sumas publicadas por Gradle
+        uses: gradle/actions/wrapper-validation@748248ddd2a24f49513d8f472f81c3a07d4d50e1  # v4.4.4
+
       - name: Compilar los mods de apoyo (ModpackES Runtime) con sus pruebas
         run: uv run python scripts/construir_mod.py
 
