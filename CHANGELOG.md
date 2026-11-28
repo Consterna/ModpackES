@@ -6,6 +6,8 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
 
 ## [Sin publicar]
 
+## [2.3.2] - 2026-11-28
+
 ### Corregido
 
 - **El glosario ya no entra en rutas, ids ni comandos.** El arreglo automático de los términos que el modelo dejó en
@@ -30,6 +32,15 @@ Todos los cambios importantes de ModpackES quedan en este archivo. El formato si
   como si fuera una frase: `/trigger as_help` salía `/trigger como_ayuda`. Visto también en un libro con una ruta
   de configuración (`liquified_experience.preferred_fluid`) y en una misión con un id de ítem (`barcode_reader`)
   del corpus de auditoría.
+
+### Nota
+
+- **Cierra el ciclo de estabilización** del 26 de noviembre: los tres fallos de proceso que había dejado la
+  retraducción de Farming Crossing 4 ya están corregidos y verificados (`scripts/verificar.py`, la puerta de
+  calidad, `foto_corpus.py` sobre el corpus de auditoría y una hoja de revisión humana nueva con 95 textos, 0
+  «Leve» y 0 «Grave»). Ver [docs/calidad.md](docs/calidad.md). A partir de acá, ninguna fuente, loader ni función
+  nueva hasta que el usuario pida reabrir ese trabajo; si aparece un fallo en algo que ya existe, se corrige de
+  inmediato.
 
 ## [2.3.1] - 2026-11-23
 
@@ -368,7 +379,8 @@ Farming Crossing 4 (1.20.1, Forge).
 
 - Script y ventana mínimos para FTB Quests, Patchouli, Citadel y lang de mods en una sola instancia.
 
-[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.3.1...HEAD
+[Sin publicar]: https://github.com/Consterna/ModpackES/compare/v2.3.2...HEAD
+[2.3.2]: https://github.com/Consterna/ModpackES/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/Consterna/ModpackES/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Consterna/ModpackES/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/Consterna/ModpackES/compare/v2.1.1...v2.2.0
