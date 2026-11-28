@@ -699,6 +699,24 @@ Si se quiere perseguir esto más adelante, conviene un perfilador por muestreo (
 el costo por llamada de `cProfile` infla mucho las funciones con muchísimas llamadas chicas (como el analizador
 de `json5`) y puede señalar la causa equivocada.
 
+## 28 de noviembre de 2026 · cierre del ciclo de estabilización: revisión humana
+
+Última condición de cierre del ciclo iniciado el 26 de noviembre: una hoja de revisión humana nueva
+(`scripts/hoja_revision.py`), centrada en los arreglos de esta vuelta.
+
+**Muestra:** 95 textos — 80 al azar de los bancos de interfaz y misiones, más 15 casos reales a propósito: 8 de
+«Chicken» (incluidos los dos que siguen con «Gallina» a propósito, «Chicken Egg» y «Chicken Nest», para que el
+usuario los juzgue), 6 de «Key» (de `controlling`, `mobz` y la memoria de Farming Crossing 4) y el párrafo del
+libro de Neo Vitae con la ruta de configuración (`liquified_experience.preferred_fluid`). Medida con Gemini
+3.8 Flash, perfil equilibrado, con revisión automática (US$ 0,021).
+
+**Resultado: 95 de 95 «Bien», 0 «Leve», 0 «Grave».** Cumple de sobra el criterio de parada (0 «Grave») que ya
+usó el plan de calidad máxima. Con esto, los tres fallos de proceso que había dejado la retraducción de Farming
+Crossing 4 el 23 de noviembre quedan corregidos y verificados: con los bancos (`puerta_calidad.py`), con el
+corpus de auditoría completo (`foto_corpus.py`, 14 packs representativos) y ahora con una persona.
+
+El ciclo de estabilización queda cerrado con la versión **2.3.2**.
+
 ## Cómo repetirlo
 
 ```
